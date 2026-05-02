@@ -1,0 +1,14 @@
+[package]
+name = "obsdn-sdk-codegen"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Out-of-band codegen for obsdn-sdk wire types. Not part of the published crate."
+
+[[bin]]
+name = "codegen-rust"
+path = "src/main.rs"
+
+[dependencies]
+prost-build = "0.13"
+pbjson-build = "0.7"
