@@ -1,0 +1,20 @@
+{
+  "mktId": "BTC-PERP",
+  "sd": "ORDER_SIDE_BUY",
+  "ot": "ORDER_TYPE_STOP",
+  "sz": 0.5,
+  "px": 65000.5,
+  "tif": "TIME_IN_FORCE_GTT",
+  "po": true,
+  "ro": true,
+  "stp": "SELF_TRADE_PREVENTION_CANCEL_BOTH",
+  "clOid": "cli-order-001",
+  "nonce": "1714000000000000000",
+  "sig": "0xabc123",
+  "stopT": "STOP_TYPE_STOP_LOSS",
+  "stopPx": 64000.25,
+  "stopPxType": "STOP_PRICE_TYPE_MARK",
+  "expireTs": "1714003600000000000",
+  "schedTs": "1714000000000000000",
+  "await": true
+}

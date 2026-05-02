@@ -1,0 +1,69 @@
+[package]
+name = "obsdn-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK for the OBSDN perpetual exchange"
+license = "MIT OR Apache-2.0"
+publish = false
+# MSRV: pinned to current stable. Several transitive crates (getrandom,
+# time-core, etc.) require Cargo's edition2024 feature, stabilized in 1.85.
+# We pin higher to use the toolchain we actually test against.
+rust-version = "1.95"
+
+[dependencies]
+prost = "0.13"
+pbjson = "0.7"
+pbjson-types = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3"
+thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tracing = "0.1"
+
+# Phase 2: REST + HMAC.
+# rustls-only, no openssl. gzip for compressed responses. json for serde body
+# helpers (we still hand-roll body bytes when signing, but Response::json is
+# convenient for unauthed paths).
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "http2"] }
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+url = "2"
+percent-encoding = "2"
+bytes = "1"
+async-trait = "0.1"
+zeroize = { version = "1", features = ["derive"] }
+
+# Phase 4: EIP-712 signing.
+# alloy-sol-types generates the ABI-encoded struct hash from Solidity-style
+# `sol!` declarations — byte-equal to go-ethereum apitypes.HashStruct for the
+# templates we mirror.
+# alloy-signer-local provides the secp256k1 signing path (k256 under the hood).
+# Individual sub-crate pins keep the dep surface narrow vs. the umbrella
+# `alloy` crate.
+alloy-primitives = { version = "0.8", features = ["serde"] }
+alloy-sol-types = "0.8"
+alloy-signer = "0.8"
+alloy-signer-local = "0.8"
+hex = "0.4"
+
+# Phase 5: WebSocket thin client.
+# rustls-tls-native-roots matches the rest of the crate (no openssl). We turn
+# off defaults so we don't accidentally pull native-tls; `connect` re-enables
+# `connect_async` which is otherwise gated.
+tokio-tungstenite = { version = "0.23", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+[dev-dependencies]
+# wiremock provides an in-process HTTP mock to assert header/body shape.
+wiremock = "0.6"
+# Phase 7 examples deps — keep minimal so `cargo build --examples` stays fast.
+anyhow = "1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+
+[build-dependencies]
+prost-build = "0.13"
+pbjson-build = "0.7"

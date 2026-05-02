@@ -1,0 +1,66 @@
+//! Per-environment EIP-712 domain values.
+//!
+//! Mirrors `pkg/config/chain.go::Domain` + the staging/local config in
+//! `configs/shared/chain/base_sepolia.yaml`. Production currently has no
+//! deployed contract — `Env::Production` returns a zero-contract domain
+//! that will fail verification by design (matches the placeholder in
+//! `configs/shared/chain/production.yaml`).
+
+use alloy_primitives::{address, Address};
+use alloy_sol_types::{eip712_domain, Eip712Domain};
+
+use crate::env::Env;
+
+/// Standard SDK domain — every template family in this crate uses this same
+/// value. Go uses one `config.Domain` for all signers (orders, transfers,
+/// withdrawals, vaults, registers); we keep that 1:1.
+///
+/// **Staging / Local** point at base-sepolia. **Production** is a stub
+/// matching the unfilled config in `configs/shared/chain/production.yaml`
+/// — update this when the public mainnet contract lands.
+pub fn sdk_domain(env: &Env) -> Eip712Domain {
+    match env {
+        Env::Local | Env::Staging => staging_domain(),
+        Env::Production => production_domain(),
+        Env::Custom { .. } => staging_domain(),
+    }
+}
+
+/// Backwards-compatible alias for callers that thought of the domain as
+/// "the order domain" — every template currently shares the same domain.
+pub fn order_domain(env: &Env) -> Eip712Domain {
+    sdk_domain(env)
+}
+
+/// Build a fully-custom domain. Useful when targeting a non-public chain or
+/// a forked staging contract.
+pub fn custom_domain(name: &str, version: &str, chain_id: u64, contract: Address) -> Eip712Domain {
+    eip712_domain! {
+        name: name.to_string(),
+        version: version.to_string(),
+        chain_id: chain_id,
+        verifying_contract: contract,
+    }
+}
+
+/// Canonical staging / base-sepolia domain.
+fn staging_domain() -> Eip712Domain {
+    eip712_domain! {
+        name: "Obsidian",
+        version: "1",
+        chain_id: 84532u64,
+        verifying_contract: address!("988Af38b04a377322aB9A5214F045938348dB155"),
+    }
+}
+
+/// Production placeholder — matches the unfilled config. Verification will
+/// fail against a real deployed contract; rebuild this when production
+/// launches.
+fn production_domain() -> Eip712Domain {
+    eip712_domain! {
+        name: "Obsidian",
+        version: "1",
+        chain_id: 0u64,
+        verifying_contract: Address::ZERO,
+    }
+}

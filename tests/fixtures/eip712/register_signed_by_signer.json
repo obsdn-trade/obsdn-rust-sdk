@@ -1,0 +1,18 @@
+{
+  "template": "DelegatedSigner",
+  "domain": {
+    "name": "Obsidian",
+    "version": "1",
+    "chain_id": "84532",
+    "verifying_contract": "0x988Af38b04a377322aB9A5214F045938348dB155"
+  },
+  "input": {
+    "account": "0x1111111111111111111111111111111111111111"
+  },
+  "domain_separator": "0xc669577be7637dbfe0b38ef377d5aaa20114222add3192186ec5bcbc2787f136",
+  "struct_hash": "0xe6fce111c38192627150d9703f29a594f08893e95f89fbe846445f3795fb71ed",
+  "digest": "0x75804226230ee5eb8b353bac7102756cee7a73ecbda91900b65ef907b8e42091",
+  "private_key": "0x0101010101010101010101010101010101010101010101010101010101010101",
+  "signer_address": "0x1a642f0E3c3aF545E7AcBD38b07251B3990914F1",
+  "signature": "0x55bd407c791a0896eb429aa040a0d3bf9143cb56ff9fe4b152149554dfa4ae5323f723735dd9f5ee3d32e3850055a0cdcb64130fd6996c2057814a40a707e01f1c"
+}
