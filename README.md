@@ -8,14 +8,24 @@ Async Rust SDK for the [OBSDN](https://obsdn.trade) perpetual exchange.
 
 ## Status
 
-Phases 1–6 implemented. Phase 7 (this) wires examples + ergonomics + docs. Phase 8 (CI) follows. Crate is `publish = false` — used as a path dep from the OBSDN monorepo.
+`publish = false` — not on crates.io. Intended to be imported / forked by integrating market-makers.
 
-## Install (path dependency)
+## Install (git dependency)
 
 ```toml
 [dependencies]
-obsdn-sdk = { path = "../path/to/sdk/rust" }
+obsdn-sdk = { git = "https://github.com/obsdn-trade/obsdn-rust-sdk", branch = "master" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+Or as a git submodule:
+
+```bash
+git submodule add git@github.com:obsdn-trade/obsdn-rust-sdk.git vendor/obsdn-sdk
+```
+
+```toml
+obsdn-sdk = { path = "vendor/obsdn-sdk" }
 ```
 
 ## Environment variables
@@ -85,13 +95,14 @@ All under `examples/`. Run with `cargo run --example NAME`.
 ## Layout
 
 ```
-sdk/rust/
-├── Cargo.toml          # Crate manifest (path dep on api/proto)
+.
+├── Cargo.toml          # Crate manifest
 ├── Cargo.lock          # Committed for reproducibility
-├── build.rs            # buf export → prost+pbjson codegen
 ├── README.md           # ← you are here
 ├── examples/           # Runnable cargo examples (see above)
-├── scripts/            # Go-side EIP-712 fixture exporter
+├── scripts/
+│   ├── codegen-rust/   # Out-of-band proto codegen (see "Codegen" below)
+│   └── ...             # Go-side EIP-712 fixture exporter
 ├── src/
 │   ├── lib.rs
 │   ├── builder.rs      # Client + ClientBuilder
@@ -101,7 +112,7 @@ sdk/rust/
 │   ├── market_cache.rs # Lazy market-index cache (TTL 60s)
 │   ├── rest/           # REST handles + helpers + auth layer
 │   ├── sign/           # EIP-712 templates + LocalSigner
-│   ├── types/          # Generated wire types
+│   ├── types/          # Generated wire types (committed under generated/)
 │   └── ws/             # Managed WS, typed views, GSN tracking
 └── tests/              # Codegen smoke, REST contract, EIP-712 golden, WS chaos
 ```
@@ -109,20 +120,32 @@ sdk/rust/
 ## Build / test
 
 ```bash
-make sdk.rust.check     # fmt + clippy -D warnings + test (the CI gate)
-cargo doc --no-deps     # browse the rendered docs
-cargo build --examples  # ensure all examples still compile
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo doc --no-deps
 ```
 
-`buf` must be installed at build time (codegen runs on each `cargo build`). Run `make codegen` once on a fresh clone to populate the buf cache.
+`cargo build` does NOT require `buf` or `protoc` — wire types live committed under `src/types/generated/`.
+
+## Codegen
+
+Wire types are regenerated via the codegen binary at `scripts/codegen-rust/`. Point it at a checkout of the OBSDN proto definitions:
+
+```bash
+cargo run --release --manifest-path scripts/codegen-rust/Cargo.toml -- \
+  --proto-dir   <path-to-api/proto> \
+  --out-dir     src/types/generated
+```
+
+`buf` must be on PATH for this. Commit the regenerated files; CI fails if `git diff --exit-code src/types/generated/` is dirty.
 
 ## Documentation
 
 - Architecture overview (ASCII diagrams): [`docs/architecture.md`](docs/architecture.md).
-- API reference: `cargo doc --open` after a successful build. Internal-only proto fields/endpoints are rendered as `#[doc(hidden)]` and don't appear in the generated docs but remain reachable.
-- Implementation plan + design notes: `plans/260424-0946-rust-sdk/` (gitignored — internal).
-- WebSocket protocol: `docs/api/ws-integration.md`, `docs/api/websocket-channels.md`.
+- API reference: `cargo doc --open`. Internal-only proto fields are tagged `#[doc(hidden)]` so they don't render but stay reachable.
+- WebSocket protocol: see the OBSDN public docs site.
 
 ## License
 
-Dual-licensed under MIT or Apache 2.0, matching the parent repo.
+Dual-licensed under MIT or Apache 2.0.
