@@ -3,10 +3,21 @@
 /// Controls database routing, authentication, and access.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct Endpoint {
-    /// requires_write_database routes to write DB instead of read replica.
-    /// Default: false (uses read replica for queries).
+    /// write_operator marks the RPC as a write operation. Today it routes the
+    /// request to the write database pool via UnaryGormTx (read RPCs leave
+    /// ctx untouched and fall through to the read pool). The read pool's
+    /// safety net is independent: its connections are opened with
+    /// `default_transaction_read_only=on` as a session GUC, so every
+    /// transaction on that pool starts with read-only as the default and
+    /// any unrouted INSERT/UPDATE/DELETE fails with SQLSTATE 25006. The
+    /// flag will also gate any future API-tier split (e.g. a separate
+    /// write-side deployment) — one annotation, both axes.
+    /// Default: false (read-only RPC; served from read pool).
+    ///
+    /// Field number 1 retained from the legacy `requires_write_database` name
+    /// for wire compatibility with any cached descriptors.
     #[prost(bool, tag = "1")]
-    pub requires_write_database: bool,
+    pub write_operator: bool,
     /// user_authenticated requires API key + signature authentication.
     /// Default: false (public endpoint).
     #[prost(bool, tag = "2")]
@@ -42,6 +53,76 @@ pub struct WhitelistSignupResponse {
     /// True if a new entry was created; false if the wallet was already on the list.
     #[prost(bool, tag = "1")]
     pub created: bool,
+}
+/// XUser mirrors the X (Twitter) v2 user object the BFF forwards verbatim.
+/// Field names follow the BFF's camelCase JSON contract; protoc maps them to
+/// snake_case Go fields automatically.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct XUser {
+    /// Numeric Twitter user ID. Immutable across handle renames; primary
+    /// dedup key.
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    /// Current handle (without leading '@'). Lowercased before storage.
+    #[prost(string, tag = "2")]
+    pub username: ::prost::alloc::string::String,
+    /// Display name (free-form; unicode allowed).
+    #[prost(string, tag = "3")]
+    pub name: ::prost::alloc::string::String,
+    /// Absolute URL to the user's profile image.
+    #[prost(string, tag = "4")]
+    pub profile_image_url: ::prost::alloc::string::String,
+    /// True iff X reports the account as verified (any tier).
+    #[prost(bool, tag = "5")]
+    pub verified: bool,
+    /// Verification tier — "blue", "business", "government", or empty.
+    #[prost(string, tag = "6")]
+    pub verified_type: ::prost::alloc::string::String,
+    /// Snapshot of public metrics at signup time. Optional; missing fields
+    /// default to zero.
+    #[prost(message, optional, tag = "7")]
+    pub public_metrics: ::core::option::Option<XPublicMetrics>,
+}
+/// XPublicMetrics captures the counts X exposes on the user object.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct XPublicMetrics {
+    #[prost(int64, tag = "1")]
+    pub followers_count: i64,
+    #[prost(int64, tag = "2")]
+    pub following_count: i64,
+    #[prost(int64, tag = "3")]
+    pub tweet_count: i64,
+    #[prost(int64, tag = "4")]
+    pub listed_count: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WaitlistXSignupRequest {
+    /// Required. The X user record forwarded by the BFF.
+    #[prost(message, optional, tag = "1")]
+    pub x_user: ::core::option::Option<XUser>,
+    /// Free-form attribution tag (e.g. "www_waitlist", "discord"). Optional.
+    #[prost(string, tag = "2")]
+    pub source: ::prost::alloc::string::String,
+    /// Best-effort referral attribution. Stored verbatim; not validated
+    /// against referral_codes here — ops can resolve later.
+    #[prost(string, tag = "3")]
+    pub referral_code: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct WaitlistXSignupResponse {
+    /// "joined" — present on every successful response. Reserved for future
+    /// states (e.g. "rejected") so callers can pattern-match instead of
+    /// inferring from HTTP status alone.
+    #[prost(string, tag = "1")]
+    pub status: ::prost::alloc::string::String,
+    /// 1-indexed waitlist position. For repeat signups this is the original
+    /// position computed off the row's id, so the user sees a stable rank.
+    #[prost(int64, tag = "2")]
+    pub position: i64,
+    /// RFC 3339 timestamp of the FIRST signup (created_at on the surviving
+    /// row). Stable across repeat calls.
+    #[prost(string, tag = "3")]
+    pub joined_at: ::prost::alloc::string::String,
 }
 /// Order represents a trading order on OBSDN.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1034,14 +1115,16 @@ pub struct CancelOrdersRequest {
 /// CancelOrdersResponse returns results for batch cancellation.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CancelOrdersResponse {
-    /// Order that were cancel requested. Not valid orders (done, already canceled
-    /// requested, not found) will be ignored
+    /// Orders for which a cancel request was submitted. Identifiers that did not
+    /// resolve to a cancelable order (already filled, already cancel-requested,
+    /// or not found) are reported in not_opened or already_cancel_req instead.
     #[prost(message, repeated, tag = "1")]
     pub cancel_req: ::prost::alloc::vec::Vec<CanceledOrder>,
-    /// Order that are not opened (already done or not found)
+    /// Orders that could not be canceled because they were not found, already
+    /// filled, or already canceled.
     #[prost(message, repeated, tag = "2")]
     pub not_opened: ::prost::alloc::vec::Vec<CanceledOrder>,
-    /// Order that were already canceled requested before this request
+    /// Orders that already had a cancel request in flight before this call.
     #[prost(message, repeated, tag = "3")]
     pub already_cancel_req: ::prost::alloc::vec::Vec<CanceledOrder>,
 }
@@ -1706,6 +1789,10 @@ pub struct Market {
     /// URL for the market icon (e.g., "<https://assets.obsdn.trade/images/icons/btc.png">).
     #[prost(string, tag = "28")]
     pub icon_url: ::prost::alloc::string::String,
+    /// Market trading mode: "trading", "post_only", "wind_down", "halted", "delisted".
+    /// FE should use this instead of enabled/post_only booleans to determine allowed actions.
+    #[prost(string, tag = "29")]
+    pub mode: ::prost::alloc::string::String,
 }
 /// GetOrderBookRequest is the request for GetOrderBook.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2629,6 +2716,131 @@ pub struct GetSubaccountPortfolioHistoryResponse {
     /// Historical portfolio snapshots.
     #[prost(message, repeated, tag = "1")]
     pub data: ::prost::alloc::vec::Vec<PortfolioSnapshot>,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetReferralCodeRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetReferralCodeResponse {
+    /// The user's referral code (uppercase). Empty if not yet set.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+    /// Unix seconds when the code was minted. Zero if not set.
+    #[prost(int64, tag = "2")]
+    pub created_at: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetReferralCodeRequest {
+    /// Desired referral code: 6-16 chars (letters, digits, hyphens, underscores).
+    /// Case-insensitive (server uppercases). Rejected if already taken or banned word.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetReferralCodeResponse {
+    /// The code that was set (uppercase).
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetReferralCodeStatusRequest {
+    /// Code to check. Case-insensitive.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetReferralCodeStatusResponse {
+    /// True if the code exists.
+    #[prost(bool, tag = "1")]
+    pub exists: bool,
+    /// Masked owner address (e.g. "0x1234...abcd"). Empty if exists=false.
+    #[prost(string, tag = "2")]
+    pub referrer: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetReferrerRequest {
+    /// The referral code of the user who referred the caller.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetReferrerResponse {
+    /// Wallet of the referrer.
+    #[prost(string, tag = "1")]
+    pub referrer: ::prost::alloc::string::String,
+    /// The code that was used.
+    #[prost(string, tag = "2")]
+    pub code: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetReferrerRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetReferrerResponse {
+    /// The referrer's address. Empty if the caller has no referrer.
+    #[prost(string, tag = "1")]
+    pub referrer: ::prost::alloc::string::String,
+    /// The code used at binding time.
+    #[prost(string, tag = "2")]
+    pub code: ::prost::alloc::string::String,
+    /// Unix seconds when the binding happened. Zero if unbound.
+    #[prost(int64, tag = "3")]
+    pub referred_at: i64,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetInviteesRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetInviteesResponse {
+    /// Total number of invitees brought in.
+    #[prost(int64, tag = "1")]
+    pub total_count: i64,
+    /// Total commission earned across all invitees, in USDC (decimal string).
+    #[prost(string, tag = "2")]
+    pub total_commission: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "3")]
+    pub invitees: ::prost::alloc::vec::Vec<Invitee>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Invitee {
+    /// Masked invitee address.
+    #[prost(string, tag = "1")]
+    pub address: ::prost::alloc::string::String,
+    /// Unix seconds when this invitee bound the caller as referrer.
+    #[prost(int64, tag = "2")]
+    pub referred_at: i64,
+    /// Commission earned from this invitee, in USDC (decimal string).
+    #[prost(string, tag = "3")]
+    pub commission: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetReferralLeaderboardRequest {
+    /// Max entries to return. Default 20, clamped to \[1, 100\].
+    #[prost(int32, tag = "1")]
+    pub limit: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetReferralLeaderboardResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub entries: ::prost::alloc::vec::Vec<LeaderboardEntry>,
+    /// Current user's 1-based rank (0 when unauthenticated or not on leaderboard).
+    #[prost(int64, tag = "2")]
+    pub current_user_rank: i64,
+    /// Current user's leaderboard entry (nil when rank is 0).
+    #[prost(message, optional, tag = "3")]
+    pub current_user_entry: ::core::option::Option<LeaderboardEntry>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LeaderboardEntry {
+    /// 1-based rank.
+    #[prost(int32, tag = "1")]
+    pub rank: i32,
+    /// Masked referrer address.
+    #[prost(string, tag = "2")]
+    pub addr: ::prost::alloc::string::String,
+    /// Number of invitees.
+    #[prost(int64, tag = "3")]
+    pub invitee_count: i64,
+    /// Total commission earned, in USDC (decimal string).
+    #[prost(string, tag = "4")]
+    pub tot_comm: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetClientInfoRequest {}
