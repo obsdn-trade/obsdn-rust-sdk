@@ -24,7 +24,7 @@ impl serde::Serialize for ApiKey {
         if self.crt_at != 0 {
             len += 1;
         }
-        if self.exp_at != 0 {
+        if self.exp_ts != 0 {
             len += 1;
         }
         if self.is_ro {
@@ -51,10 +51,10 @@ impl serde::Serialize for ApiKey {
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser.serialize_field("crtAt", ToString::to_string(&self.crt_at).as_str())?;
         }
-        if self.exp_at != 0 {
+        if self.exp_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("expAt", ToString::to_string(&self.exp_at).as_str())?;
+            struct_ser.serialize_field("expTs", ToString::to_string(&self.exp_ts).as_str())?;
         }
         if self.is_ro {
             struct_ser.serialize_field("isRo", &self.is_ro)?;
@@ -78,8 +78,8 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
             "signer",
             "crt_at",
             "crtAt",
-            "exp_at",
-            "expAt",
+            "exp_ts",
+            "expTs",
             "is_ro",
             "isRo",
         ];
@@ -92,7 +92,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
             Sndr,
             Signer,
             CrtAt,
-            ExpAt,
+            ExpTs,
             IsRo,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -121,7 +121,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                             "sndr" => Ok(GeneratedField::Sndr),
                             "signer" => Ok(GeneratedField::Signer),
                             "crtAt" | "crt_at" => Ok(GeneratedField::CrtAt),
-                            "expAt" | "exp_at" => Ok(GeneratedField::ExpAt),
+                            "expTs" | "exp_ts" => Ok(GeneratedField::ExpTs),
                             "isRo" | "is_ro" => Ok(GeneratedField::IsRo),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -148,7 +148,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                 let mut sndr__ = None;
                 let mut signer__ = None;
                 let mut crt_at__ = None;
-                let mut exp_at__ = None;
+                let mut exp_ts__ = None;
                 let mut is_ro__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
@@ -190,11 +190,11 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::ExpAt => {
-                            if exp_at__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("expAt"));
+                        GeneratedField::ExpTs => {
+                            if exp_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("expTs"));
                             }
-                            exp_at__ = 
+                            exp_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -213,7 +213,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                     sndr: sndr__.unwrap_or_default(),
                     signer: signer__.unwrap_or_default(),
                     crt_at: crt_at__.unwrap_or_default(),
-                    exp_at: exp_at__.unwrap_or_default(),
+                    exp_ts: exp_ts__.unwrap_or_default(),
                     is_ro: is_ro__.unwrap_or_default(),
                 })
             }
@@ -4460,18 +4460,18 @@ impl serde::Serialize for FeeTier {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if !self.mk_fee_rt.is_empty() {
+        if !self.mkr_fee_rt.is_empty() {
             len += 1;
         }
-        if !self.tk_fee_rt.is_empty() {
+        if !self.tkr_fee_rt.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.FeeTier", len)?;
-        if !self.mk_fee_rt.is_empty() {
-            struct_ser.serialize_field("mkFeeRt", &self.mk_fee_rt)?;
+        if !self.mkr_fee_rt.is_empty() {
+            struct_ser.serialize_field("mkrFeeRt", &self.mkr_fee_rt)?;
         }
-        if !self.tk_fee_rt.is_empty() {
-            struct_ser.serialize_field("tkFeeRt", &self.tk_fee_rt)?;
+        if !self.tkr_fee_rt.is_empty() {
+            struct_ser.serialize_field("tkrFeeRt", &self.tkr_fee_rt)?;
         }
         struct_ser.end()
     }
@@ -4483,16 +4483,16 @@ impl<'de> serde::Deserialize<'de> for FeeTier {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "mk_fee_rt",
-            "mkFeeRt",
-            "tk_fee_rt",
-            "tkFeeRt",
+            "mkr_fee_rt",
+            "mkrFeeRt",
+            "tkr_fee_rt",
+            "tkrFeeRt",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            MkFeeRt,
-            TkFeeRt,
+            MkrFeeRt,
+            TkrFeeRt,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4514,8 +4514,8 @@ impl<'de> serde::Deserialize<'de> for FeeTier {
                         E: serde::de::Error,
                     {
                         match value {
-                            "mkFeeRt" | "mk_fee_rt" => Ok(GeneratedField::MkFeeRt),
-                            "tkFeeRt" | "tk_fee_rt" => Ok(GeneratedField::TkFeeRt),
+                            "mkrFeeRt" | "mkr_fee_rt" => Ok(GeneratedField::MkrFeeRt),
+                            "tkrFeeRt" | "tkr_fee_rt" => Ok(GeneratedField::TkrFeeRt),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4535,27 +4535,27 @@ impl<'de> serde::Deserialize<'de> for FeeTier {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut mk_fee_rt__ = None;
-                let mut tk_fee_rt__ = None;
+                let mut mkr_fee_rt__ = None;
+                let mut tkr_fee_rt__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::MkFeeRt => {
-                            if mk_fee_rt__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("mkFeeRt"));
+                        GeneratedField::MkrFeeRt => {
+                            if mkr_fee_rt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("mkrFeeRt"));
                             }
-                            mk_fee_rt__ = Some(map_.next_value()?);
+                            mkr_fee_rt__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::TkFeeRt => {
-                            if tk_fee_rt__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("tkFeeRt"));
+                        GeneratedField::TkrFeeRt => {
+                            if tkr_fee_rt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tkrFeeRt"));
                             }
-                            tk_fee_rt__ = Some(map_.next_value()?);
+                            tkr_fee_rt__ = Some(map_.next_value()?);
                         }
                     }
                 }
                 Ok(FeeTier {
-                    mk_fee_rt: mk_fee_rt__.unwrap_or_default(),
-                    tk_fee_rt: tk_fee_rt__.unwrap_or_default(),
+                    mkr_fee_rt: mkr_fee_rt__.unwrap_or_default(),
+                    tkr_fee_rt: tkr_fee_rt__.unwrap_or_default(),
                 })
             }
         }
@@ -4737,17 +4737,17 @@ impl serde::Serialize for FundingRateItem {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.time != 0 {
+        if self.ts != 0 {
             len += 1;
         }
         if !self.rate.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.FundingRateItem", len)?;
-        if self.time != 0 {
+        if self.ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("time", ToString::to_string(&self.time).as_str())?;
+            struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
         if !self.rate.is_empty() {
             struct_ser.serialize_field("rate", &self.rate)?;
@@ -4762,13 +4762,13 @@ impl<'de> serde::Deserialize<'de> for FundingRateItem {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "time",
+            "ts",
             "rate",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Time,
+            Ts,
             Rate,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -4791,7 +4791,7 @@ impl<'de> serde::Deserialize<'de> for FundingRateItem {
                         E: serde::de::Error,
                     {
                         match value {
-                            "time" => Ok(GeneratedField::Time),
+                            "ts" => Ok(GeneratedField::Ts),
                             "rate" => Ok(GeneratedField::Rate),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -4812,15 +4812,15 @@ impl<'de> serde::Deserialize<'de> for FundingRateItem {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut time__ = None;
+                let mut ts__ = None;
                 let mut rate__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Time => {
-                            if time__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("time"));
+                        GeneratedField::Ts => {
+                            if ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ts"));
                             }
-                            time__ = 
+                            ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -4833,7 +4833,7 @@ impl<'de> serde::Deserialize<'de> for FundingRateItem {
                     }
                 }
                 Ok(FundingRateItem {
-                    time: time__.unwrap_or_default(),
+                    ts: ts__.unwrap_or_default(),
                     rate: rate__.unwrap_or_default(),
                 })
             }
@@ -7242,10 +7242,10 @@ impl serde::Serialize for GetFundingRateHistoryRequest {
         if !self.mkt_id.is_empty() {
             len += 1;
         }
-        if self.from != 0 {
+        if self.start_ts != 0 {
             len += 1;
         }
-        if self.to != 0 {
+        if self.end_ts != 0 {
             len += 1;
         }
         if self.lmt != 0 {
@@ -7258,15 +7258,15 @@ impl serde::Serialize for GetFundingRateHistoryRequest {
         if !self.mkt_id.is_empty() {
             struct_ser.serialize_field("mktId", &self.mkt_id)?;
         }
-        if self.from != 0 {
+        if self.start_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("from", ToString::to_string(&self.from).as_str())?;
+            struct_ser.serialize_field("startTs", ToString::to_string(&self.start_ts).as_str())?;
         }
-        if self.to != 0 {
+        if self.end_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("to", ToString::to_string(&self.to).as_str())?;
+            struct_ser.serialize_field("endTs", ToString::to_string(&self.end_ts).as_str())?;
         }
         if self.lmt != 0 {
             #[allow(clippy::needless_borrow)]
@@ -7290,8 +7290,10 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
         const FIELDS: &[&str] = &[
             "mkt_id",
             "mktId",
-            "from",
-            "to",
+            "start_ts",
+            "startTs",
+            "end_ts",
+            "endTs",
             "lmt",
             "pg",
         ];
@@ -7299,8 +7301,8 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             MktId,
-            From,
-            To,
+            StartTs,
+            EndTs,
             Lmt,
             Pg,
         }
@@ -7325,8 +7327,8 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
                     {
                         match value {
                             "mktId" | "mkt_id" => Ok(GeneratedField::MktId),
-                            "from" => Ok(GeneratedField::From),
-                            "to" => Ok(GeneratedField::To),
+                            "startTs" | "start_ts" => Ok(GeneratedField::StartTs),
+                            "endTs" | "end_ts" => Ok(GeneratedField::EndTs),
                             "lmt" => Ok(GeneratedField::Lmt),
                             "pg" => Ok(GeneratedField::Pg),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -7349,8 +7351,8 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut mkt_id__ = None;
-                let mut from__ = None;
-                let mut to__ = None;
+                let mut start_ts__ = None;
+                let mut end_ts__ = None;
                 let mut lmt__ = None;
                 let mut pg__ = None;
                 while let Some(k) = map_.next_key()? {
@@ -7361,19 +7363,19 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
                             }
                             mkt_id__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::From => {
-                            if from__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("from"));
+                        GeneratedField::StartTs => {
+                            if start_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("startTs"));
                             }
-                            from__ = 
+                            start_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::To => {
-                            if to__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("to"));
+                        GeneratedField::EndTs => {
+                            if end_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("endTs"));
                             }
-                            to__ = 
+                            end_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -7397,8 +7399,8 @@ impl<'de> serde::Deserialize<'de> for GetFundingRateHistoryRequest {
                 }
                 Ok(GetFundingRateHistoryRequest {
                     mkt_id: mkt_id__.unwrap_or_default(),
-                    from: from__.unwrap_or_default(),
-                    to: to__.unwrap_or_default(),
+                    start_ts: start_ts__.unwrap_or_default(),
+                    end_ts: end_ts__.unwrap_or_default(),
                     lmt: lmt__.unwrap_or_default(),
                     pg: pg__.unwrap_or_default(),
                 })
@@ -7612,23 +7614,23 @@ impl serde::Serialize for GetInviteesResponse {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.total_count != 0 {
+        if self.tot != 0 {
             len += 1;
         }
-        if !self.total_commission.is_empty() {
+        if !self.tot_comm.is_empty() {
             len += 1;
         }
         if !self.invitees.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetInviteesResponse", len)?;
-        if self.total_count != 0 {
+        if self.tot != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("totalCount", ToString::to_string(&self.total_count).as_str())?;
+            struct_ser.serialize_field("tot", ToString::to_string(&self.tot).as_str())?;
         }
-        if !self.total_commission.is_empty() {
-            struct_ser.serialize_field("totalCommission", &self.total_commission)?;
+        if !self.tot_comm.is_empty() {
+            struct_ser.serialize_field("totComm", &self.tot_comm)?;
         }
         if !self.invitees.is_empty() {
             struct_ser.serialize_field("invitees", &self.invitees)?;
@@ -7643,17 +7645,16 @@ impl<'de> serde::Deserialize<'de> for GetInviteesResponse {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "total_count",
-            "totalCount",
-            "total_commission",
-            "totalCommission",
+            "tot",
+            "tot_comm",
+            "totComm",
             "invitees",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            TotalCount,
-            TotalCommission,
+            Tot,
+            TotComm,
             Invitees,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -7676,8 +7677,8 @@ impl<'de> serde::Deserialize<'de> for GetInviteesResponse {
                         E: serde::de::Error,
                     {
                         match value {
-                            "totalCount" | "total_count" => Ok(GeneratedField::TotalCount),
-                            "totalCommission" | "total_commission" => Ok(GeneratedField::TotalCommission),
+                            "tot" => Ok(GeneratedField::Tot),
+                            "totComm" | "tot_comm" => Ok(GeneratedField::TotComm),
                             "invitees" => Ok(GeneratedField::Invitees),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -7698,24 +7699,24 @@ impl<'de> serde::Deserialize<'de> for GetInviteesResponse {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut total_count__ = None;
-                let mut total_commission__ = None;
+                let mut tot__ = None;
+                let mut tot_comm__ = None;
                 let mut invitees__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::TotalCount => {
-                            if total_count__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("totalCount"));
+                        GeneratedField::Tot => {
+                            if tot__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tot"));
                             }
-                            total_count__ = 
+                            tot__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::TotalCommission => {
-                            if total_commission__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("totalCommission"));
+                        GeneratedField::TotComm => {
+                            if tot_comm__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("totComm"));
                             }
-                            total_commission__ = Some(map_.next_value()?);
+                            tot_comm__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Invitees => {
                             if invitees__.is_some() {
@@ -7726,8 +7727,8 @@ impl<'de> serde::Deserialize<'de> for GetInviteesResponse {
                     }
                 }
                 Ok(GetInviteesResponse {
-                    total_count: total_count__.unwrap_or_default(),
-                    total_commission: total_commission__.unwrap_or_default(),
+                    tot: tot__.unwrap_or_default(),
+                    tot_comm: tot_comm__.unwrap_or_default(),
                     invitees: invitees__.unwrap_or_default(),
                 })
             }
@@ -7937,10 +7938,10 @@ impl serde::Serialize for GetMarketCandlesRequest {
         if self.intv != 0 {
             len += 1;
         }
-        if self.from != 0 {
+        if self.start_ts != 0 {
             len += 1;
         }
-        if self.to != 0 {
+        if self.end_ts != 0 {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetMarketCandlesRequest", len)?;
@@ -7952,15 +7953,15 @@ impl serde::Serialize for GetMarketCandlesRequest {
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser.serialize_field("intv", ToString::to_string(&self.intv).as_str())?;
         }
-        if self.from != 0 {
+        if self.start_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("from", ToString::to_string(&self.from).as_str())?;
+            struct_ser.serialize_field("startTs", ToString::to_string(&self.start_ts).as_str())?;
         }
-        if self.to != 0 {
+        if self.end_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("to", ToString::to_string(&self.to).as_str())?;
+            struct_ser.serialize_field("endTs", ToString::to_string(&self.end_ts).as_str())?;
         }
         struct_ser.end()
     }
@@ -7975,16 +7976,18 @@ impl<'de> serde::Deserialize<'de> for GetMarketCandlesRequest {
             "mkt_id",
             "mktId",
             "intv",
-            "from",
-            "to",
+            "start_ts",
+            "startTs",
+            "end_ts",
+            "endTs",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             MktId,
             Intv,
-            From,
-            To,
+            StartTs,
+            EndTs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -8008,8 +8011,8 @@ impl<'de> serde::Deserialize<'de> for GetMarketCandlesRequest {
                         match value {
                             "mktId" | "mkt_id" => Ok(GeneratedField::MktId),
                             "intv" => Ok(GeneratedField::Intv),
-                            "from" => Ok(GeneratedField::From),
-                            "to" => Ok(GeneratedField::To),
+                            "startTs" | "start_ts" => Ok(GeneratedField::StartTs),
+                            "endTs" | "end_ts" => Ok(GeneratedField::EndTs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -8031,8 +8034,8 @@ impl<'de> serde::Deserialize<'de> for GetMarketCandlesRequest {
             {
                 let mut mkt_id__ = None;
                 let mut intv__ = None;
-                let mut from__ = None;
-                let mut to__ = None;
+                let mut start_ts__ = None;
+                let mut end_ts__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::MktId => {
@@ -8049,19 +8052,19 @@ impl<'de> serde::Deserialize<'de> for GetMarketCandlesRequest {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::From => {
-                            if from__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("from"));
+                        GeneratedField::StartTs => {
+                            if start_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("startTs"));
                             }
-                            from__ = 
+                            start_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::To => {
-                            if to__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("to"));
+                        GeneratedField::EndTs => {
+                            if end_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("endTs"));
                             }
-                            to__ = 
+                            end_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -8070,8 +8073,8 @@ impl<'de> serde::Deserialize<'de> for GetMarketCandlesRequest {
                 Ok(GetMarketCandlesRequest {
                     mkt_id: mkt_id__.unwrap_or_default(),
                     intv: intv__.unwrap_or_default(),
-                    from: from__.unwrap_or_default(),
-                    to: to__.unwrap_or_default(),
+                    start_ts: start_ts__.unwrap_or_default(),
+                    end_ts: end_ts__.unwrap_or_default(),
                 })
             }
         }
@@ -10669,17 +10672,17 @@ impl serde::Serialize for GetReferralCodeResponse {
         if !self.code.is_empty() {
             len += 1;
         }
-        if self.created_at != 0 {
+        if self.crt_ts != 0 {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetReferralCodeResponse", len)?;
         if !self.code.is_empty() {
             struct_ser.serialize_field("code", &self.code)?;
         }
-        if self.created_at != 0 {
+        if self.crt_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("createdAt", ToString::to_string(&self.created_at).as_str())?;
+            struct_ser.serialize_field("crtTs", ToString::to_string(&self.crt_ts).as_str())?;
         }
         struct_ser.end()
     }
@@ -10692,14 +10695,14 @@ impl<'de> serde::Deserialize<'de> for GetReferralCodeResponse {
     {
         const FIELDS: &[&str] = &[
             "code",
-            "created_at",
-            "createdAt",
+            "crt_ts",
+            "crtTs",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Code,
-            CreatedAt,
+            CrtTs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -10722,7 +10725,7 @@ impl<'de> serde::Deserialize<'de> for GetReferralCodeResponse {
                     {
                         match value {
                             "code" => Ok(GeneratedField::Code),
-                            "createdAt" | "created_at" => Ok(GeneratedField::CreatedAt),
+                            "crtTs" | "crt_ts" => Ok(GeneratedField::CrtTs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -10743,7 +10746,7 @@ impl<'de> serde::Deserialize<'de> for GetReferralCodeResponse {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut code__ = None;
-                let mut created_at__ = None;
+                let mut crt_ts__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Code => {
@@ -10752,11 +10755,11 @@ impl<'de> serde::Deserialize<'de> for GetReferralCodeResponse {
                             }
                             code__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::CreatedAt => {
-                            if created_at__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("createdAt"));
+                        GeneratedField::CrtTs => {
+                            if crt_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("crtTs"));
                             }
-                            created_at__ = 
+                            crt_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -10764,7 +10767,7 @@ impl<'de> serde::Deserialize<'de> for GetReferralCodeResponse {
                 }
                 Ok(GetReferralCodeResponse {
                     code: code__.unwrap_or_default(),
-                    created_at: created_at__.unwrap_or_default(),
+                    crt_ts: crt_ts__.unwrap_or_default(),
                 })
             }
         }
@@ -10978,12 +10981,12 @@ impl serde::Serialize for GetReferralLeaderboardRequest {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.limit != 0 {
+        if self.lmt != 0 {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetReferralLeaderboardRequest", len)?;
-        if self.limit != 0 {
-            struct_ser.serialize_field("limit", &self.limit)?;
+        if self.lmt != 0 {
+            struct_ser.serialize_field("lmt", &self.lmt)?;
         }
         struct_ser.end()
     }
@@ -10995,12 +10998,12 @@ impl<'de> serde::Deserialize<'de> for GetReferralLeaderboardRequest {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "limit",
+            "lmt",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Limit,
+            Lmt,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -11022,7 +11025,7 @@ impl<'de> serde::Deserialize<'de> for GetReferralLeaderboardRequest {
                         E: serde::de::Error,
                     {
                         match value {
-                            "limit" => Ok(GeneratedField::Limit),
+                            "lmt" => Ok(GeneratedField::Lmt),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -11042,21 +11045,21 @@ impl<'de> serde::Deserialize<'de> for GetReferralLeaderboardRequest {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut limit__ = None;
+                let mut lmt__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Limit => {
-                            if limit__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("limit"));
+                        GeneratedField::Lmt => {
+                            if lmt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lmt"));
                             }
-                            limit__ = 
+                            lmt__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                     }
                 }
                 Ok(GetReferralLeaderboardRequest {
-                    limit: limit__.unwrap_or_default(),
+                    lmt: lmt__.unwrap_or_default(),
                 })
             }
         }
@@ -11279,7 +11282,7 @@ impl serde::Serialize for GetReferrerResponse {
         if !self.code.is_empty() {
             len += 1;
         }
-        if self.referred_at != 0 {
+        if self.ref_ts != 0 {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetReferrerResponse", len)?;
@@ -11289,10 +11292,10 @@ impl serde::Serialize for GetReferrerResponse {
         if !self.code.is_empty() {
             struct_ser.serialize_field("code", &self.code)?;
         }
-        if self.referred_at != 0 {
+        if self.ref_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("referredAt", ToString::to_string(&self.referred_at).as_str())?;
+            struct_ser.serialize_field("refTs", ToString::to_string(&self.ref_ts).as_str())?;
         }
         struct_ser.end()
     }
@@ -11306,15 +11309,15 @@ impl<'de> serde::Deserialize<'de> for GetReferrerResponse {
         const FIELDS: &[&str] = &[
             "referrer",
             "code",
-            "referred_at",
-            "referredAt",
+            "ref_ts",
+            "refTs",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Referrer,
             Code,
-            ReferredAt,
+            RefTs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -11338,7 +11341,7 @@ impl<'de> serde::Deserialize<'de> for GetReferrerResponse {
                         match value {
                             "referrer" => Ok(GeneratedField::Referrer),
                             "code" => Ok(GeneratedField::Code),
-                            "referredAt" | "referred_at" => Ok(GeneratedField::ReferredAt),
+                            "refTs" | "ref_ts" => Ok(GeneratedField::RefTs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -11360,7 +11363,7 @@ impl<'de> serde::Deserialize<'de> for GetReferrerResponse {
             {
                 let mut referrer__ = None;
                 let mut code__ = None;
-                let mut referred_at__ = None;
+                let mut ref_ts__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Referrer => {
@@ -11375,11 +11378,11 @@ impl<'de> serde::Deserialize<'de> for GetReferrerResponse {
                             }
                             code__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::ReferredAt => {
-                            if referred_at__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("referredAt"));
+                        GeneratedField::RefTs => {
+                            if ref_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("refTs"));
                             }
-                            referred_at__ = 
+                            ref_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -11388,7 +11391,7 @@ impl<'de> serde::Deserialize<'de> for GetReferrerResponse {
                 Ok(GetReferrerResponse {
                     referrer: referrer__.unwrap_or_default(),
                     code: code__.unwrap_or_default(),
-                    referred_at: referred_at__.unwrap_or_default(),
+                    ref_ts: ref_ts__.unwrap_or_default(),
                 })
             }
         }
@@ -12167,27 +12170,27 @@ impl serde::Serialize for GetTradingCalendarResponse {
         if !self.days.is_empty() {
             len += 1;
         }
-        if !self.cumulative_pnl.is_empty() {
+        if !self.cum_pnl.is_empty() {
             len += 1;
         }
-        if self.total_trades != 0 {
+        if self.tot_trds != 0 {
             len += 1;
         }
-        if !self.total_fees.is_empty() {
+        if !self.tot_fees.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.GetTradingCalendarResponse", len)?;
         if !self.days.is_empty() {
             struct_ser.serialize_field("days", &self.days)?;
         }
-        if !self.cumulative_pnl.is_empty() {
-            struct_ser.serialize_field("cumulativePnl", &self.cumulative_pnl)?;
+        if !self.cum_pnl.is_empty() {
+            struct_ser.serialize_field("cumPnl", &self.cum_pnl)?;
         }
-        if self.total_trades != 0 {
-            struct_ser.serialize_field("totalTrades", &self.total_trades)?;
+        if self.tot_trds != 0 {
+            struct_ser.serialize_field("totTrds", &self.tot_trds)?;
         }
-        if !self.total_fees.is_empty() {
-            struct_ser.serialize_field("totalFees", &self.total_fees)?;
+        if !self.tot_fees.is_empty() {
+            struct_ser.serialize_field("totFees", &self.tot_fees)?;
         }
         struct_ser.end()
     }
@@ -12200,20 +12203,20 @@ impl<'de> serde::Deserialize<'de> for GetTradingCalendarResponse {
     {
         const FIELDS: &[&str] = &[
             "days",
-            "cumulative_pnl",
-            "cumulativePnl",
-            "total_trades",
-            "totalTrades",
-            "total_fees",
-            "totalFees",
+            "cum_pnl",
+            "cumPnl",
+            "tot_trds",
+            "totTrds",
+            "tot_fees",
+            "totFees",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Days,
-            CumulativePnl,
-            TotalTrades,
-            TotalFees,
+            CumPnl,
+            TotTrds,
+            TotFees,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -12236,9 +12239,9 @@ impl<'de> serde::Deserialize<'de> for GetTradingCalendarResponse {
                     {
                         match value {
                             "days" => Ok(GeneratedField::Days),
-                            "cumulativePnl" | "cumulative_pnl" => Ok(GeneratedField::CumulativePnl),
-                            "totalTrades" | "total_trades" => Ok(GeneratedField::TotalTrades),
-                            "totalFees" | "total_fees" => Ok(GeneratedField::TotalFees),
+                            "cumPnl" | "cum_pnl" => Ok(GeneratedField::CumPnl),
+                            "totTrds" | "tot_trds" => Ok(GeneratedField::TotTrds),
+                            "totFees" | "tot_fees" => Ok(GeneratedField::TotFees),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -12259,9 +12262,9 @@ impl<'de> serde::Deserialize<'de> for GetTradingCalendarResponse {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut days__ = None;
-                let mut cumulative_pnl__ = None;
-                let mut total_trades__ = None;
-                let mut total_fees__ = None;
+                let mut cum_pnl__ = None;
+                let mut tot_trds__ = None;
+                let mut tot_fees__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Days => {
@@ -12270,33 +12273,33 @@ impl<'de> serde::Deserialize<'de> for GetTradingCalendarResponse {
                             }
                             days__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::CumulativePnl => {
-                            if cumulative_pnl__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("cumulativePnl"));
+                        GeneratedField::CumPnl => {
+                            if cum_pnl__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("cumPnl"));
                             }
-                            cumulative_pnl__ = Some(map_.next_value()?);
+                            cum_pnl__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::TotalTrades => {
-                            if total_trades__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("totalTrades"));
+                        GeneratedField::TotTrds => {
+                            if tot_trds__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("totTrds"));
                             }
-                            total_trades__ = 
+                            tot_trds__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::TotalFees => {
-                            if total_fees__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("totalFees"));
+                        GeneratedField::TotFees => {
+                            if tot_fees__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("totFees"));
                             }
-                            total_fees__ = Some(map_.next_value()?);
+                            tot_fees__ = Some(map_.next_value()?);
                         }
                     }
                 }
                 Ok(GetTradingCalendarResponse {
                     days: days__.unwrap_or_default(),
-                    cumulative_pnl: cumulative_pnl__.unwrap_or_default(),
-                    total_trades: total_trades__.unwrap_or_default(),
-                    total_fees: total_fees__.unwrap_or_default(),
+                    cum_pnl: cum_pnl__.unwrap_or_default(),
+                    tot_trds: tot_trds__.unwrap_or_default(),
+                    tot_fees: tot_fees__.unwrap_or_default(),
                 })
             }
         }
@@ -16468,7 +16471,7 @@ impl serde::Serialize for HistoricalPosition {
         if !self.mkt_id.is_empty() {
             len += 1;
         }
-        if !self.m_id.is_empty() {
+        if !self.match_id.is_empty() {
             len += 1;
         }
         if self.sd != 0 {
@@ -16541,8 +16544,8 @@ impl serde::Serialize for HistoricalPosition {
         if !self.mkt_id.is_empty() {
             struct_ser.serialize_field("mktId", &self.mkt_id)?;
         }
-        if !self.m_id.is_empty() {
-            struct_ser.serialize_field("mId", &self.m_id)?;
+        if !self.match_id.is_empty() {
+            struct_ser.serialize_field("matchId", &self.match_id)?;
         }
         if self.sd != 0 {
             let v = PositionSide::try_from(self.sd)
@@ -16636,8 +16639,8 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
         const FIELDS: &[&str] = &[
             "mkt_id",
             "mktId",
-            "m_id",
-            "mId",
+            "match_id",
+            "matchId",
             "sd",
             "st",
             "sz",
@@ -16683,7 +16686,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             MktId,
-            MId,
+            MatchId,
             Sd,
             St,
             Sz,
@@ -16728,7 +16731,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
                     {
                         match value {
                             "mktId" | "mkt_id" => Ok(GeneratedField::MktId),
-                            "mId" | "m_id" => Ok(GeneratedField::MId),
+                            "matchId" | "match_id" => Ok(GeneratedField::MatchId),
                             "sd" => Ok(GeneratedField::Sd),
                             "st" => Ok(GeneratedField::St),
                             "sz" => Ok(GeneratedField::Sz),
@@ -16771,7 +16774,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut mkt_id__ = None;
-                let mut m_id__ = None;
+                let mut match_id__ = None;
                 let mut sd__ = None;
                 let mut st__ = None;
                 let mut sz__ = None;
@@ -16802,11 +16805,11 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
                             }
                             mkt_id__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::MId => {
-                            if m_id__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("mId"));
+                        GeneratedField::MatchId => {
+                            if match_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("matchId"));
                             }
-                            m_id__ = Some(map_.next_value()?);
+                            match_id__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Sd => {
                             if sd__.is_some() {
@@ -16952,7 +16955,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalPosition {
                 }
                 Ok(HistoricalPosition {
                     mkt_id: mkt_id__.unwrap_or_default(),
-                    m_id: m_id__.unwrap_or_default(),
+                    match_id: match_id__.unwrap_or_default(),
                     sd: sd__.unwrap_or_default(),
                     st: st__.unwrap_or_default(),
                     sz: sz__.unwrap_or_default(),
@@ -16989,23 +16992,23 @@ impl serde::Serialize for Invitee {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if !self.address.is_empty() {
+        if !self.addr.is_empty() {
             len += 1;
         }
-        if self.referred_at != 0 {
+        if self.ref_ts != 0 {
             len += 1;
         }
         if !self.commission.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.Invitee", len)?;
-        if !self.address.is_empty() {
-            struct_ser.serialize_field("address", &self.address)?;
+        if !self.addr.is_empty() {
+            struct_ser.serialize_field("addr", &self.addr)?;
         }
-        if self.referred_at != 0 {
+        if self.ref_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("referredAt", ToString::to_string(&self.referred_at).as_str())?;
+            struct_ser.serialize_field("refTs", ToString::to_string(&self.ref_ts).as_str())?;
         }
         if !self.commission.is_empty() {
             struct_ser.serialize_field("commission", &self.commission)?;
@@ -17020,16 +17023,16 @@ impl<'de> serde::Deserialize<'de> for Invitee {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "address",
-            "referred_at",
-            "referredAt",
+            "addr",
+            "ref_ts",
+            "refTs",
             "commission",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Address,
-            ReferredAt,
+            Addr,
+            RefTs,
             Commission,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -17052,8 +17055,8 @@ impl<'de> serde::Deserialize<'de> for Invitee {
                         E: serde::de::Error,
                     {
                         match value {
-                            "address" => Ok(GeneratedField::Address),
-                            "referredAt" | "referred_at" => Ok(GeneratedField::ReferredAt),
+                            "addr" => Ok(GeneratedField::Addr),
+                            "refTs" | "ref_ts" => Ok(GeneratedField::RefTs),
                             "commission" => Ok(GeneratedField::Commission),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -17074,22 +17077,22 @@ impl<'de> serde::Deserialize<'de> for Invitee {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut address__ = None;
-                let mut referred_at__ = None;
+                let mut addr__ = None;
+                let mut ref_ts__ = None;
                 let mut commission__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Address => {
-                            if address__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("address"));
+                        GeneratedField::Addr => {
+                            if addr__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("addr"));
                             }
-                            address__ = Some(map_.next_value()?);
+                            addr__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::ReferredAt => {
-                            if referred_at__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("referredAt"));
+                        GeneratedField::RefTs => {
+                            if ref_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("refTs"));
                             }
-                            referred_at__ = 
+                            ref_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -17102,8 +17105,8 @@ impl<'de> serde::Deserialize<'de> for Invitee {
                     }
                 }
                 Ok(Invitee {
-                    address: address__.unwrap_or_default(),
-                    referred_at: referred_at__.unwrap_or_default(),
+                    addr: addr__.unwrap_or_default(),
+                    ref_ts: ref_ts__.unwrap_or_default(),
                     commission: commission__.unwrap_or_default(),
                 })
             }
@@ -19313,7 +19316,7 @@ impl serde::Serialize for Order {
         if self.cancel_req_ts != 0 {
             len += 1;
         }
-        if self.expire_ts != 0 {
+        if self.exp_ts != 0 {
             len += 1;
         }
         if !self.cl_oid.is_empty() {
@@ -19435,10 +19438,10 @@ impl serde::Serialize for Order {
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser.serialize_field("cancelReqTs", ToString::to_string(&self.cancel_req_ts).as_str())?;
         }
-        if self.expire_ts != 0 {
+        if self.exp_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("expireTs", ToString::to_string(&self.expire_ts).as_str())?;
+            struct_ser.serialize_field("expTs", ToString::to_string(&self.exp_ts).as_str())?;
         }
         if !self.cl_oid.is_empty() {
             struct_ser.serialize_field("clOid", &self.cl_oid)?;
@@ -19509,8 +19512,8 @@ impl<'de> serde::Deserialize<'de> for Order {
             "updTs",
             "cancel_req_ts",
             "cancelReqTs",
-            "expire_ts",
-            "expireTs",
+            "exp_ts",
+            "expTs",
             "cl_oid",
             "clOid",
             "cancel_req",
@@ -19551,7 +19554,7 @@ impl<'de> serde::Deserialize<'de> for Order {
             CrtTs,
             UpdTs,
             CancelReqTs,
-            ExpireTs,
+            ExpTs,
             ClOid,
             CancelReq,
             SchedTs,
@@ -19605,7 +19608,7 @@ impl<'de> serde::Deserialize<'de> for Order {
                             "crtTs" | "crt_ts" => Ok(GeneratedField::CrtTs),
                             "updTs" | "upd_ts" => Ok(GeneratedField::UpdTs),
                             "cancelReqTs" | "cancel_req_ts" => Ok(GeneratedField::CancelReqTs),
-                            "expireTs" | "expire_ts" => Ok(GeneratedField::ExpireTs),
+                            "expTs" | "exp_ts" => Ok(GeneratedField::ExpTs),
                             "clOid" | "cl_oid" => Ok(GeneratedField::ClOid),
                             "cancelReq" | "cancel_req" => Ok(GeneratedField::CancelReq),
                             "schedTs" | "sched_ts" => Ok(GeneratedField::SchedTs),
@@ -19657,7 +19660,7 @@ impl<'de> serde::Deserialize<'de> for Order {
                 let mut crt_ts__ = None;
                 let mut upd_ts__ = None;
                 let mut cancel_req_ts__ = None;
-                let mut expire_ts__ = None;
+                let mut exp_ts__ = None;
                 let mut cl_oid__ = None;
                 let mut cancel_req__ = None;
                 let mut sched_ts__ = None;
@@ -19835,11 +19838,11 @@ impl<'de> serde::Deserialize<'de> for Order {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::ExpireTs => {
-                            if expire_ts__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("expireTs"));
+                        GeneratedField::ExpTs => {
+                            if exp_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("expTs"));
                             }
-                            expire_ts__ = 
+                            exp_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -19905,7 +19908,7 @@ impl<'de> serde::Deserialize<'de> for Order {
                     crt_ts: crt_ts__.unwrap_or_default(),
                     upd_ts: upd_ts__.unwrap_or_default(),
                     cancel_req_ts: cancel_req_ts__.unwrap_or_default(),
-                    expire_ts: expire_ts__.unwrap_or_default(),
+                    exp_ts: exp_ts__.unwrap_or_default(),
                     cl_oid: cl_oid__.unwrap_or_default(),
                     cancel_req: cancel_req__.unwrap_or_default(),
                     sched_ts: sched_ts__.unwrap_or_default(),
@@ -20588,7 +20591,7 @@ impl serde::Serialize for OrderTradeEvent {
         if self.ts != 0 {
             len += 1;
         }
-        if !self.m_id.is_empty() {
+        if !self.match_id.is_empty() {
             len += 1;
         }
         if !self.cpty_oid.is_empty() {
@@ -20640,8 +20643,8 @@ impl serde::Serialize for OrderTradeEvent {
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
-        if !self.m_id.is_empty() {
-            struct_ser.serialize_field("mId", &self.m_id)?;
+        if !self.match_id.is_empty() {
+            struct_ser.serialize_field("matchId", &self.match_id)?;
         }
         if !self.cpty_oid.is_empty() {
             struct_ser.serialize_field("cptyOid", &self.cpty_oid)?;
@@ -20681,8 +20684,8 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
             "px",
             "sz",
             "ts",
-            "m_id",
-            "mId",
+            "match_id",
+            "matchId",
             "cpty_oid",
             "cptyOid",
             "cpty_addr",
@@ -20708,7 +20711,7 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
             Px,
             Sz,
             Ts,
-            MId,
+            MatchId,
             CptyOid,
             CptyAddr,
             IsMkr,
@@ -20744,7 +20747,7 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
                             "px" => Ok(GeneratedField::Px),
                             "sz" => Ok(GeneratedField::Sz),
                             "ts" => Ok(GeneratedField::Ts),
-                            "mId" | "m_id" => Ok(GeneratedField::MId),
+                            "matchId" | "match_id" => Ok(GeneratedField::MatchId),
                             "cptyOid" | "cpty_oid" => Ok(GeneratedField::CptyOid),
                             "cptyAddr" | "cpty_addr" => Ok(GeneratedField::CptyAddr),
                             "isMkr" | "is_mkr" => Ok(GeneratedField::IsMkr),
@@ -20778,7 +20781,7 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
                 let mut px__ = None;
                 let mut sz__ = None;
                 let mut ts__ = None;
-                let mut m_id__ = None;
+                let mut match_id__ = None;
                 let mut cpty_oid__ = None;
                 let mut cpty_addr__ = None;
                 let mut is_mkr__ = None;
@@ -20832,11 +20835,11 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::MId => {
-                            if m_id__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("mId"));
+                        GeneratedField::MatchId => {
+                            if match_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("matchId"));
                             }
-                            m_id__ = Some(map_.next_value()?);
+                            match_id__ = Some(map_.next_value()?);
                         }
                         GeneratedField::CptyOid => {
                             if cpty_oid__.is_some() {
@@ -20890,7 +20893,7 @@ impl<'de> serde::Deserialize<'de> for OrderTradeEvent {
                     px: px__.unwrap_or_default(),
                     sz: sz__.unwrap_or_default(),
                     ts: ts__.unwrap_or_default(),
-                    m_id: m_id__.unwrap_or_default(),
+                    match_id: match_id__.unwrap_or_default(),
                     cpty_oid: cpty_oid__.unwrap_or_default(),
                     cpty_addr: cpty_addr__.unwrap_or_default(),
                     is_mkr: is_mkr__.unwrap_or_default(),
@@ -21535,7 +21538,7 @@ impl serde::Serialize for PlaceOrderRequest {
         if self.stop_px_type != 0 {
             len += 1;
         }
-        if self.expire_ts != 0 {
+        if self.exp_ts != 0 {
             len += 1;
         }
         if self.sched_ts != 0 {
@@ -21604,10 +21607,10 @@ impl serde::Serialize for PlaceOrderRequest {
                 .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.stop_px_type)))?;
             struct_ser.serialize_field("stopPxType", &v)?;
         }
-        if self.expire_ts != 0 {
+        if self.exp_ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("expireTs", ToString::to_string(&self.expire_ts).as_str())?;
+            struct_ser.serialize_field("expTs", ToString::to_string(&self.exp_ts).as_str())?;
         }
         if self.sched_ts != 0 {
             #[allow(clippy::needless_borrow)]
@@ -21647,8 +21650,8 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
             "stopPx",
             "stop_px_type",
             "stopPxType",
-            "expire_ts",
-            "expireTs",
+            "exp_ts",
+            "expTs",
             "sched_ts",
             "schedTs",
             "await",
@@ -21671,7 +21674,7 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
             StopT,
             StopPx,
             StopPxType,
-            ExpireTs,
+            ExpTs,
             SchedTs,
             Await,
         }
@@ -21710,7 +21713,7 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                             "stopT" | "stop_t" => Ok(GeneratedField::StopT),
                             "stopPx" | "stop_px" => Ok(GeneratedField::StopPx),
                             "stopPxType" | "stop_px_type" => Ok(GeneratedField::StopPxType),
-                            "expireTs" | "expire_ts" => Ok(GeneratedField::ExpireTs),
+                            "expTs" | "exp_ts" => Ok(GeneratedField::ExpTs),
                             "schedTs" | "sched_ts" => Ok(GeneratedField::SchedTs),
                             "await" => Ok(GeneratedField::Await),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -21747,7 +21750,7 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                 let mut stop_t__ = None;
                 let mut stop_px__ = None;
                 let mut stop_px_type__ = None;
-                let mut expire_ts__ = None;
+                let mut exp_ts__ = None;
                 let mut sched_ts__ = None;
                 let mut r#await__ = None;
                 while let Some(k) = map_.next_key()? {
@@ -21850,11 +21853,11 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                             }
                             stop_px_type__ = Some(map_.next_value::<StopPriceType>()? as i32);
                         }
-                        GeneratedField::ExpireTs => {
-                            if expire_ts__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("expireTs"));
+                        GeneratedField::ExpTs => {
+                            if exp_ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("expTs"));
                             }
-                            expire_ts__ = 
+                            exp_ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -21890,7 +21893,7 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                     stop_t: stop_t__.unwrap_or_default(),
                     stop_px: stop_px__.unwrap_or_default(),
                     stop_px_type: stop_px_type__.unwrap_or_default(),
-                    expire_ts: expire_ts__.unwrap_or_default(),
+                    exp_ts: exp_ts__.unwrap_or_default(),
                     sched_ts: sched_ts__.unwrap_or_default(),
                     r#await: r#await__.unwrap_or_default(),
                 })
@@ -22556,17 +22559,17 @@ impl serde::Serialize for PnLSnapshot {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.time != 0 {
+        if self.ts != 0 {
             len += 1;
         }
         if !self.pnl_usd.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.PnLSnapshot", len)?;
-        if self.time != 0 {
+        if self.ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("time", ToString::to_string(&self.time).as_str())?;
+            struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
         if !self.pnl_usd.is_empty() {
             struct_ser.serialize_field("pnlUsd", &self.pnl_usd)?;
@@ -22581,14 +22584,14 @@ impl<'de> serde::Deserialize<'de> for PnLSnapshot {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "time",
+            "ts",
             "pnl_usd",
             "pnlUsd",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Time,
+            Ts,
             PnlUsd,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -22611,7 +22614,7 @@ impl<'de> serde::Deserialize<'de> for PnLSnapshot {
                         E: serde::de::Error,
                     {
                         match value {
-                            "time" => Ok(GeneratedField::Time),
+                            "ts" => Ok(GeneratedField::Ts),
                             "pnlUsd" | "pnl_usd" => Ok(GeneratedField::PnlUsd),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -22632,15 +22635,15 @@ impl<'de> serde::Deserialize<'de> for PnLSnapshot {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut time__ = None;
+                let mut ts__ = None;
                 let mut pnl_usd__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Time => {
-                            if time__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("time"));
+                        GeneratedField::Ts => {
+                            if ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ts"));
                             }
-                            time__ = 
+                            ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -22653,7 +22656,7 @@ impl<'de> serde::Deserialize<'de> for PnLSnapshot {
                     }
                 }
                 Ok(PnLSnapshot {
-                    time: time__.unwrap_or_default(),
+                    ts: ts__.unwrap_or_default(),
                     pnl_usd: pnl_usd__.unwrap_or_default(),
                 })
             }
@@ -23140,17 +23143,17 @@ impl serde::Serialize for PortfolioSnapshot {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.time != 0 {
+        if self.ts != 0 {
             len += 1;
         }
         if !self.val_usd.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.PortfolioSnapshot", len)?;
-        if self.time != 0 {
+        if self.ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("time", ToString::to_string(&self.time).as_str())?;
+            struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
         if !self.val_usd.is_empty() {
             struct_ser.serialize_field("valUsd", &self.val_usd)?;
@@ -23165,14 +23168,14 @@ impl<'de> serde::Deserialize<'de> for PortfolioSnapshot {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "time",
+            "ts",
             "val_usd",
             "valUsd",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Time,
+            Ts,
             ValUsd,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -23195,7 +23198,7 @@ impl<'de> serde::Deserialize<'de> for PortfolioSnapshot {
                         E: serde::de::Error,
                     {
                         match value {
-                            "time" => Ok(GeneratedField::Time),
+                            "ts" => Ok(GeneratedField::Ts),
                             "valUsd" | "val_usd" => Ok(GeneratedField::ValUsd),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -23216,15 +23219,15 @@ impl<'de> serde::Deserialize<'de> for PortfolioSnapshot {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut time__ = None;
+                let mut ts__ = None;
                 let mut val_usd__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Time => {
-                            if time__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("time"));
+                        GeneratedField::Ts => {
+                            if ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ts"));
                             }
-                            time__ = 
+                            ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -23237,7 +23240,7 @@ impl<'de> serde::Deserialize<'de> for PortfolioSnapshot {
                     }
                 }
                 Ok(PortfolioSnapshot {
-                    time: time__.unwrap_or_default(),
+                    ts: ts__.unwrap_or_default(),
                     val_usd: val_usd__.unwrap_or_default(),
                 })
             }
@@ -27490,10 +27493,10 @@ impl serde::Serialize for TradingCalendarDay {
         if !self.date.is_empty() {
             len += 1;
         }
-        if self.trade_count != 0 {
+        if self.trd_cnt != 0 {
             len += 1;
         }
-        if !self.volume_usd.is_empty() {
+        if !self.vol_usd.is_empty() {
             len += 1;
         }
         if !self.fees_usd.is_empty() {
@@ -27512,11 +27515,11 @@ impl serde::Serialize for TradingCalendarDay {
         if !self.date.is_empty() {
             struct_ser.serialize_field("date", &self.date)?;
         }
-        if self.trade_count != 0 {
-            struct_ser.serialize_field("tradeCount", &self.trade_count)?;
+        if self.trd_cnt != 0 {
+            struct_ser.serialize_field("trdCnt", &self.trd_cnt)?;
         }
-        if !self.volume_usd.is_empty() {
-            struct_ser.serialize_field("volumeUsd", &self.volume_usd)?;
+        if !self.vol_usd.is_empty() {
+            struct_ser.serialize_field("volUsd", &self.vol_usd)?;
         }
         if !self.fees_usd.is_empty() {
             struct_ser.serialize_field("feesUsd", &self.fees_usd)?;
@@ -27541,10 +27544,10 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
     {
         const FIELDS: &[&str] = &[
             "date",
-            "trade_count",
-            "tradeCount",
-            "volume_usd",
-            "volumeUsd",
+            "trd_cnt",
+            "trdCnt",
+            "vol_usd",
+            "volUsd",
             "fees_usd",
             "feesUsd",
             "activity_level",
@@ -27558,8 +27561,8 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Date,
-            TradeCount,
-            VolumeUsd,
+            TrdCnt,
+            VolUsd,
             FeesUsd,
             ActivityLevel,
             IsSynthetic,
@@ -27586,8 +27589,8 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
                     {
                         match value {
                             "date" => Ok(GeneratedField::Date),
-                            "tradeCount" | "trade_count" => Ok(GeneratedField::TradeCount),
-                            "volumeUsd" | "volume_usd" => Ok(GeneratedField::VolumeUsd),
+                            "trdCnt" | "trd_cnt" => Ok(GeneratedField::TrdCnt),
+                            "volUsd" | "vol_usd" => Ok(GeneratedField::VolUsd),
                             "feesUsd" | "fees_usd" => Ok(GeneratedField::FeesUsd),
                             "activityLevel" | "activity_level" => Ok(GeneratedField::ActivityLevel),
                             "isSynthetic" | "is_synthetic" => Ok(GeneratedField::IsSynthetic),
@@ -27612,8 +27615,8 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut date__ = None;
-                let mut trade_count__ = None;
-                let mut volume_usd__ = None;
+                let mut trd_cnt__ = None;
+                let mut vol_usd__ = None;
                 let mut fees_usd__ = None;
                 let mut activity_level__ = None;
                 let mut is_synthetic__ = None;
@@ -27626,19 +27629,19 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
                             }
                             date__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::TradeCount => {
-                            if trade_count__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("tradeCount"));
+                        GeneratedField::TrdCnt => {
+                            if trd_cnt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("trdCnt"));
                             }
-                            trade_count__ = 
+                            trd_cnt__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::VolumeUsd => {
-                            if volume_usd__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("volumeUsd"));
+                        GeneratedField::VolUsd => {
+                            if vol_usd__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("volUsd"));
                             }
-                            volume_usd__ = Some(map_.next_value()?);
+                            vol_usd__ = Some(map_.next_value()?);
                         }
                         GeneratedField::FeesUsd => {
                             if fees_usd__.is_some() {
@@ -27670,8 +27673,8 @@ impl<'de> serde::Deserialize<'de> for TradingCalendarDay {
                 }
                 Ok(TradingCalendarDay {
                     date: date__.unwrap_or_default(),
-                    trade_count: trade_count__.unwrap_or_default(),
-                    volume_usd: volume_usd__.unwrap_or_default(),
+                    trd_cnt: trd_cnt__.unwrap_or_default(),
+                    vol_usd: vol_usd__.unwrap_or_default(),
                     fees_usd: fees_usd__.unwrap_or_default(),
                     activity_level: activity_level__.unwrap_or_default(),
                     is_synthetic: is_synthetic__.unwrap_or_default(),
@@ -28569,17 +28572,17 @@ impl serde::Serialize for VaultAccountValueSnapshot {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.time != 0 {
+        if self.ts != 0 {
             len += 1;
         }
         if !self.val_usd.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.VaultAccountValueSnapshot", len)?;
-        if self.time != 0 {
+        if self.ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("time", ToString::to_string(&self.time).as_str())?;
+            struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
         if !self.val_usd.is_empty() {
             struct_ser.serialize_field("valUsd", &self.val_usd)?;
@@ -28594,14 +28597,14 @@ impl<'de> serde::Deserialize<'de> for VaultAccountValueSnapshot {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "time",
+            "ts",
             "val_usd",
             "valUsd",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Time,
+            Ts,
             ValUsd,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -28624,7 +28627,7 @@ impl<'de> serde::Deserialize<'de> for VaultAccountValueSnapshot {
                         E: serde::de::Error,
                     {
                         match value {
-                            "time" => Ok(GeneratedField::Time),
+                            "ts" => Ok(GeneratedField::Ts),
                             "valUsd" | "val_usd" => Ok(GeneratedField::ValUsd),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -28645,15 +28648,15 @@ impl<'de> serde::Deserialize<'de> for VaultAccountValueSnapshot {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut time__ = None;
+                let mut ts__ = None;
                 let mut val_usd__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Time => {
-                            if time__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("time"));
+                        GeneratedField::Ts => {
+                            if ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ts"));
                             }
-                            time__ = 
+                            ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -28666,7 +28669,7 @@ impl<'de> serde::Deserialize<'de> for VaultAccountValueSnapshot {
                     }
                 }
                 Ok(VaultAccountValueSnapshot {
-                    time: time__.unwrap_or_default(),
+                    ts: ts__.unwrap_or_default(),
                     val_usd: val_usd__.unwrap_or_default(),
                 })
             }
@@ -28682,17 +28685,17 @@ impl serde::Serialize for VaultPnLSnapshot {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.time != 0 {
+        if self.ts != 0 {
             len += 1;
         }
         if !self.pnl_usd.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.VaultPnLSnapshot", len)?;
-        if self.time != 0 {
+        if self.ts != 0 {
             #[allow(clippy::needless_borrow)]
             #[allow(clippy::needless_borrows_for_generic_args)]
-            struct_ser.serialize_field("time", ToString::to_string(&self.time).as_str())?;
+            struct_ser.serialize_field("ts", ToString::to_string(&self.ts).as_str())?;
         }
         if !self.pnl_usd.is_empty() {
             struct_ser.serialize_field("pnlUsd", &self.pnl_usd)?;
@@ -28707,14 +28710,14 @@ impl<'de> serde::Deserialize<'de> for VaultPnLSnapshot {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "time",
+            "ts",
             "pnl_usd",
             "pnlUsd",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            Time,
+            Ts,
             PnlUsd,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -28737,7 +28740,7 @@ impl<'de> serde::Deserialize<'de> for VaultPnLSnapshot {
                         E: serde::de::Error,
                     {
                         match value {
-                            "time" => Ok(GeneratedField::Time),
+                            "ts" => Ok(GeneratedField::Ts),
                             "pnlUsd" | "pnl_usd" => Ok(GeneratedField::PnlUsd),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -28758,15 +28761,15 @@ impl<'de> serde::Deserialize<'de> for VaultPnLSnapshot {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut time__ = None;
+                let mut ts__ = None;
                 let mut pnl_usd__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::Time => {
-                            if time__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("time"));
+                        GeneratedField::Ts => {
+                            if ts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ts"));
                             }
-                            time__ = 
+                            ts__ = 
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -28779,7 +28782,7 @@ impl<'de> serde::Deserialize<'de> for VaultPnLSnapshot {
                     }
                 }
                 Ok(VaultPnLSnapshot {
-                    time: time__.unwrap_or_default(),
+                    ts: ts__.unwrap_or_default(),
                     pnl_usd: pnl_usd__.unwrap_or_default(),
                 })
             }
@@ -29502,7 +29505,7 @@ impl serde::Serialize for WhitelistSignupRequest {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if !self.wallet_address.is_empty() {
+        if !self.addr.is_empty() {
             len += 1;
         }
         if !self.email.is_empty() {
@@ -29515,8 +29518,8 @@ impl serde::Serialize for WhitelistSignupRequest {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.WhitelistSignupRequest", len)?;
-        if !self.wallet_address.is_empty() {
-            struct_ser.serialize_field("walletAddress", &self.wallet_address)?;
+        if !self.addr.is_empty() {
+            struct_ser.serialize_field("addr", &self.addr)?;
         }
         if !self.email.is_empty() {
             struct_ser.serialize_field("email", &self.email)?;
@@ -29537,8 +29540,7 @@ impl<'de> serde::Deserialize<'de> for WhitelistSignupRequest {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "wallet_address",
-            "walletAddress",
+            "addr",
             "email",
             "source",
             "x_handle",
@@ -29547,7 +29549,7 @@ impl<'de> serde::Deserialize<'de> for WhitelistSignupRequest {
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            WalletAddress,
+            Addr,
             Email,
             Source,
             XHandle,
@@ -29572,7 +29574,7 @@ impl<'de> serde::Deserialize<'de> for WhitelistSignupRequest {
                         E: serde::de::Error,
                     {
                         match value {
-                            "walletAddress" | "wallet_address" => Ok(GeneratedField::WalletAddress),
+                            "addr" => Ok(GeneratedField::Addr),
                             "email" => Ok(GeneratedField::Email),
                             "source" => Ok(GeneratedField::Source),
                             "xHandle" | "x_handle" => Ok(GeneratedField::XHandle),
@@ -29595,17 +29597,17 @@ impl<'de> serde::Deserialize<'de> for WhitelistSignupRequest {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut wallet_address__ = None;
+                let mut addr__ = None;
                 let mut email__ = None;
                 let mut source__ = None;
                 let mut x_handle__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
-                        GeneratedField::WalletAddress => {
-                            if wallet_address__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("walletAddress"));
+                        GeneratedField::Addr => {
+                            if addr__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("addr"));
                             }
-                            wallet_address__ = Some(map_.next_value()?);
+                            addr__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Email => {
                             if email__.is_some() {
@@ -29628,7 +29630,7 @@ impl<'de> serde::Deserialize<'de> for WhitelistSignupRequest {
                     }
                 }
                 Ok(WhitelistSignupRequest {
-                    wallet_address: wallet_address__.unwrap_or_default(),
+                    addr: addr__.unwrap_or_default(),
                     email: email__.unwrap_or_default(),
                     source: source__.unwrap_or_default(),
                     x_handle: x_handle__.unwrap_or_default(),
@@ -30013,7 +30015,7 @@ impl serde::Serialize for WithdrawalRequestItem {
         if self.apprv_at != 0 {
             len += 1;
         }
-        if !self.rjct_rsn.is_empty() {
+        if !self.rej_rsn.is_empty() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.WithdrawalRequestItem", len)?;
@@ -30068,8 +30070,8 @@ impl serde::Serialize for WithdrawalRequestItem {
             #[allow(clippy::needless_borrows_for_generic_args)]
             struct_ser.serialize_field("apprvAt", ToString::to_string(&self.apprv_at).as_str())?;
         }
-        if !self.rjct_rsn.is_empty() {
-            struct_ser.serialize_field("rjctRsn", &self.rjct_rsn)?;
+        if !self.rej_rsn.is_empty() {
+            struct_ser.serialize_field("rejRsn", &self.rej_rsn)?;
         }
         struct_ser.end()
     }
@@ -30100,8 +30102,8 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
             "apprvBy",
             "apprv_at",
             "apprvAt",
-            "rjct_rsn",
-            "rjctRsn",
+            "rej_rsn",
+            "rejRsn",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -30119,7 +30121,7 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
             Dst,
             ApprvBy,
             ApprvAt,
-            RjctRsn,
+            RejRsn,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -30154,7 +30156,7 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
                             "dst" => Ok(GeneratedField::Dst),
                             "apprvBy" | "apprv_by" => Ok(GeneratedField::ApprvBy),
                             "apprvAt" | "apprv_at" => Ok(GeneratedField::ApprvAt),
-                            "rjctRsn" | "rjct_rsn" => Ok(GeneratedField::RjctRsn),
+                            "rejRsn" | "rej_rsn" => Ok(GeneratedField::RejRsn),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -30187,7 +30189,7 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
                 let mut dst__ = None;
                 let mut apprv_by__ = None;
                 let mut apprv_at__ = None;
-                let mut rjct_rsn__ = None;
+                let mut rej_rsn__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -30278,11 +30280,11 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
-                        GeneratedField::RjctRsn => {
-                            if rjct_rsn__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("rjctRsn"));
+                        GeneratedField::RejRsn => {
+                            if rej_rsn__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("rejRsn"));
                             }
-                            rjct_rsn__ = Some(map_.next_value()?);
+                            rej_rsn__ = Some(map_.next_value()?);
                         }
                     }
                 }
@@ -30300,7 +30302,7 @@ impl<'de> serde::Deserialize<'de> for WithdrawalRequestItem {
                     dst: dst__.unwrap_or_default(),
                     apprv_by: apprv_by__.unwrap_or_default(),
                     apprv_at: apprv_at__.unwrap_or_default(),
-                    rjct_rsn: rjct_rsn__.unwrap_or_default(),
+                    rej_rsn: rej_rsn__.unwrap_or_default(),
                 })
             }
         }

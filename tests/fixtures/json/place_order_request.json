@@ -14,7 +14,7 @@
   "stopT": "STOP_TYPE_STOP_LOSS",
   "stopPx": 64000.25,
   "stopPxType": "STOP_PRICE_TYPE_MARK",
-  "expireTs": "1714003600000000000",
+  "expTs": "1714003600000000000",
   "schedTs": "1714000000000000000",
   "await": true
 }

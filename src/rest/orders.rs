@@ -144,7 +144,7 @@ impl OrdersApi {
     /// MARKET order — IOC at top-of-book is the supported substitute, set
     /// `tif = TimeInForce::Ioc` on a LIMIT and pick a price that crosses.
     /// STOP / TWAP / order-group flows require fields (`stop_t`,
-    /// `stop_px`, `expire_ts`, `sched_ts`, ...) that this helper
+    /// `stop_px`, `exp_ts`, `sched_ts`, ...) that this helper
     /// deliberately doesn't expose; build a raw [`PlaceOrderRequest`] +
     /// [`crate::Client::sign_place_order`] for those. Calling
     /// `place_easy` with any non-`Limit` order type returns `Error::Sign`.

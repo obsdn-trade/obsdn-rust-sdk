@@ -34,9 +34,9 @@ pub struct Endpoint {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WhitelistSignupRequest {
     /// Wallet address (0x-prefixed, 40 hex chars). Optional; at least one of
-    /// wallet_address / email / x_handle must be provided.
+    /// addr / email / x_handle must be provided.
     #[prost(string, tag = "1")]
-    pub wallet_address: ::prost::alloc::string::String,
+    pub addr: ::prost::alloc::string::String,
     /// Email (optional, RFC 5321 max 254 chars enforced by handler).
     #[prost(string, tag = "2")]
     pub email: ::prost::alloc::string::String,
@@ -210,7 +210,7 @@ pub struct Order {
     pub cancel_req_ts: i64,
     /// Expiration timestamp in nanoseconds (0 means never expires).
     #[prost(int64, tag = "28")]
-    pub expire_ts: i64,
+    pub exp_ts: i64,
     /// Client-provided identifier for the order.
     #[prost(string, tag = "29")]
     pub cl_oid: ::prost::alloc::string::String,
@@ -421,7 +421,7 @@ pub struct HistoricalPosition {
     pub mkt_id: ::prost::alloc::string::String,
     /// Open match ID.
     #[prost(string, tag = "2")]
-    pub m_id: ::prost::alloc::string::String,
+    pub match_id: ::prost::alloc::string::String,
     /// Position side (long/short).
     #[prost(enumeration = "PositionSide", tag = "3")]
     pub sd: i32,
@@ -967,7 +967,7 @@ pub struct PlaceOrderRequest {
     pub stop_px_type: i32,
     /// Expiration timestamp in nanoseconds. For GTT orders.
     #[prost(uint64, tag = "16")]
-    pub expire_ts: u64,
+    pub exp_ts: u64,
     /// Scheduled execution timestamp in nanoseconds.
     #[prost(int64, tag = "17")]
     pub sched_ts: i64,
@@ -1283,7 +1283,7 @@ pub struct OrderTradeEvent {
     /// Match-specific fields (only set for MATCH events)
     /// Match ID for the trade.
     #[prost(string, tag = "10")]
-    pub m_id: ::prost::alloc::string::String,
+    pub match_id: ::prost::alloc::string::String,
     /// Counter-party order ID.
     #[prost(string, tag = "11")]
     pub cpty_oid: ::prost::alloc::string::String,
@@ -1382,10 +1382,10 @@ pub struct GetPortfolioResponse {
 pub struct FeeTier {
     /// Maker fee rate.
     #[prost(string, tag = "1")]
-    pub mk_fee_rt: ::prost::alloc::string::String,
+    pub mkr_fee_rt: ::prost::alloc::string::String,
     /// Taker fee rate.
     #[prost(string, tag = "2")]
-    pub tk_fee_rt: ::prost::alloc::string::String,
+    pub tkr_fee_rt: ::prost::alloc::string::String,
 }
 /// PortfolioStats contains internal portfolio statistics.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1563,7 +1563,7 @@ pub struct GetPortfolioHistoryResponse {
 pub struct PortfolioSnapshot {
     /// Timestamp in nanoseconds.
     #[prost(int64, tag = "1")]
-    pub time: i64,
+    pub ts: i64,
     /// Portfolio value in USD.
     #[prost(string, tag = "2")]
     pub val_usd: ::prost::alloc::string::String,
@@ -1590,7 +1590,7 @@ pub struct GetPnLHistoryResponse {
 pub struct PnLSnapshot {
     /// Timestamp in nanoseconds.
     #[prost(int64, tag = "1")]
-    pub time: i64,
+    pub ts: i64,
     /// Cumulative PnL in USD.
     #[prost(string, tag = "2")]
     pub pnl_usd: ::prost::alloc::string::String,
@@ -1629,10 +1629,10 @@ pub struct TradingCalendarDay {
     pub date: ::prost::alloc::string::String,
     /// Number of trades executed.
     #[prost(int32, tag = "2")]
-    pub trade_count: i32,
+    pub trd_cnt: i32,
     /// Total traded volume in USD.
     #[prost(string, tag = "3")]
-    pub volume_usd: ::prost::alloc::string::String,
+    pub vol_usd: ::prost::alloc::string::String,
     /// Total fees paid in USD.
     #[prost(string, tag = "4")]
     pub fees_usd: ::prost::alloc::string::String,
@@ -1653,13 +1653,13 @@ pub struct GetTradingCalendarResponse {
     pub days: ::prost::alloc::vec::Vec<TradingCalendarDay>,
     /// Cumulative PnL in USD over the requested date range.
     #[prost(string, tag = "2")]
-    pub cumulative_pnl: ::prost::alloc::string::String,
+    pub cum_pnl: ::prost::alloc::string::String,
     /// Total number of trades over the requested date range.
     #[prost(int32, tag = "3")]
-    pub total_trades: i32,
+    pub tot_trds: i32,
     /// Total fees paid in USD over the requested date range.
     #[prost(string, tag = "4")]
-    pub total_fees: ::prost::alloc::string::String,
+    pub tot_fees: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetAssetsRequest {}
@@ -1925,10 +1925,10 @@ pub struct GetMarketCandlesRequest {
     pub intv: i64,
     /// Start time in nanoseconds (default: now() - 1 hour if not set).
     #[prost(int64, tag = "3")]
-    pub from: i64,
+    pub start_ts: i64,
     /// End time in nanoseconds (default: now() if not set).
     #[prost(int64, tag = "4")]
-    pub to: i64,
+    pub end_ts: i64,
 }
 /// GetMarketCandlesResponse returns historical candlestick data.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1973,10 +1973,10 @@ pub struct GetFundingRateHistoryRequest {
     pub mkt_id: ::prost::alloc::string::String,
     /// Start timestamp in nanoseconds to filter results from (inclusive).
     #[prost(int64, tag = "2")]
-    pub from: i64,
+    pub start_ts: i64,
     /// End timestamp in nanoseconds to filter results up to (exclusive).
     #[prost(int64, tag = "3")]
-    pub to: i64,
+    pub end_ts: i64,
     /// Maximum number of records to return per page (default: 20).
     #[prost(int64, tag = "4")]
     pub lmt: i64,
@@ -2002,7 +2002,7 @@ pub struct GetFundingRateHistoryResponse {
 pub struct FundingRateItem {
     /// Timestamp of the funding rate (nanoseconds).
     #[prost(int64, tag = "1")]
-    pub time: i64,
+    pub ts: i64,
     /// Funding rate value.
     #[prost(string, tag = "2")]
     pub rate: ::prost::alloc::string::String,
@@ -2442,7 +2442,7 @@ pub struct WithdrawalRequestItem {
     pub apprv_at: u64,
     /// Reason supplied with a rejection; empty otherwise.
     #[prost(string, tag = "14")]
-    pub rjct_rsn: ::prost::alloc::string::String,
+    pub rej_rsn: ::prost::alloc::string::String,
 }
 /// SendFundsRequest is the request for SendFunds.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2726,7 +2726,7 @@ pub struct GetReferralCodeResponse {
     pub code: ::prost::alloc::string::String,
     /// Unix seconds when the code was minted. Zero if not set.
     #[prost(int64, tag = "2")]
-    pub created_at: i64,
+    pub crt_ts: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SetReferralCodeRequest {
@@ -2783,7 +2783,7 @@ pub struct GetReferrerResponse {
     pub code: ::prost::alloc::string::String,
     /// Unix seconds when the binding happened. Zero if unbound.
     #[prost(int64, tag = "3")]
-    pub referred_at: i64,
+    pub ref_ts: i64,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetInviteesRequest {}
@@ -2791,10 +2791,10 @@ pub struct GetInviteesRequest {}
 pub struct GetInviteesResponse {
     /// Total number of invitees brought in.
     #[prost(int64, tag = "1")]
-    pub total_count: i64,
+    pub tot: i64,
     /// Total commission earned across all invitees, in USDC (decimal string).
     #[prost(string, tag = "2")]
-    pub total_commission: ::prost::alloc::string::String,
+    pub tot_comm: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "3")]
     pub invitees: ::prost::alloc::vec::Vec<Invitee>,
 }
@@ -2802,10 +2802,10 @@ pub struct GetInviteesResponse {
 pub struct Invitee {
     /// Masked invitee address.
     #[prost(string, tag = "1")]
-    pub address: ::prost::alloc::string::String,
+    pub addr: ::prost::alloc::string::String,
     /// Unix seconds when this invitee bound the caller as referrer.
     #[prost(int64, tag = "2")]
-    pub referred_at: i64,
+    pub ref_ts: i64,
     /// Commission earned from this invitee, in USDC (decimal string).
     #[prost(string, tag = "3")]
     pub commission: ::prost::alloc::string::String,
@@ -2814,7 +2814,7 @@ pub struct Invitee {
 pub struct GetReferralLeaderboardRequest {
     /// Max entries to return. Default 20, clamped to \[1, 100\].
     #[prost(int32, tag = "1")]
-    pub limit: i32,
+    pub lmt: i32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetReferralLeaderboardResponse {
@@ -3068,7 +3068,7 @@ pub struct GetVaultAccountValueHistoryResponse {
 pub struct VaultAccountValueSnapshot {
     /// Timestamp in nanoseconds.
     #[prost(uint64, tag = "1")]
-    pub time: u64,
+    pub ts: u64,
     /// Account value in USD.
     #[prost(string, tag = "2")]
     pub val_usd: ::prost::alloc::string::String,
@@ -3099,7 +3099,7 @@ pub struct GetVaultPnLHistoryResponse {
 pub struct VaultPnLSnapshot {
     /// Timestamp in nanoseconds.
     #[prost(uint64, tag = "1")]
-    pub time: u64,
+    pub ts: u64,
     /// PnL in USD.
     #[prost(string, tag = "2")]
     pub pnl_usd: ::prost::alloc::string::String,
@@ -3396,7 +3396,7 @@ pub struct ApiKey {
     pub crt_at: u64,
     /// Unix timestamp in nanoseconds when this API key expires. Zero means no expiration.
     #[prost(uint64, tag = "7")]
-    pub exp_at: u64,
+    pub exp_ts: u64,
     /// When true, this API key is restricted to read-only operations.
     #[prost(bool, tag = "8")]
     pub is_ro: bool,
