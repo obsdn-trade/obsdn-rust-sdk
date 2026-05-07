@@ -122,7 +122,7 @@ pub struct WaitlistXSignupResponse {
     /// RFC 3339 timestamp of the FIRST signup (created_at on the surviving
     /// row). Stable across repeat calls.
     #[prost(string, tag = "3")]
-    pub joined_at: ::prost::alloc::string::String,
+    pub joined_ts: ::prost::alloc::string::String,
 }
 /// Order represents a trading order on OBSDN.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1769,7 +1769,7 @@ pub struct Market {
     pub fund_intv: ::prost::alloc::string::String,
     /// Timestamp of the next funding payment (nanoseconds).
     #[prost(string, tag = "22")]
-    pub next_fund_time: ::prost::alloc::string::String,
+    pub next_fund_ts: ::prost::alloc::string::String,
     /// Predicted funding rate for the next interval.
     #[prost(string, tag = "23")]
     pub pred_fund_rt: ::prost::alloc::string::String,
@@ -1782,7 +1782,7 @@ pub struct Market {
     /// Open interest cap (0 = no cap).
     #[prost(string, tag = "26")]
     pub oi_cap: ::prost::alloc::string::String,
-    /// Tags for UI grouping/filtering. Values: "crypto", "equity".
+    /// Tags for UI grouping/filtering. Values: "crypto", "equities".
     #[prost(string, repeated, tag = "27")]
     #[doc(hidden)]
     pub tags: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
@@ -2145,7 +2145,7 @@ pub mod get_account_response {
         pub st: i32,
         /// Unix timestamp when the vault was created.
         #[prost(int64, tag = "4")]
-        pub crt_at: i64,
+        pub crt_ts: i64,
     }
     /// Subaccount information.
     #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2158,7 +2158,7 @@ pub mod get_account_response {
         pub st: i32,
         /// Unix timestamp when the subaccount was created.
         #[prost(int64, tag = "3")]
-        pub crt_at: i64,
+        pub crt_ts: i64,
         /// Display name of the subaccount.
         #[prost(string, tag = "4")]
         pub nm: ::prost::alloc::string::String,
@@ -2284,10 +2284,10 @@ pub struct GetTransferHistoryRequest {
     pub t: i32,
     /// Filter transfers from this Unix timestamp (inclusive).
     #[prost(uint64, tag = "2")]
-    pub blk_time_from: u64,
+    pub blk_start_ts: u64,
     /// Filter transfers up to this Unix timestamp (inclusive).
     #[prost(uint64, tag = "3")]
-    pub blk_time_to: u64,
+    pub blk_end_ts: u64,
     /// Page number for pagination (1-indexed).
     #[prost(int64, tag = "4")]
     pub pg: i64,
@@ -2340,7 +2340,7 @@ pub struct TransferItem {
     pub amt: ::prost::alloc::string::String,
     /// Unix timestamp of the block when the transfer occurred.
     #[prost(uint64, tag = "8")]
-    pub blk_time: u64,
+    pub blk_ts: u64,
     /// Whether the transfer is still pending confirmation.
     #[prost(bool, tag = "9")]
     pub pnd: bool,
@@ -2371,10 +2371,10 @@ pub struct GetWithdrawalRequestsRequest {
     pub asset: ::prost::alloc::string::String,
     /// Filter requests from this Unix timestamp (inclusive).
     #[prost(uint64, tag = "3")]
-    pub crt_at_from: u64,
+    pub crt_start_ts: u64,
     /// Filter requests up to this Unix timestamp (inclusive).
     #[prost(uint64, tag = "4")]
-    pub crt_at_to: u64,
+    pub crt_end_ts: u64,
     /// Page number for pagination (1-indexed).
     #[prost(int64, tag = "5")]
     pub pg: i64,
@@ -2421,10 +2421,10 @@ pub struct WithdrawalRequestItem {
     pub st: i32,
     /// Unix timestamp when the request was created.
     #[prost(uint64, tag = "7")]
-    pub crt_at: u64,
+    pub crt_ts: u64,
     /// Unix timestamp when the request was last updated.
     #[prost(uint64, tag = "8")]
-    pub upd_at: u64,
+    pub upd_ts: u64,
     /// Transaction hash when settled on-chain (empty if pending).
     #[prost(string, tag = "9")]
     pub tx_hash: ::prost::alloc::string::String,
@@ -2439,7 +2439,7 @@ pub struct WithdrawalRequestItem {
     pub apprv_by: ::prost::alloc::string::String,
     /// Unix timestamp of the approve/reject decision; 0 until decided.
     #[prost(uint64, tag = "13")]
-    pub apprv_at: u64,
+    pub apprv_ts: u64,
     /// Reason supplied with a rejection; empty otherwise.
     #[prost(string, tag = "14")]
     pub rej_rsn: ::prost::alloc::string::String,
@@ -3160,10 +3160,10 @@ pub struct GetVaultTransferHistoryRequest {
     pub t: i32,
     /// Filter from block time (optional).
     #[prost(uint64, tag = "3")]
-    pub blk_time_from: u64,
+    pub blk_start_ts: u64,
     /// Filter to block time (optional).
     #[prost(uint64, tag = "4")]
-    pub blk_time_to: u64,
+    pub blk_end_ts: u64,
     /// Page number.
     #[prost(int64, tag = "5")]
     pub pg: i64,
@@ -3193,10 +3193,10 @@ pub struct GetVaultTransferHistoryByUserRequest {
     pub t: i32,
     /// Filter from block time (optional).
     #[prost(uint64, tag = "2")]
-    pub blk_time_from: u64,
+    pub blk_start_ts: u64,
     /// Filter to block time (optional).
     #[prost(uint64, tag = "3")]
-    pub blk_time_to: u64,
+    pub blk_end_ts: u64,
     /// Page number.
     #[prost(int64, tag = "4")]
     pub pg: i64,
@@ -3280,10 +3280,10 @@ pub struct GetVaultStakerResponse {
     pub all_time_pnl: ::prost::alloc::string::String,
     /// Entry timestamp.
     #[prost(uint64, tag = "7")]
-    pub entry_time: u64,
+    pub entry_ts: u64,
     /// Lockup end timestamp.
     #[prost(uint64, tag = "8")]
-    pub lockup_until: u64,
+    pub lockup_ts: u64,
 }
 /// VaultStaker represents a staker in a vault.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3305,10 +3305,10 @@ pub struct VaultStaker {
     pub all_time_pnl: ::prost::alloc::string::String,
     /// Entry timestamp.
     #[prost(uint64, tag = "6")]
-    pub entry_time: u64,
+    pub entry_ts: u64,
     /// Lockup end timestamp.
     #[prost(uint64, tag = "7")]
-    pub lockup_until: u64,
+    pub lockup_ts: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetVaultPositionHistoryRequest {
@@ -3393,7 +3393,7 @@ pub struct ApiKey {
     pub signer: ::prost::alloc::string::String,
     /// Unix timestamp in nanoseconds when this API key was created.
     #[prost(uint64, tag = "6")]
-    pub crt_at: u64,
+    pub crt_ts: u64,
     /// Unix timestamp in nanoseconds when this API key expires. Zero means no expiration.
     #[prost(uint64, tag = "7")]
     pub exp_ts: u64,
@@ -3646,7 +3646,7 @@ pub struct OnChainEventItem {
     #[prost(uint64, tag = "4")]
     pub blk_num: u64,
     #[prost(uint64, tag = "5")]
-    pub blk_time: u64,
+    pub blk_ts: u64,
     /// Event type: "deposit", "withdraw", "register_signer", etc.
     #[prost(string, tag = "6")]
     pub evt_t: ::prost::alloc::string::String,
