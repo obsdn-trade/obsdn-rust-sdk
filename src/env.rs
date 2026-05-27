@@ -1,11 +1,8 @@
 //! Environment selection — REST + WebSocket endpoints per env.
 //!
-//! Production is a placeholder until pulse.prd public endpoints land
-//! (`docs/api/ws-integration.md` notes "Not yet available"). Internal
-//! Twingate-gated hosts are NOT exposed here — those require a private
-//! network and an `x-bypass` debug header that is intentionally ungated
-//! on the public domain. SDK consumers should pass an explicit
-//! [`Env::Custom`] base URL when targeting `*.int.obsdn.trade`.
+//! Internal Twingate-gated hosts are NOT exposed here — those require a
+//! private network. SDK consumers should pass an explicit [`Env::Custom`]
+//! base URL when targeting `*.int.obsdn.trade`.
 
 /// Target environment for [`crate::Client`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,9 +39,6 @@ impl Env {
         match self {
             Env::Local => "ws://localhost:8080/ws",
             Env::Staging => "wss://pulse.staging.obsdn.trade/ws",
-            // Public production WS not yet announced; keep a sentinel that
-            // matches the `api.obsdn.trade` host so a misconfigured client
-            // fails fast rather than silently picking staging.
             Env::Production => "wss://pulse.obsdn.trade/ws",
             Env::Custom { ws, .. } => ws.as_str(),
         }

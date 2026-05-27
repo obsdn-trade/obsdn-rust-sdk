@@ -1,4 +1,4 @@
-//! Place a single LIMIT order on staging.
+//! Place a single LIMIT order on production.
 //!
 //! Run:
 //! ```bash
@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
 
     let signer = Arc::new(LocalSigner::from_hex(&private_key)?);
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .api_key(api_key, api_secret)
         .eip_signer(signer)
         .build()?;

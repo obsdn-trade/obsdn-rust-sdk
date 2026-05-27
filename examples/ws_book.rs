@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let market = std::env::args().nth(1).unwrap_or_else(|| "BTC-PERP".into());
-    let client = Client::builder().env(Env::Staging).build()?;
+    let client = Client::builder().env(Env::Production).build()?;
     let ws = client.ws();
     let mut stream = ws
         .subscribe(Channel::Book {

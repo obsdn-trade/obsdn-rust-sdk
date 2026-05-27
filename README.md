@@ -35,7 +35,6 @@ obsdn-sdk = { path = "vendor/obsdn-sdk" }
 | `OBSDN_API_KEY`      | HMAC API key — required for authenticated endpoints / private channels. |
 | `OBSDN_API_SECRET`   | HMAC API secret. Pair with `OBSDN_API_KEY`.                              |
 | `OBSDN_PRIVATE_KEY`  | secp256k1 private key (hex, `0x`-prefixed or bare) for EIP-712 signing.  |
-| `OBSDN_ENV`          | Optional — `staging` (default) / `production` / `local`.                 |
 | `RUST_LOG`           | Standard `tracing-subscriber` filter (e.g. `obsdn_sdk=debug,info`).      |
 
 > ⚠️ Never commit secrets. Use a local `.env` (gitignored) or your secret manager.
@@ -48,7 +47,7 @@ use obsdn_sdk::{Client, Env};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .api_key(std::env::var("OBSDN_API_KEY")?, std::env::var("OBSDN_API_SECRET")?)
         .build()?;
     let markets = client.markets().get_markets().await?;
@@ -68,7 +67,7 @@ use obsdn_sdk::{Client, Env, LocalSigner};
 
 let signer = Arc::new(LocalSigner::from_hex(&std::env::var("OBSDN_PRIVATE_KEY")?)?);
 let client = Client::builder()
-    .env(Env::Staging)
+    .env(Env::Production)
     .api_key(key, secret)
     .eip_signer(signer)
     .build()?;

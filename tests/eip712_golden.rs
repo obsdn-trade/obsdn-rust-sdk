@@ -2,9 +2,9 @@
 //! struct hashes / digests / signatures vs. the Go signer.
 //!
 //! Fixtures under `tests/fixtures/eip712/*.json` are captured by
-//! `sdk/rust/scripts/capture_eip712_fixtures.go`. Re-run that script when:
+//! `scripts/capture_eip712_fixtures.go`. Re-run that script when:
 //!   - any template `.json.tmpl` changes
-//!   - the canonical staging domain changes (chain id / contract)
+//!   - the domain changes (chain id / contract)
 //!   - a new sign function is added (also add a fixture there)
 //!
 //! What we assert per fixture:

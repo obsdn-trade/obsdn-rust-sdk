@@ -17,6 +17,8 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::time::timeout;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
+use alloy_primitives::Address;
+use alloy_sol_types::eip712_domain;
 use obsdn_sdk::ws::{Channel, ChannelName, WsEvent};
 use obsdn_sdk::{Client, Env};
 
@@ -267,13 +269,22 @@ where
 
 /* ──── tests ───────────────────────────────────────────────────────── */
 
+fn dummy_domain() -> alloy_sol_types::Eip712Domain {
+    eip712_domain! {
+        name: "Test",
+        version: "1",
+        chain_id: 1u64,
+        verifying_contract: Address::ZERO,
+    }
+}
+
 fn build_client(url: String) -> Client {
     Client::builder()
         .env(Env::Custom {
-            // REST not exercised; provide a syntactically-valid placeholder.
             rest: "http://127.0.0.1:1".into(),
             ws: url,
         })
+        .eip712_domain(dummy_domain())
         .build()
         .expect("build client")
 }
@@ -442,6 +453,7 @@ async fn auth_replay_failure_emits_unauthorized_after_reconnect() {
             rest: "http://127.0.0.1:1".into(),
             ws: mock.url(),
         })
+        .eip712_domain(dummy_domain())
         .api_key("k", "s")
         .build()
         .expect("build client");
@@ -615,6 +627,7 @@ async fn disconnected_authenticate_blocks_until_replay() {
             rest: "http://127.0.0.1:1".into(),
             ws: mock.url(),
         })
+        .eip712_domain(dummy_domain())
         .api_key("k", "s")
         .build()
         .expect("build client");

@@ -1,10 +1,8 @@
 //! Per-environment EIP-712 domain values.
 //!
-//! Mirrors `pkg/config/chain.go::Domain` + the staging/local config in
-//! `configs/shared/chain/base_sepolia.yaml`. Production currently has no
-//! deployed contract — `Env::Production` returns a zero-contract domain
-//! that will fail verification by design (matches the placeholder in
-//! `configs/shared/chain/production.yaml`).
+//! Mirrors `pkg/config/chain.go::Domain`. Staging uses base-sepolia
+//! (`configs/shared/chain/base_sepolia.yaml`), production uses Monad
+//! mainnet (`configs/shared/chain/monad_mainnet.yaml`).
 
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{eip712_domain, Eip712Domain};
@@ -15,14 +13,12 @@ use crate::env::Env;
 /// value. Go uses one `config.Domain` for all signers (orders, transfers,
 /// withdrawals, vaults, registers); we keep that 1:1.
 ///
-/// **Staging / Local** point at base-sepolia. **Production** is a stub
-/// matching the unfilled config in `configs/shared/chain/production.yaml`
-/// — update this when the public mainnet contract lands.
+/// **Staging / Local** → base-sepolia. **Production** → Monad mainnet.
 pub fn sdk_domain(env: &Env) -> Eip712Domain {
     match env {
         Env::Local | Env::Staging => staging_domain(),
         Env::Production => production_domain(),
-        Env::Custom { .. } => staging_domain(),
+        Env::Custom { .. } => production_domain(),
     }
 }
 
@@ -53,14 +49,14 @@ fn staging_domain() -> Eip712Domain {
     }
 }
 
-/// Production placeholder — matches the unfilled config. Verification will
-/// fail against a real deployed contract; rebuild this when production
-/// launches.
+/// Production domain — Monad mainnet (chain 143).
+/// Values at time of writing; canonical source: `GET /chain/config`.
+/// These rarely change — any change will be announced publicly.
 fn production_domain() -> Eip712Domain {
     eip712_domain! {
         name: "Obsidian",
         version: "1",
-        chain_id: 0u64,
-        verifying_contract: Address::ZERO,
+        chain_id: 143u64,
+        verifying_contract: address!("90c3747cd4E6bC6FbebB1b3C54D99737590eBE45"),
     }
 }

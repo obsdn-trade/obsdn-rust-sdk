@@ -12,7 +12,7 @@ full API reference; this file is the orientation, not the spec.
 └─────────────────────────────────┬──────────────────────────────────────────┘
                                   │
                        Client::builder()
-                         .env(Env::Staging)
+                         .env(Env::Production)
                          .api_key(k, s)        ← HMAC for REST/WS auth
                          .eip_signer(local)    ← EIP-712 for orders/transfers
                          .build()?
@@ -138,12 +138,12 @@ full API reference; this file is the orientation, not the spec.
 ## Crate layout
 
 ```
-  sdk/rust/
-  ├── Cargo.toml          path-dep on api/proto, build.rs codegen
-  ├── build.rs            buf export → prost+pbjson → OUT_DIR
+  obsdn-rust-sdk/
+  ├── Cargo.toml          standalone crate
   ├── examples/           place_order, cancel_order, ws_book,
   │                       ws_private_orders, transfer, withdraw,
   │                       book_with_resync
+  ├── scripts/            codegen-rust (proto → prost+pbjson)
   └── src/
       ├── lib.rs          re-exports Client, Env, LocalSigner
       ├── builder.rs      ClientBuilder, Client (Arc handle)
@@ -154,7 +154,7 @@ full API reference; this file is the orientation, not the spec.
       ├── rest/           orders / portfolio / markets / price /
       │                   transfers + RestClient + query helpers
       ├── sign/           EIP-712 order/transfer/withdraw + LocalSigner
-      ├── types/v1/       generated wire types
+      ├── types/          generated wire types (nil.v1)
       └── ws/             managed.rs (top-level), connection.rs (raw),
                           channel.rs, event.rs, frame.rs, views.rs, gsn.rs
 ```

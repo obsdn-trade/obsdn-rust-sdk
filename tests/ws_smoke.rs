@@ -1,11 +1,11 @@
-//! Phase 6 managed-WS smoke tests against the live staging pulse.
+//! Managed-WS smoke tests against the live production pulse.
 //!
 //! Skipped silently when the gating env vars aren't set so CI doesn't
-//! hammer staging from PR runs. To enable:
+//! hammer production from PR runs. To enable:
 //!
 //! ```sh
-//! OBSDN_STAGING_SMOKE=1 cargo test --test ws_smoke -- --nocapture
-//! OBSDN_STAGING_API_KEY=... OBSDN_STAGING_API_SECRET=... \
+//! OBSDN_SMOKE=1 cargo test --test ws_smoke -- --nocapture
+//! OBSDN_API_KEY=... OBSDN_API_SECRET=... \
 //!     cargo test --test ws_smoke ws_authenticated_smoke -- --nocapture
 //! ```
 
@@ -16,23 +16,23 @@ use obsdn_sdk::ws::{Channel, ChannelName, WsEvent, WsUpdateKind};
 use obsdn_sdk::{Client, Env};
 
 fn opt_in() -> bool {
-    std::env::var("OBSDN_STAGING_SMOKE").is_ok()
+    std::env::var("OBSDN_SMOKE").is_ok()
 }
 
 fn creds() -> Option<(String, String)> {
-    let key = std::env::var("OBSDN_STAGING_API_KEY").ok()?;
-    let secret = std::env::var("OBSDN_STAGING_API_SECRET").ok()?;
+    let key = std::env::var("OBSDN_API_KEY").ok()?;
+    let secret = std::env::var("OBSDN_API_SECRET").ok()?;
     Some((key, secret))
 }
 
 #[tokio::test]
 async fn ws_book_subscribe_smoke() {
     if !opt_in() {
-        eprintln!("skipping: set OBSDN_STAGING_SMOKE=1 to enable");
+        eprintln!("skipping: set OBSDN_SMOKE=1 to enable");
         return;
     }
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .build()
         .expect("build client");
     let ws = client.ws();
@@ -70,15 +70,15 @@ async fn ws_book_subscribe_smoke() {
 #[tokio::test]
 async fn ws_authenticated_smoke() {
     if !opt_in() {
-        eprintln!("skipping: set OBSDN_STAGING_SMOKE=1 to enable");
+        eprintln!("skipping: set OBSDN_SMOKE=1 to enable");
         return;
     }
     let Some((key, secret)) = creds() else {
-        eprintln!("skipping: OBSDN_STAGING_API_KEY/SECRET not set");
+        eprintln!("skipping: OBSDN_API_KEY/SECRET not set");
         return;
     };
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .api_key(key, secret)
         .build()
         .expect("build authed client");

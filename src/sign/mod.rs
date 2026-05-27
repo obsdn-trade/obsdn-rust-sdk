@@ -12,7 +12,7 @@
 //! | [`register`]  | `Register`, `DelegatedSigner`                 |
 //!
 //! Correctness gate: `tests/eip712_golden.rs` loads JSON fixtures captured
-//! from the Go signer (`sdk/rust/scripts/capture_eip712_fixtures.go`) and
+//! from the Go signer (`scripts/capture_eip712_fixtures.go`) and
 //! asserts the Rust hash matches byte-for-byte. Without these, a subtle
 //! type-encoding bug would silently reject orders at the matching engine —
 //! see `pkg/ethsig/verify_order.go::computeOrderStructHash`.
@@ -44,6 +44,8 @@ pub use withdraw::{sign_withdraw, WithdrawPayload};
 use alloy_primitives::{Address, B256};
 use alloy_signer::SignerSync;
 use alloy_signer_local::PrivateKeySigner;
+
+use zeroize::Zeroize;
 
 use crate::error::{Error, Result};
 
@@ -88,9 +90,10 @@ impl LocalSigner {
     /// Build from a hex-encoded private key (`0x`-prefixed or bare).
     pub fn from_hex(hex_str: &str) -> Result<Self> {
         let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-        let bytes = hex::decode(stripped)
+        let mut bytes = hex::decode(stripped)
             .map_err(|e| Error::Sign(format!("invalid hex private key: {e}")))?;
         if bytes.len() != 32 {
+            bytes.zeroize();
             return Err(Error::Sign(format!(
                 "private key must be 32 bytes, got {}",
                 bytes.len()
@@ -98,7 +101,10 @@ impl LocalSigner {
         }
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&bytes);
-        Self::from_bytes(&arr)
+        bytes.zeroize();
+        let result = Self::from_bytes(&arr);
+        arr.zeroize();
+        result
     }
 
     /// Borrow the underlying alloy signer (e.g., to attach a chain id).

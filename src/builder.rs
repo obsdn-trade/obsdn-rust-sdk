@@ -171,7 +171,7 @@ impl Client {
     }
 }
 
-/// Builder for [`Client`]. Defaults: env=Staging, timeout=10s, no signer.
+/// Builder for [`Client`]. Defaults: env=Production, timeout=10s, no signer.
 #[derive(Default)]
 pub struct ClientBuilder {
     env: Option<Env>,
@@ -247,7 +247,7 @@ impl ClientBuilder {
     /// Finalize. Returns `Error::Config` if the resolved base URL is
     /// invalid.
     pub fn build(self) -> Result<Client> {
-        let env = self.env.unwrap_or(Env::Staging);
+        let env = self.env.unwrap_or(Env::Production);
         let base = match self.base_url_override {
             Some(s) => s,
             None => env.rest_base_url().to_string(),
@@ -258,7 +258,17 @@ impl ClientBuilder {
         let hmac = self.signer.clone();
         let rest = RestClient::new(base_url, self.signer, timeout, self.user_agent)?;
         let rest = Arc::new(rest);
-        let domain = self.domain_override.unwrap_or_else(|| sdk_domain(&env));
+        let domain = match (&env, self.domain_override) {
+            (_, Some(d)) => d,
+            (Env::Custom { .. }, None) => {
+                return Err(Error::Config(
+                    "Env::Custom requires an explicit .eip712_domain() — \
+                     the SDK cannot guess the correct chain_id / verifying_contract"
+                        .into(),
+                ));
+            }
+            (env, None) => sdk_domain(env),
+        };
         let markets_api = MarketsApi::new(Arc::clone(&rest));
         let markets_cache = Arc::new(MarketCache::new(markets_api));
         Ok(Client {

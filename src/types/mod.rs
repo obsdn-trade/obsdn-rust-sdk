@@ -11,7 +11,7 @@
 
 #[allow(missing_docs)]
 pub mod nil {
-    #[allow(missing_docs)]
+    #[allow(missing_docs, rustdoc::invalid_html_tags)]
     pub mod v1 {
         // prost-generated message + enum types. Auto-generated; field-level
         // doc comments come from the .proto sources via prost — `missing_docs`

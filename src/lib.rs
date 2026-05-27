@@ -12,7 +12,7 @@
 //! use obsdn_sdk::{Client, Env};
 //!
 //! let client = Client::builder()
-//!     .env(Env::Staging)
+//!     .env(Env::Production)
 //!     .api_key("my-api-key", "my-api-secret")
 //!     .build()?;
 //!
@@ -32,7 +32,7 @@
 //!
 //! let signer = Arc::new(LocalSigner::from_hex("0x...")?);
 //! let client = Client::builder()
-//!     .env(Env::Staging)
+//!     .env(Env::Production)
 //!     .api_key("key", "secret")
 //!     .eip_signer(signer)
 //!     .build()?;
@@ -52,7 +52,7 @@
 //! use obsdn_sdk::ws::{Channel, WsEvent};
 //! use obsdn_sdk::{Client, Env};
 //!
-//! let client = Client::builder().env(Env::Staging).build()?;
+//! let client = Client::builder().env(Env::Production).build()?;
 //! let ws = client.ws();
 //! let mut stream = ws
 //!     .subscribe(Channel::Book { market: "BTC-PERP".into() })
@@ -66,7 +66,7 @@
 //! # Ok(()) }
 //! ```
 //!
-//! See `sdk/rust/examples/` for end-to-end flows (place_order,
+//! See `examples/` for end-to-end flows (place_order,
 //! ws_book, transfer, withdraw, book_with_resync, ...).
 
 #![warn(rust_2018_idioms)]

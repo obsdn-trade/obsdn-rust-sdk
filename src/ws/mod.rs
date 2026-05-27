@@ -15,7 +15,7 @@
 //! use obsdn_sdk::{Client, Env};
 //! use obsdn_sdk::ws::{Channel, WsEvent};
 //!
-//! let client = Client::builder().env(Env::Staging).build()?;
+//! let client = Client::builder().env(Env::Production).build()?;
 //! let ws = client.ws();
 //! let mut stream = ws.subscribe(Channel::Book { market: "BTC-PERP".into() }).await?;
 //! while let Some(evt) = stream.next().await {

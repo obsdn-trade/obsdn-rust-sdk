@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
 
     let signer = Arc::new(LocalSigner::from_hex(&private_key)?);
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .api_key(api_key, api_secret)
         .eip_signer(signer.clone())
         .build()?;

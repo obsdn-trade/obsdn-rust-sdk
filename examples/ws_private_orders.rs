@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
     let api_key = std::env::var("OBSDN_API_KEY").context("OBSDN_API_KEY")?;
     let api_secret = std::env::var("OBSDN_API_SECRET").context("OBSDN_API_SECRET")?;
     let client = Client::builder()
-        .env(Env::Staging)
+        .env(Env::Production)
         .api_key(api_key, api_secret)
         .build()?;
 
