@@ -125,6 +125,8 @@ cargo test                  # 87 offline tests (unit + WS chaos + REST/WS smoke)
 cargo doc --no-deps
 ```
 
+Or via the Makefile (mirrors CI): `make style` (fmt check), `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
+
 `cargo build` does NOT require `buf` or `protoc` — wire types live committed under `src/types/generated/`.
 
 Offline `cargo test` covers unit tests, EIP-712 golden fixtures, the WS chaos
