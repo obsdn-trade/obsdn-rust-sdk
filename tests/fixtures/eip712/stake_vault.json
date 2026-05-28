@@ -3,8 +3,8 @@
   "domain": {
     "name": "Obsidian",
     "version": "1",
-    "chain_id": "84532",
-    "verifying_contract": "0x988Af38b04a377322aB9A5214F045938348dB155"
+    "chain_id": "10143",
+    "verifying_contract": "0xB95aE40b700FDBb0906b8Dc2AeBBDd94848325Df"
   },
   "input": {
     "amount": "100000000",
@@ -13,10 +13,10 @@
     "token": "0x3333333333333333333333333333333333333333",
     "vault": "0x4444444444444444444444444444444444444444"
   },
-  "domain_separator": "0xc669577be7637dbfe0b38ef377d5aaa20114222add3192186ec5bcbc2787f136",
+  "domain_separator": "0x015838c3bb89cb7ac14be0a4c0c5f143c3782da15cb8b45375fc82b01d22794b",
   "struct_hash": "0x4c8d752aabc9c41a4a3d9df6fb3d3e7f794bdc998ba77f83a7ab1594789dcb6d",
-  "digest": "0x91f065dd0ace7efcc81ee6b4fe0b8ebd6dc7560f8db18a81d9c651245b9708b7",
+  "digest": "0xdc7b1a78325d5f933f9c10ab6c1aa509baa9eb177198e58b7481aff8cbbe5579",
   "private_key": "0x0101010101010101010101010101010101010101010101010101010101010101",
   "signer_address": "0x1a642f0E3c3aF545E7AcBD38b07251B3990914F1",
-  "signature": "0xc4284e1649c61126be49d50904e8a69b7d03c3dfac07ad55d2813b7bfad86aa965f167b8d64153453caa80350f1ff9c9146f2df802c5985fa4f27ebd35105c931b"
+  "signature": "0xe77fe92e2250e3745ab1fdfaa60d2bd55c15665ff616ab591c915cfd6fe9e0bc7d16e67aff9e59552e212e94c016680c0cbf5c8fd56c1d85500c491055c18bc91b"
 }

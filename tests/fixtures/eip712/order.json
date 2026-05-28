@@ -3,8 +3,8 @@
   "domain": {
     "name": "Obsidian",
     "version": "1",
-    "chain_id": "84532",
-    "verifying_contract": "0x988Af38b04a377322aB9A5214F045938348dB155"
+    "chain_id": "10143",
+    "verifying_contract": "0xB95aE40b700FDBb0906b8Dc2AeBBDd94848325Df"
   },
   "input": {
     "market_index": 7,
@@ -14,10 +14,10 @@
     "side": "buy",
     "size": "1500000000000000000"
   },
-  "domain_separator": "0xc669577be7637dbfe0b38ef377d5aaa20114222add3192186ec5bcbc2787f136",
+  "domain_separator": "0x015838c3bb89cb7ac14be0a4c0c5f143c3782da15cb8b45375fc82b01d22794b",
   "struct_hash": "0x411eed617812e74377136070c7e53994f205b3c09df084f1a0a00bacdf67a8d7",
-  "digest": "0xa01ca29ac2a0b9545e035703777684f33dc3f4a234ba57a729d89bdbd1d69779",
+  "digest": "0xf8bb1f4ee9619449a935051c275065531f33d56b9c58bc58666a0f05974809b7",
   "private_key": "0x0101010101010101010101010101010101010101010101010101010101010101",
   "signer_address": "0x1a642f0E3c3aF545E7AcBD38b07251B3990914F1",
-  "signature": "0x89196d78c05c8d342fa10896590a50042e7c7b930e72b5d462130c41d1c6e90c107ebb7b76e5624968003cbe1e4598a77a59d02ea04bcc49ccfbe4e7ee8210d71c"
+  "signature": "0x9e963866cd1506c6fdfc14ff9d43eb890b3e96f5d7cc4ef2194ceb73779cc8c83f798ec234bf6a10a029f2ba71332c3f3557744ea37e5bd6475f858d2e7f92fe1c"
 }
