@@ -28,7 +28,7 @@ impl Env {
     pub fn rest_base_url(&self) -> &str {
         match self {
             Env::Local => "http://localhost:8080",
-            Env::Staging => "https://api.staging.obsdn.trade",
+            Env::Staging => "https://nova.staging.obsdn.trade",
             Env::Production => "https://api.obsdn.trade",
             Env::Custom { rest, .. } => rest.as_str(),
         }

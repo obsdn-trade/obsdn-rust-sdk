@@ -111,12 +111,10 @@ impl MarketCache {
         Err(Error::Config(format!("unknown market: {mkt_id}")))
     }
 
-    /// Parse `Market.idx` (a decimal string) into the `u8` shape required
-    /// by the EIP-712 `Order.marketIndex` field. Server-side indexes are
-    /// constrained to `< 256` (matching engine packs them into a single
-    /// byte); a parse failure here means proto/schema drift.
-    pub(crate) fn idx_as_u8(market: &Market) -> Result<u8> {
-        market.idx.parse::<u8>().map_err(|e| {
+    /// Parse `Market.idx` (a decimal string) into the `u16` shape required
+    /// by the EIP-712 `Order.marketIndex` field.
+    pub(crate) fn idx_as_u16(market: &Market) -> Result<u16> {
+        market.idx.parse::<u16>().map_err(|e| {
             Error::Config(format!(
                 "market {} has invalid idx {}: {e}",
                 market.mkt_id, market.idx

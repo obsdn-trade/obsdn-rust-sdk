@@ -16,6 +16,7 @@ sol! {
     /// Template: `register_signed_by_sender.json.tmpl` (primaryType `Register`).
     #[derive(Debug)]
     struct Register {
+        address sender;
         address signer;
         string message;
         uint64 nonce;
@@ -34,6 +35,8 @@ sol! {
 /// authorize a new signer key.
 #[derive(Debug, Clone)]
 pub struct RegisterPayload {
+    /// Sender address (the main wallet authorizing the signer).
+    pub sender: Address,
     /// Signing key being authorized.
     pub signer: Address,
     /// Human-readable consent message.
@@ -45,6 +48,7 @@ pub struct RegisterPayload {
 impl RegisterPayload {
     fn into_sol(self) -> Register {
         Register {
+            sender: self.sender,
             signer: self.signer,
             message: self.message,
             nonce: self.nonce,

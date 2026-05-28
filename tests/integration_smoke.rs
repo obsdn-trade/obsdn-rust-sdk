@@ -35,11 +35,7 @@ async fn get_markets_smoke() {
         .env(Env::Production)
         .build()
         .expect("build client");
-    let resp = client
-        .markets()
-        .get_markets()
-        .await
-        .expect("get_markets");
+    let resp = client.markets().get_markets().await.expect("get_markets");
     assert!(
         !resp.mkts.is_empty(),
         "production should expose at least one market"

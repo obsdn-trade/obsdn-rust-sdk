@@ -39,13 +39,13 @@ pub fn custom_domain(name: &str, version: &str, chain_id: u64, contract: Address
     }
 }
 
-/// Canonical staging / base-sepolia domain.
+/// Canonical staging / Monad-testnet domain.
 fn staging_domain() -> Eip712Domain {
     eip712_domain! {
         name: "Obsidian",
         version: "1",
-        chain_id: 84532u64,
-        verifying_contract: address!("988Af38b04a377322aB9A5214F045938348dB155"),
+        chain_id: 10143u64,
+        verifying_contract: address!("B95aE40b700FDBb0906b8Dc2AeBBDd94848325Df"),
     }
 }
 

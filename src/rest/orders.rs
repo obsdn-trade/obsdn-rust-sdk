@@ -173,7 +173,7 @@ impl OrdersApi {
             }
         }
         let market = client.resolve_market(req.mkt_id).await?;
-        let market_index = MarketCache::idx_as_u8(&market)?;
+        let market_index = MarketCache::idx_as_u16(&market)?;
         let size_x18 = scale_f64(req.size)?;
         let price_x18 = scale_f64(req.price)?;
         let nonce = if req.nonce == 0 {

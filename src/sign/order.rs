@@ -18,7 +18,7 @@ sol! {
     #[derive(Debug)]
     struct Order {
         address sender;
-        uint8 marketIndex;
+        uint16 marketIndex;
         uint8 side;
         uint128 size;
         uint128 price;
@@ -52,7 +52,7 @@ pub struct OrderPayload {
     /// Sender address (the trader's main wallet).
     pub sender: Address,
     /// Market index — looked up from `markets()`/proto `Market.idx`.
-    pub market_index: u8,
+    pub market_index: u16,
     /// Buy / sell.
     pub side: OrderSide,
     /// Size in base-asset 18-decimal fixed-point.

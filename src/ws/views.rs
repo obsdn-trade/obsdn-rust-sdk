@@ -45,6 +45,9 @@ pub struct BookView {
     /// `[price, size]` rows. Snapshot: ascending by price.
     #[serde(default)]
     pub asks: Vec<[String; 2]>,
+    /// CRC32-IEEE of the full book state — validate local book after applying diffs.
+    #[serde(default)]
+    pub checksum: u32,
 }
 
 /// Best bid/ask frame (`ticker` channel).

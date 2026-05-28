@@ -32,6 +32,213 @@ pub struct Endpoint {
     pub read_only_allowed: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListJournalEntriesRequest {
+    /// Filter by event type (optional, e.g. "deposit", "match", "funding").
+    #[prost(string, tag = "1")]
+    pub event_type: ::prost::alloc::string::String,
+    /// Filter entries from this Unix timestamp in nanoseconds (inclusive).
+    #[prost(uint64, tag = "2")]
+    pub start_ts: u64,
+    /// Filter entries up to this Unix timestamp in nanoseconds (exclusive).
+    #[prost(uint64, tag = "3")]
+    pub end_ts: u64,
+    /// Page size. Default 50, max 200.
+    #[prost(int32, tag = "4")]
+    pub lmt: i32,
+    /// Opaque cursor from previous response.
+    #[prost(string, tag = "5")]
+    pub cursor: ::prost::alloc::string::String,
+}
+/// ListJournalEntriesResponse is the paginated list of journal entries.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListJournalEntriesResponse {
+    /// Journal entries in this page, ordered by id DESC (newest first).
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<JournalEntryItem>,
+    /// Cursor for the next page. Empty when no more pages.
+    #[prost(string, tag = "2")]
+    pub next_cursor: ::prost::alloc::string::String,
+    /// True if more pages remain.
+    #[prost(bool, tag = "3")]
+    pub has_more: bool,
+}
+/// JournalEntryItem represents a single journal entry in the double-entry ledger.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct JournalEntryItem {
+    /// Database row id.
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    /// Global sequence number of the event that produced this journal entry.
+    #[prost(int64, tag = "2")]
+    pub gsn: i64,
+    /// Event type that triggered this entry (e.g. "deposit", "match", "funding").
+    #[prost(string, tag = "3")]
+    pub event_type: ::prost::alloc::string::String,
+    /// Unique origin identifier (e.g. "onchain@0xabc...:5", "match@m123", "funding@BTC-PERP:1234").
+    #[prost(string, tag = "4")]
+    pub origin: ::prost::alloc::string::String,
+    /// Arbitrary JSON metadata attached to the journal entry.
+    #[prost(string, tag = "5")]
+    pub metadata: ::prost::alloc::string::String,
+    /// Creation timestamp (Unix nanoseconds).
+    #[prost(int64, tag = "6")]
+    pub crt_ts: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetJournalEntryRequest {
+    /// Journal origin string (e.g. "onchain@0x...:5", "match@abc123").
+    #[prost(string, tag = "1")]
+    pub origin: ::prost::alloc::string::String,
+}
+/// GetJournalEntryResponse returns the journal entry with all associated records.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetJournalEntryResponse {
+    /// The journal entry.
+    #[prost(message, optional, tag = "1")]
+    pub journal: ::core::option::Option<JournalEntryItem>,
+    /// Ledger entries (debits/credits) linked to this journal.
+    #[prost(message, repeated, tag = "2")]
+    pub entries: ::prost::alloc::vec::Vec<LedgerEntryItem>,
+    /// Fund transfers linked to this journal.
+    #[prost(message, repeated, tag = "3")]
+    pub transfers: ::prost::alloc::vec::Vec<LedgerTransferItem>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListLedgerEntriesRequest {
+    /// Filter by wallet address (optional).
+    #[prost(string, tag = "1")]
+    pub addr: ::prost::alloc::string::String,
+    /// Filter by asset symbol (optional, e.g. "USDC").
+    #[prost(string, tag = "2")]
+    pub asset: ::prost::alloc::string::String,
+    /// Filter by ledger entry type (optional). One of: "deposit", "withdraw",
+    /// "sequencer_fee", "transfer", "stake", "unstake", "unstake_fee", "funding",
+    /// "trading_fee", "liquidation_fee", "maker_rebate", "referral_fee",
+    /// "claim_trading_fee", "claim_sequencer_fee", "insurance_deposit",
+    /// "insurance_withdraw", "rebate_deposit", "settle_rebate", "realized_pnl".
+    #[prost(string, tag = "3")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Filter entries from this Unix timestamp in nanoseconds (inclusive).
+    #[prost(uint64, tag = "4")]
+    pub start_ts: u64,
+    /// Filter entries up to this Unix timestamp in nanoseconds (exclusive).
+    #[prost(uint64, tag = "5")]
+    pub end_ts: u64,
+    /// Page size. Default 50, max 200.
+    #[prost(int32, tag = "6")]
+    pub lmt: i32,
+    /// Opaque cursor from previous response.
+    #[prost(string, tag = "7")]
+    pub cursor: ::prost::alloc::string::String,
+}
+/// ListLedgerEntriesResponse is the paginated list of ledger entries.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListLedgerEntriesResponse {
+    /// Ledger entries in this page, ordered by id DESC (newest first).
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<LedgerEntryItem>,
+    /// Cursor for the next page. Empty when no more pages.
+    #[prost(string, tag = "2")]
+    pub next_cursor: ::prost::alloc::string::String,
+    /// True if more pages remain.
+    #[prost(bool, tag = "3")]
+    pub has_more: bool,
+}
+/// LedgerEntryItem represents a single debit or credit in the ledger.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LedgerEntryItem {
+    /// Database row id.
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    /// Origin of the parent journal entry.
+    #[prost(string, tag = "2")]
+    pub journal_origin: ::prost::alloc::string::String,
+    /// Wallet address affected by this entry.
+    #[prost(string, tag = "3")]
+    pub addr: ::prost::alloc::string::String,
+    /// Asset symbol (e.g. "USDC").
+    #[prost(string, tag = "4")]
+    pub asset: ::prost::alloc::string::String,
+    /// Amount as a decimal string. Positive = credit, negative = debit.
+    #[prost(string, tag = "5")]
+    pub amt: ::prost::alloc::string::String,
+    /// Entry type (e.g. "deposit", "withdraw", "trading_fee", "realized_pnl").
+    #[prost(string, tag = "6")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Creation timestamp (Unix nanoseconds).
+    #[prost(int64, tag = "7")]
+    pub crt_ts: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListLedgerTransfersRequest {
+    /// Filter by sender or receiver address (optional). Matches from_address OR to_address.
+    #[prost(string, tag = "1")]
+    pub addr: ::prost::alloc::string::String,
+    /// Filter by asset symbol (optional, e.g. "USDC").
+    #[prost(string, tag = "2")]
+    pub asset: ::prost::alloc::string::String,
+    /// Filter by transfer type (optional). One of: "deposit", "withdraw",
+    /// "sequencer_fee", "transfer", "stake", "unstake", "unstake_fee", "funding",
+    /// "trading_fee", "liquidation_fee", "maker_rebate", "referral_fee",
+    /// "claim_trading_fee", "claim_sequencer_fee", "insurance_deposit",
+    /// "insurance_withdraw", "rebate_deposit", "settle_rebate", "realized_pnl".
+    #[prost(string, tag = "3")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Filter transfers from this Unix timestamp in nanoseconds (inclusive).
+    #[prost(uint64, tag = "4")]
+    pub start_ts: u64,
+    /// Filter transfers up to this Unix timestamp in nanoseconds (exclusive).
+    #[prost(uint64, tag = "5")]
+    pub end_ts: u64,
+    /// Page size. Default 50, max 200.
+    #[prost(int32, tag = "6")]
+    pub lmt: i32,
+    /// Opaque cursor from previous response.
+    #[prost(string, tag = "7")]
+    pub cursor: ::prost::alloc::string::String,
+}
+/// ListLedgerTransfersResponse is the paginated list of ledger transfers.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListLedgerTransfersResponse {
+    /// Transfers in this page, ordered by id DESC (newest first).
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<LedgerTransferItem>,
+    /// Cursor for the next page. Empty when no more pages.
+    #[prost(string, tag = "2")]
+    pub next_cursor: ::prost::alloc::string::String,
+    /// True if more pages remain.
+    #[prost(bool, tag = "3")]
+    pub has_more: bool,
+}
+/// LedgerTransferItem represents a fund movement between two addresses.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct LedgerTransferItem {
+    /// Database row id.
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    /// Origin of the parent journal entry.
+    #[prost(string, tag = "2")]
+    pub journal_origin: ::prost::alloc::string::String,
+    /// Sender wallet address.
+    #[prost(string, tag = "3")]
+    pub from_addr: ::prost::alloc::string::String,
+    /// Receiver wallet address.
+    #[prost(string, tag = "4")]
+    pub to_addr: ::prost::alloc::string::String,
+    /// Asset symbol (e.g. "USDC").
+    #[prost(string, tag = "5")]
+    pub asset: ::prost::alloc::string::String,
+    /// Transfer amount as a decimal string (always positive).
+    #[prost(string, tag = "6")]
+    pub amt: ::prost::alloc::string::String,
+    /// Transfer type (e.g. "transfer", "stake", "unstake", "funding").
+    #[prost(string, tag = "7")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Creation timestamp (Unix nanoseconds).
+    #[prost(int64, tag = "8")]
+    pub crt_ts: i64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct WhitelistSignupRequest {
     /// Wallet address (0x-prefixed, 40 hex chars). Optional; at least one of
     /// addr / email / x_handle must be provided.
@@ -124,6 +331,104 @@ pub struct WaitlistXSignupResponse {
     #[prost(string, tag = "3")]
     pub joined_ts: ::prost::alloc::string::String,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetClientInfoRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetClientInfoResponse {
+    /// User's wallet address (empty if not authenticated).
+    #[prost(string, tag = "1")]
+    pub usr_addr: ::prost::alloc::string::String,
+    /// API key used for this request (empty if not authenticated).
+    #[prost(string, tag = "2")]
+    pub api_key: ::prost::alloc::string::String,
+    /// Country code from client IP (e.g., "US").
+    #[prost(string, tag = "3")]
+    pub ip_country: ::prost::alloc::string::String,
+    /// Client IP address.
+    #[prost(string, tag = "4")]
+    pub ip: ::prost::alloc::string::String,
+    /// Whether the API key is read-only.
+    #[prost(bool, tag = "5")]
+    pub is_ro: bool,
+    /// Whether the client is authenticated.
+    #[prost(bool, tag = "6")]
+    pub is_auth: bool,
+    /// Whether this wallet has redeemed an access code (production gate).
+    #[prost(bool, tag = "7")]
+    pub has_access: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetErrorCodesRequest {
+    /// Filter by category (auth, validation, trading, account, market, rate_limit, funding, system).
+    #[prost(string, tag = "1")]
+    pub cat: ::prost::alloc::string::String,
+    /// Filter by specific error ref (e.g., "E0001_AuthRequired").
+    #[prost(string, tag = "2")]
+    pub r#ref: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetErrorCodesResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub errs: ::prost::alloc::vec::Vec<ErrorCodeMeta>,
+}
+/// ErrorCodeMeta contains metadata for an error code.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ErrorCodeMeta {
+    /// Full error reference (e.g., "E0001_AuthRequired").
+    #[prost(string, tag = "1")]
+    pub r#ref: ::prost::alloc::string::String,
+    /// Short error code (e.g., "E0001").
+    #[prost(string, tag = "2")]
+    pub code: ::prost::alloc::string::String,
+    /// Error category (auth, validation, trading, etc.).
+    #[prost(string, tag = "3")]
+    pub cat: ::prost::alloc::string::String,
+    /// Corresponding gRPC code (Unauthenticated, InvalidArgument, etc.).
+    #[prost(string, tag = "4")]
+    pub grpc_code: ::prost::alloc::string::String,
+    /// Short title for UI display.
+    #[prost(string, tag = "5")]
+    pub title: ::prost::alloc::string::String,
+    /// User-friendly error message.
+    #[prost(string, tag = "6")]
+    pub msg: ::prost::alloc::string::String,
+    /// Suggested action (redirect_login, retry, contact_support, none).
+    #[prost(string, tag = "7")]
+    pub action: ::prost::alloc::string::String,
+    /// Severity level (error, warning, info).
+    #[prost(string, tag = "8")]
+    pub sev: ::prost::alloc::string::String,
+    /// Whether client can retry the operation.
+    #[prost(bool, tag = "9")]
+    pub retry_alwd: bool,
+    /// Corresponding HTTP status code.
+    #[prost(int32, tag = "10")]
+    pub http_st: i32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetFeeTiersRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetFeeTiersResponse {
+    /// All available fee tier definitions.
+    #[prost(message, repeated, tag = "1")]
+    pub tiers: ::prost::alloc::vec::Vec<FeeTierInfo>,
+}
+/// FeeTierInfo describes a single fee tier.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FeeTierInfo {
+    /// Display name.
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+    /// Minimum 30-day volume in USD to qualify.
+    #[prost(string, tag = "2")]
+    pub min_volume: ::prost::alloc::string::String,
+    /// Maker fee rate at this tier.
+    #[prost(string, tag = "3")]
+    pub maker_fee_rate: ::prost::alloc::string::String,
+    /// Taker fee rate at this tier.
+    #[prost(string, tag = "4")]
+    pub taker_fee_rate: ::prost::alloc::string::String,
+}
 /// Order represents a trading order on OBSDN.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Order {
@@ -181,9 +486,15 @@ pub struct Order {
     /// If true, order is part of liquidation process.
     #[prost(bool, tag = "18")]
     pub is_liq: bool,
+    /// If true, order is an auto-deleveraging order.
+    #[prost(bool, tag = "35")]
+    pub is_adl: bool,
     /// Fee rate applied for liquidation orders.
     #[prost(string, tag = "19")]
     pub liq_fee_rt: ::prost::alloc::string::String,
+    /// If true, order is a force-closed position from market delist.
+    #[prost(bool, tag = "34")]
+    pub is_force_closed: bool,
     /// Fee rate applied when order is maker.
     #[prost(string, tag = "20")]
     pub mkr_fee_rt: ::prost::alloc::string::String,
@@ -211,15 +522,15 @@ pub struct Order {
     /// Expiration timestamp in nanoseconds (0 means never expires).
     #[prost(int64, tag = "28")]
     pub exp_ts: i64,
+    /// Scheduled execution timestamp in nanoseconds (0 means immediate). For TWAP orders.
+    #[prost(int64, tag = "31")]
+    pub sched_ts: i64,
     /// Client-provided identifier for the order.
     #[prost(string, tag = "29")]
     pub cl_oid: ::prost::alloc::string::String,
     /// If true, order has been requested for cancellation.
     #[prost(bool, tag = "30")]
     pub cancel_req: bool,
-    /// Scheduled execution timestamp in nanoseconds (0 means immediate). For TWAP orders.
-    #[prost(int64, tag = "31")]
-    pub sched_ts: i64,
     /// Recent trades associated with this order.
     #[prost(message, repeated, tag = "32")]
     #[doc(hidden)]
@@ -1213,10 +1524,12 @@ pub struct ListOrderHistoryRequest {
     /// Filter by market ID.
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Filter by minimum posted UNIX timestamp in nanoseconds.
+    /// Start timestamp in nanoseconds for filtering orders (inclusive).
+    /// If omitted, no lower bound is applied.
     #[prost(uint64, tag = "2")]
     pub start_ts: u64,
-    /// Filter by maximum posted UNIX timestamp in nanoseconds.
+    /// End timestamp in nanoseconds for filtering orders (exclusive).
+    /// If omitted, no upper bound is applied.
     #[prost(uint64, tag = "3")]
     pub end_ts: u64,
     /// Limit on number of results. Max limit is 1000
@@ -1377,15 +1690,21 @@ pub struct GetPortfolioResponse {
     #[doc(hidden)]
     pub dis_wdraw: bool,
 }
-/// FeeTier represents the trading fee rates for the user.
+/// FeeTier represents the trading fee rates and tier info for the user.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FeeTier {
-    /// Maker fee rate.
+    /// Tier display name (e.g., "Regular", "VIP 1", "VIP").
     #[prost(string, tag = "1")]
+    pub tier_nm: ::prost::alloc::string::String,
+    /// Maker fee rate.
+    #[prost(string, tag = "2")]
     pub mkr_fee_rt: ::prost::alloc::string::String,
     /// Taker fee rate.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag = "3")]
     pub tkr_fee_rt: ::prost::alloc::string::String,
+    /// 30-day trailing trading volume in USD.
+    #[prost(string, tag = "4")]
+    pub vol_30d: ::prost::alloc::string::String,
 }
 /// PortfolioStats contains internal portfolio statistics.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1479,10 +1798,12 @@ pub struct GetPositionHistoryRequest {
     /// Filter by market ID (optional).
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Start time in nanoseconds (optional).
+    /// Start timestamp in nanoseconds for filtering positions (inclusive).
+    /// If omitted, no lower bound is applied.
     #[prost(int64, tag = "2")]
     pub start_ts: i64,
-    /// End time in nanoseconds (optional).
+    /// End timestamp in nanoseconds for filtering positions (exclusive).
+    /// If omitted, no upper bound is applied.
     #[prost(int64, tag = "3")]
     pub end_ts: i64,
     /// Maximum results to return (default: 100, max: 1000).
@@ -1661,6 +1982,502 @@ pub struct GetTradingCalendarResponse {
     #[prost(string, tag = "4")]
     pub tot_fees: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseCard {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseCardType", tag = "3")]
+    pub card_type: i32,
+    #[prost(string, tag = "4")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub body: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub channel: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseHorizon", tag = "7")]
+    pub horizon: i32,
+    #[prost(message, optional, tag = "8")]
+    pub posted_by: ::core::option::Option<PulsePostedBy>,
+    #[prost(int64, tag = "9")]
+    pub posted_at_ts: i64,
+    #[prost(int32, tag = "10")]
+    pub impact_score: i32,
+    #[prost(int32, tag = "11")]
+    pub upvote_count: i32,
+    #[prost(int32, tag = "12")]
+    pub comment_count: i32,
+    #[prost(int32, tag = "13")]
+    pub watch_count: i32,
+    #[prost(message, repeated, tag = "14")]
+    pub linked_assets: ::prost::alloc::vec::Vec<PulseCardAsset>,
+    #[prost(message, repeated, tag = "15")]
+    pub topics: ::prost::alloc::vec::Vec<PulseTopic>,
+    #[prost(string, tag = "16")]
+    pub listing_status: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "17")]
+    pub viewer_state: ::core::option::Option<PulseViewerState>,
+    #[prost(string, tag = "18")]
+    pub status: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulsePostedBy {
+    #[prost(string, tag = "1")]
+    pub handle: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub display_name: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseCardAsset {
+    #[prost(string, tag = "1")]
+    pub symbol: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub market_id: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseSide", tag = "3")]
+    pub side: i32,
+    #[prost(enumeration = "PulseListingStatus", tag = "4")]
+    pub listing_status: i32,
+    #[prost(int32, tag = "5")]
+    pub ord: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseTopic {
+    #[prost(string, tag = "1")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub tone: ::prost::alloc::string::String,
+    #[prost(int32, tag = "4")]
+    pub count: i32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulseViewerState {
+    #[prost(bool, tag = "1")]
+    pub has_upvoted: bool,
+    #[prost(bool, tag = "2")]
+    pub is_watching: bool,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseTrendingItem {
+    #[prost(int32, tag = "1")]
+    pub rank: i32,
+    #[prost(string, tag = "2")]
+    pub topic_slug: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub topic_label: ::prost::alloc::string::String,
+    #[prost(int32, tag = "4")]
+    pub delta_pct: i32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulsePagination {
+    #[prost(uint32, tag = "1")]
+    pub page: u32,
+    #[prost(uint32, tag = "2")]
+    pub per_page: u32,
+    #[prost(int64, tag = "3")]
+    pub total: i64,
+    #[prost(uint32, tag = "4")]
+    pub last_page: u32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulseFeedCountsFeeds {
+    #[prost(int32, tag = "1")]
+    pub all: i32,
+    #[prost(int32, tag = "2")]
+    pub hot: i32,
+    #[prost(int32, tag = "3")]
+    pub fresh: i32,
+    #[prost(int32, tag = "4")]
+    pub watching: i32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulseFeedCountsCardTypes {
+    #[prost(int32, tag = "1")]
+    pub event: i32,
+    #[prost(int32, tag = "2")]
+    pub theme: i32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulseFeedCountsListing {
+    #[prost(int32, tag = "1")]
+    pub listed: i32,
+    #[prost(int32, tag = "2")]
+    pub potential: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseTopicCount {
+    #[prost(string, tag = "1")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(int32, tag = "3")]
+    pub count: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseFeedCounts {
+    #[prost(message, optional, tag = "1")]
+    pub feeds: ::core::option::Option<PulseFeedCountsFeeds>,
+    #[prost(message, optional, tag = "2")]
+    pub card_types: ::core::option::Option<PulseFeedCountsCardTypes>,
+    #[prost(message, optional, tag = "3")]
+    pub listing: ::core::option::Option<PulseFeedCountsListing>,
+    #[prost(message, repeated, tag = "4")]
+    pub topics: ::prost::alloc::vec::Vec<PulseTopicCount>,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PulseFeedWindow {
+    #[prost(int32, tag = "1")]
+    pub hours: i32,
+    #[prost(int32, tag = "2")]
+    pub card_count: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PulseCardAssetInput {
+    #[prost(string, tag = "1")]
+    pub symbol: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub market_id: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseSide", tag = "3")]
+    pub side: i32,
+    #[prost(enumeration = "PulseListingStatus", tag = "4")]
+    pub listing_status: i32,
+    #[prost(int32, tag = "5")]
+    pub ord: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListPulseFeedRequest {
+    #[prost(string, tag = "1")]
+    pub feed: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub listing: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub topics: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub sort: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub q: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "7")]
+    pub page: u32,
+    #[prost(uint32, tag = "8")]
+    pub per_page: u32,
+    #[prost(uint32, tag = "9")]
+    pub window_h: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListPulseFeedResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub cards: ::prost::alloc::vec::Vec<PulseCard>,
+    #[prost(message, optional, tag = "2")]
+    pub pagination: ::core::option::Option<PulsePagination>,
+    #[prost(message, optional, tag = "3")]
+    pub counts: ::core::option::Option<PulseFeedCounts>,
+    #[prost(message, optional, tag = "4")]
+    pub feed_window: ::core::option::Option<PulseFeedWindow>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetPulseCardRequest {
+    #[prost(string, tag = "1")]
+    pub slug: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetPulseCardResponse {
+    #[prost(message, optional, tag = "1")]
+    pub card: ::core::option::Option<PulseCard>,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetPulseTrendingRequest {
+    #[prost(uint32, tag = "1")]
+    pub window_h: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetPulseTrendingResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<PulseTrendingItem>,
+    #[prost(int32, tag = "2")]
+    pub window_h: i32,
+    #[prost(int64, tag = "3")]
+    pub computed_at_ts: i64,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct ListPulseTopicsRequest {
+    #[prost(uint32, tag = "1")]
+    pub window_h: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListPulseTopicsResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub topics: ::prost::alloc::vec::Vec<PulseTopic>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TogglePulseUpvoteRequest {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct TogglePulseUpvoteResponse {
+    #[prost(bool, tag = "1")]
+    pub has_upvoted: bool,
+    #[prost(int32, tag = "2")]
+    pub upvote_count: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TogglePulseWatchRequest {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct TogglePulseWatchResponse {
+    #[prost(bool, tag = "1")]
+    pub is_watching: bool,
+    #[prost(int32, tag = "2")]
+    pub watch_count: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePulseCardRequest {
+    #[prost(string, tag = "1")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub body: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseCardType", tag = "4")]
+    pub card_type: i32,
+    #[prost(string, tag = "5")]
+    pub channel: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseHorizon", tag = "6")]
+    pub horizon: i32,
+    #[prost(message, optional, tag = "7")]
+    pub posted_by: ::core::option::Option<PulsePostedBy>,
+    #[prost(int32, tag = "8")]
+    pub impact_score: i32,
+    #[prost(string, tag = "9")]
+    pub status: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "10")]
+    pub linked_assets: ::prost::alloc::vec::Vec<PulseCardAssetInput>,
+    #[prost(string, repeated, tag = "11")]
+    pub topic_slugs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePulseCardResponse {
+    #[prost(message, optional, tag = "1")]
+    pub card: ::core::option::Option<PulseCard>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdatePulseCardRequest {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub title: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub body: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseCardType", tag = "5")]
+    pub card_type: i32,
+    #[prost(string, tag = "6")]
+    pub channel: ::prost::alloc::string::String,
+    #[prost(enumeration = "PulseHorizon", tag = "7")]
+    pub horizon: i32,
+    #[prost(message, optional, tag = "8")]
+    pub posted_by: ::core::option::Option<PulsePostedBy>,
+    #[prost(int32, tag = "9")]
+    pub impact_score: i32,
+    #[prost(string, tag = "10")]
+    pub status: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "11")]
+    pub linked_assets: ::prost::alloc::vec::Vec<PulseCardAssetInput>,
+    #[prost(string, repeated, tag = "12")]
+    pub topic_slugs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UpdatePulseCardResponse {
+    #[prost(message, optional, tag = "1")]
+    pub card: ::core::option::Option<PulseCard>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeletePulseCardRequest {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct DeletePulseCardResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListAdminPulseCardsRequest {
+    #[prost(string, tag = "1")]
+    pub status: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub sort: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "3")]
+    pub page: u32,
+    #[prost(uint32, tag = "4")]
+    pub per_page: u32,
+    #[prost(string, tag = "5")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub q: ::prost::alloc::string::String,
+    #[prost(string, tag = "7")]
+    pub topics: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListAdminPulseCardsResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub cards: ::prost::alloc::vec::Vec<PulseCard>,
+    #[prost(message, optional, tag = "2")]
+    pub pagination: ::core::option::Option<PulsePagination>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetAdminPulseCardRequest {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetAdminPulseCardResponse {
+    #[prost(message, optional, tag = "1")]
+    pub card: ::core::option::Option<PulseCard>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePulseTopicRequest {
+    #[prost(string, tag = "1")]
+    pub slug: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub label: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub tone: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CreatePulseTopicResponse {
+    #[prost(message, optional, tag = "1")]
+    pub topic: ::core::option::Option<PulseTopic>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum PulseCardType {
+    Unspecified = 0,
+    Event = 1,
+    Theme = 2,
+}
+impl PulseCardType {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "PULSE_CARD_TYPE_UNSPECIFIED",
+            Self::Event => "PULSE_CARD_TYPE_EVENT",
+            Self::Theme => "PULSE_CARD_TYPE_THEME",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PULSE_CARD_TYPE_UNSPECIFIED" => Some(Self::Unspecified),
+            "PULSE_CARD_TYPE_EVENT" => Some(Self::Event),
+            "PULSE_CARD_TYPE_THEME" => Some(Self::Theme),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum PulseHorizon {
+    Unspecified = 0,
+    Intraday = 1,
+    MultiDay = 2,
+    MultiWeek = 3,
+    MultiMonth = 4,
+}
+impl PulseHorizon {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "PULSE_HORIZON_UNSPECIFIED",
+            Self::Intraday => "PULSE_HORIZON_INTRADAY",
+            Self::MultiDay => "PULSE_HORIZON_MULTI_DAY",
+            Self::MultiWeek => "PULSE_HORIZON_MULTI_WEEK",
+            Self::MultiMonth => "PULSE_HORIZON_MULTI_MONTH",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PULSE_HORIZON_UNSPECIFIED" => Some(Self::Unspecified),
+            "PULSE_HORIZON_INTRADAY" => Some(Self::Intraday),
+            "PULSE_HORIZON_MULTI_DAY" => Some(Self::MultiDay),
+            "PULSE_HORIZON_MULTI_WEEK" => Some(Self::MultiWeek),
+            "PULSE_HORIZON_MULTI_MONTH" => Some(Self::MultiMonth),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum PulseSide {
+    Unspecified = 0,
+    Long = 1,
+    Short = 2,
+    Neutral = 3,
+}
+impl PulseSide {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "PULSE_SIDE_UNSPECIFIED",
+            Self::Long => "PULSE_SIDE_LONG",
+            Self::Short => "PULSE_SIDE_SHORT",
+            Self::Neutral => "PULSE_SIDE_NEUTRAL",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PULSE_SIDE_UNSPECIFIED" => Some(Self::Unspecified),
+            "PULSE_SIDE_LONG" => Some(Self::Long),
+            "PULSE_SIDE_SHORT" => Some(Self::Short),
+            "PULSE_SIDE_NEUTRAL" => Some(Self::Neutral),
+            _ => None,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum PulseListingStatus {
+    Unspecified = 0,
+    Listed = 1,
+    Potential = 2,
+}
+impl PulseListingStatus {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "PULSE_LISTING_STATUS_UNSPECIFIED",
+            Self::Listed => "PULSE_LISTING_STATUS_LISTED",
+            Self::Potential => "PULSE_LISTING_STATUS_POTENTIAL",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "PULSE_LISTING_STATUS_UNSPECIFIED" => Some(Self::Unspecified),
+            "PULSE_LISTING_STATUS_LISTED" => Some(Self::Listed),
+            "PULSE_LISTING_STATUS_POTENTIAL" => Some(Self::Potential),
+            _ => None,
+        }
+    }
+}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetAssetsRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1694,7 +2511,10 @@ pub struct Asset {
 }
 /// GetMarketsRequest is the request for GetMarkets.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct GetMarketsRequest {}
+pub struct GetMarketsRequest {
+    #[prost(bool, tag = "1")]
+    pub debug: bool,
+}
 /// GetMarketsResponse returns the list of available markets.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetMarketsResponse {
@@ -1789,7 +2609,7 @@ pub struct Market {
     /// URL for the market icon (e.g., "<https://assets.obsdn.trade/images/icons/btc.png">).
     #[prost(string, tag = "28")]
     pub icon_url: ::prost::alloc::string::String,
-    /// Market trading mode: "trading", "post_only", "wind_down", "halted", "delisted".
+    /// Market trading mode: "trading", "post_only", "wind_down", "halted", "delisting", "delisted".
     /// FE should use this instead of enabled/post_only booleans to determine allowed actions.
     #[prost(string, tag = "29")]
     pub mode: ::prost::alloc::string::String,
@@ -2842,77 +3662,6 @@ pub struct LeaderboardEntry {
     #[prost(string, tag = "4")]
     pub tot_comm: ::prost::alloc::string::String,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct GetClientInfoRequest {}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetClientInfoResponse {
-    /// User's wallet address (empty if not authenticated).
-    #[prost(string, tag = "1")]
-    pub usr_addr: ::prost::alloc::string::String,
-    /// API key used for this request (empty if not authenticated).
-    #[prost(string, tag = "2")]
-    pub api_key: ::prost::alloc::string::String,
-    /// Country code from client IP (e.g., "US").
-    #[prost(string, tag = "3")]
-    pub ip_country: ::prost::alloc::string::String,
-    /// Client IP address.
-    #[prost(string, tag = "4")]
-    pub ip: ::prost::alloc::string::String,
-    /// Whether the API key is read-only.
-    #[prost(bool, tag = "5")]
-    pub is_ro: bool,
-    /// Whether the client is authenticated.
-    #[prost(bool, tag = "6")]
-    pub is_auth: bool,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetErrorCodesRequest {
-    /// Filter by category (auth, validation, trading, account, market, rate_limit, funding, system).
-    #[prost(string, tag = "1")]
-    pub cat: ::prost::alloc::string::String,
-    /// Filter by specific error ref (e.g., "E0001_AuthRequired").
-    #[prost(string, tag = "2")]
-    pub r#ref: ::prost::alloc::string::String,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetErrorCodesResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub errs: ::prost::alloc::vec::Vec<ErrorCodeMeta>,
-}
-/// ErrorCodeMeta contains metadata for an error code.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ErrorCodeMeta {
-    /// Full error reference (e.g., "E0001_AuthRequired").
-    #[prost(string, tag = "1")]
-    pub r#ref: ::prost::alloc::string::String,
-    /// Short error code (e.g., "E0001").
-    #[prost(string, tag = "2")]
-    pub code: ::prost::alloc::string::String,
-    /// Error category (auth, validation, trading, etc.).
-    #[prost(string, tag = "3")]
-    pub cat: ::prost::alloc::string::String,
-    /// Corresponding gRPC code (Unauthenticated, InvalidArgument, etc.).
-    #[prost(string, tag = "4")]
-    pub grpc_code: ::prost::alloc::string::String,
-    /// Short title for UI display.
-    #[prost(string, tag = "5")]
-    pub title: ::prost::alloc::string::String,
-    /// User-friendly error message.
-    #[prost(string, tag = "6")]
-    pub msg: ::prost::alloc::string::String,
-    /// Suggested action (redirect_login, retry, contact_support, none).
-    #[prost(string, tag = "7")]
-    pub action: ::prost::alloc::string::String,
-    /// Severity level (error, warning, info).
-    #[prost(string, tag = "8")]
-    pub sev: ::prost::alloc::string::String,
-    /// Whether client can retry the operation.
-    #[prost(bool, tag = "9")]
-    pub retry_alwd: bool,
-    /// Corresponding HTTP status code.
-    #[prost(int32, tag = "10")]
-    pub http_st: i32,
-}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetVaultPortfolioRequest {
     /// Vault address.
@@ -3379,7 +4128,9 @@ pub struct ApiKey {
     /// The API key identifier used in the header for authentication.
     #[prost(string, tag = "1")]
     pub api_key: ::prost::alloc::string::String,
-    /// The API secret used in the header for authentication.
+    /// The API secret used in the header for authentication. Returned only in
+    /// creation responses (RegisterSigner, CreateAPIKey, RegisterChildAccountSigner);
+    /// list endpoints (GetAPIKeys, GetChildAccountAPIKeys) leave it empty.
     #[prost(string, tag = "2")]
     pub api_secret: ::prost::alloc::string::String,
     /// Human-friendly display name for this API key.
@@ -3507,6 +4258,20 @@ pub struct GetChildAccountApiKeysRequest {
 pub struct GetChildAccountApiKeysResponse {
     #[prost(message, repeated, tag = "1")]
     pub api_keys: ::prost::alloc::vec::Vec<ApiKey>,
+}
+/// RedeemAccessCodeRequest redeems an access code for the authenticated wallet.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RedeemAccessCodeRequest {
+    /// The access code to redeem.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+}
+/// RedeemAccessCodeResponse confirms the redemption.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct RedeemAccessCodeResponse {
+    /// True if the wallet now has access (either freshly redeemed or already had access).
+    #[prost(bool, tag = "1")]
+    pub ok: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPricesRequest {

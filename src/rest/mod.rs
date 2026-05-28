@@ -74,6 +74,7 @@ impl RestClient {
         signer: Option<HmacSigner>,
         timeout: Duration,
         user_agent: Option<String>,
+        danger_accept_invalid_certs: bool,
     ) -> Result<Self> {
         let ua = user_agent.unwrap_or_else(|| DEFAULT_USER_AGENT.to_string());
         let ua = HeaderValue::from_str(&ua)
@@ -84,6 +85,7 @@ impl RestClient {
         let http = reqwest::Client::builder()
             .default_headers(headers)
             .timeout(timeout)
+            .danger_accept_invalid_certs(danger_accept_invalid_certs)
             .build()
             .map_err(Error::from)?;
         Ok(Self { http, base, signer })

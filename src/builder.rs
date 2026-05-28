@@ -181,6 +181,7 @@ pub struct ClientBuilder {
     domain_override: Option<Eip712Domain>,
     timeout: Option<Duration>,
     user_agent: Option<String>,
+    danger_accept_invalid_certs: bool,
 }
 
 impl std::fmt::Debug for ClientBuilder {
@@ -244,6 +245,13 @@ impl ClientBuilder {
         self
     }
 
+    /// Skip TLS certificate verification. **Staging/testing only** — never
+    /// enable in production.
+    pub fn danger_accept_invalid_certs(mut self, accept: bool) -> Self {
+        self.danger_accept_invalid_certs = accept;
+        self
+    }
+
     /// Finalize. Returns `Error::Config` if the resolved base URL is
     /// invalid.
     pub fn build(self) -> Result<Client> {
@@ -256,7 +264,13 @@ impl ClientBuilder {
             .map_err(|e| Error::Config(format!("invalid base url {base}: {e}")))?;
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
         let hmac = self.signer.clone();
-        let rest = RestClient::new(base_url, self.signer, timeout, self.user_agent)?;
+        let rest = RestClient::new(
+            base_url,
+            self.signer,
+            timeout,
+            self.user_agent,
+            self.danger_accept_invalid_certs,
+        )?;
         let rest = Arc::new(rest);
         let domain = match (&env, self.domain_override) {
             (_, Some(d)) => d,

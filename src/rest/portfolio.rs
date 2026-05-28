@@ -4,13 +4,15 @@
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::rest::query::percent_encode_segment;
 use crate::rest::{Auth, RestClient};
 use crate::types::v1::{
     GetFundingPaymentsRequest, GetFundingPaymentsResponse, GetPnLHistoryRequest,
     GetPnLHistoryResponse, GetPortfolioHistoryRequest, GetPortfolioHistoryResponse,
     GetPortfolioRequest, GetPortfolioResponse, GetPositionHistoryRequest,
     GetPositionHistoryResponse, GetTradingCalendarRequest, GetTradingCalendarResponse,
-    PlaceOrderRequest,
+    PlaceOrderRequest, SetLeverageRequest, SetLeverageResponse, SetMarginModeRequest,
+    SetMarginModeResponse, TransferMarginRequest, TransferMarginResponse,
 };
 
 /// Cheap handle to portfolio endpoints.
@@ -94,5 +96,38 @@ impl PortfolioApi {
         self.rest
             .get_with_query("/portfolio/trading-calendar", &req, Auth::Required)
             .await
+    }
+
+    /// `POST /positions/{mkt_id}/leverage` — update leverage for a market position.
+    /// **Auth:** required.
+    pub async fn set_leverage(&self, req: SetLeverageRequest) -> Result<SetLeverageResponse> {
+        let path = format!(
+            "/positions/{}/leverage",
+            percent_encode_segment(&req.mkt_id)
+        );
+        self.rest.post(&path, &req, Auth::Required).await
+    }
+
+    /// `POST /positions/{mkt_id}/margin-mode` — switch cross/isolated margin.
+    /// **Auth:** required.
+    pub async fn set_margin_mode(
+        &self,
+        req: SetMarginModeRequest,
+    ) -> Result<SetMarginModeResponse> {
+        let path = format!(
+            "/positions/{}/margin-mode",
+            percent_encode_segment(&req.mkt_id)
+        );
+        self.rest.post(&path, &req, Auth::Required).await
+    }
+
+    /// `POST /positions/{mkt_id}/margin` — add/remove margin on an isolated position.
+    /// **Auth:** required.
+    pub async fn transfer_margin(
+        &self,
+        req: TransferMarginRequest,
+    ) -> Result<TransferMarginResponse> {
+        let path = format!("/positions/{}/margin", percent_encode_segment(&req.mkt_id));
+        self.rest.post(&path, &req, Auth::Required).await
     }
 }

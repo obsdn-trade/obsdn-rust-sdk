@@ -6,6 +6,7 @@ use crate::error::Result;
 use crate::rest::{Auth, RestClient};
 use crate::types::v1::{
     GetClientInfoRequest, GetClientInfoResponse, GetErrorCodesRequest, GetErrorCodesResponse,
+    GetFeeTiersRequest, GetFeeTiersResponse,
 };
 
 /// Cheap handle to general endpoints.
@@ -36,6 +37,14 @@ impl GeneralApi {
     ) -> Result<GetErrorCodesResponse> {
         self.rest
             .get_with_query("/error-codes", &req, Auth::None)
+            .await
+    }
+
+    /// `GET /fee-tiers` — all available fee tier definitions.
+    /// **Auth:** none.
+    pub async fn get_fee_tiers(&self, req: GetFeeTiersRequest) -> Result<GetFeeTiersResponse> {
+        self.rest
+            .get_with_query("/fee-tiers", &req, Auth::None)
             .await
     }
 }

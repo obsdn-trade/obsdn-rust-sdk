@@ -140,7 +140,7 @@ fn order_hash_matches_go() {
     let f = load("order");
     let domain = fixture_domain(&f.domain);
     let sender = parse_addr(f.input["sender"].as_str().unwrap());
-    let market_index = f.input["market_index"].as_u64().unwrap() as u8;
+    let market_index = f.input["market_index"].as_u64().unwrap() as u16;
     let side = match f.input["side"].as_str().unwrap() {
         "buy" => OrderSide::Buy,
         "sell" => OrderSide::Sell,
@@ -376,11 +376,13 @@ fn create_subaccount_hash_matches_go() {
 fn register_signed_by_sender_matches_go() {
     let f = load("register_signed_by_sender");
     let domain = fixture_domain(&f.domain);
+    let sender_addr = parse_addr(f.input["sender"].as_str().unwrap());
     let signer_addr = parse_addr(f.input["signer"].as_str().unwrap());
     let message = f.input["message"].as_str().unwrap().to_string();
     let nonce: u64 = f.input["nonce"].as_str().unwrap().parse().unwrap();
 
     let sol = obsdn_sdk::sign::register::Register {
+        sender: sender_addr,
         signer: signer_addr,
         message: message.clone(),
         nonce,
@@ -392,6 +394,7 @@ fn register_signed_by_sender_matches_go() {
         &signer,
         &domain,
         RegisterPayload {
+            sender: sender_addr,
             signer: signer_addr,
             message,
             nonce,
