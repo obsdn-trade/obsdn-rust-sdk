@@ -18,7 +18,7 @@
 //!     --proto-dir <path-to-api/proto> \
 //!     --out-dir   <path-to-sdk/rust/src/types/generated>
 //!
-//! Defaults assume the standard nil monorepo layout:
+//! Defaults assume the standard backend monorepo layout:
 //!   proto-dir = ../../../../api/proto    (relative to scripts/codegen-rust)
 //!   out-dir   = ../../src/types/generated
 

@@ -85,7 +85,7 @@ The fixture `domain_separator` only changes if the EIP-712 domain changes.
 
 ```bash
 cargo run --manifest-path scripts/codegen-rust/Cargo.toml -- \
-  --proto-dir /path/to/nil/api/proto \
+  --proto-dir /path/to/backend/api/proto \
   --out-dir src/types/generated
 ```
 

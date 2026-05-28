@@ -34,14 +34,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// Canonical staging domain (base-sepolia) — see configs/shared/chain/base_sepolia.yaml.
+// Canonical staging domain (monad-testnet).
 // Pinning this here means a domain change requires re-running the script and
 // the diff to fixtures is the audit trail.
 var stagingDomain = config.Domain{
 	Name:              "Obsidian",
 	Version:           "1",
-	ChainID:           "84532",
-	VerifyingContract: "0x988Af38b04a377322aB9A5214F045938348dB155",
+	ChainID:           "10143",
+	VerifyingContract: "0xB95aE40b700FDBb0906b8Dc2AeBBDd94848325Df",
 }
 
 // Deterministic test key. NOT a real key — published widely in test vectors.
@@ -347,21 +347,22 @@ func createSubaccountCase(priv *ecdsa.PrivateKey) fixtureCase {
 }
 
 func registerSenderCase(priv *ecdsa.PrivateKey) fixtureCase {
+	senderAddr := crypto.PubkeyToAddress(priv.PublicKey)
 	signerAddr := addrSigner
 	nonce := uint64(123)
 	message := "I authorize 0x8888888888888888888888888888888888888888 to sign on my behalf."
-	sig, err := ethsig.SignSenderMessage(priv, stagingDomain, signerAddr.Hex(), nonce, message)
+	sig, err := ethsig.SignSenderMessage(priv, stagingDomain, senderAddr.Hex(), signerAddr.Hex(), nonce, message)
 	must(err)
-	td := buildSenderTypedData(stagingDomain, signerAddr.Hex(), nonce, message)
-	signer := crypto.PubkeyToAddress(priv.PublicKey)
+	td := buildSenderTypedData(stagingDomain, senderAddr.Hex(), signerAddr.Hex(), nonce, message)
 	return fixtureCase{
 		name: "register_signed_by_sender", template: "Register",
 		inputJSON: mustJSON(map[string]any{
+			"sender":  senderAddr.Hex(),
 			"signer":  signerAddr.Hex(),
 			"message": message,
 			"nonce":   strconv.FormatUint(nonce, 10),
 		}),
-		typedData: td, signature: sig, signer: signer,
+		typedData: td, signature: sig, signer: senderAddr,
 	}
 }
 
@@ -427,7 +428,7 @@ func buildOrderTypedData(domain config.Domain, order ethsig.Order) apitypes.Type
 			},
 			"Order": []apitypes.Type{
 				{Name: "sender", Type: "address"},
-				{Name: "marketIndex", Type: "uint8"},
+				{Name: "marketIndex", Type: "uint16"},
 				{Name: "side", Type: "uint8"},
 				{Name: "size", Type: "uint128"},
 				{Name: "price", Type: "uint128"},
@@ -590,12 +591,13 @@ func buildCreateSubaccountTypedData(domain config.Domain, in ethsig.CreateSubacc
 	}
 }
 
-func buildSenderTypedData(domain config.Domain, signer string, nonce uint64, message string) apitypes.TypedData {
+func buildSenderTypedData(domain config.Domain, sender string, signer string, nonce uint64, message string) apitypes.TypedData {
 	chainID, _ := strconv.ParseInt(domain.ChainID, 10, 64)
 	return apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": eip712DomainType(),
 			"Register": []apitypes.Type{
+				{Name: "sender", Type: "address"},
 				{Name: "signer", Type: "address"},
 				{Name: "message", Type: "string"},
 				{Name: "nonce", Type: "uint64"},
@@ -604,6 +606,7 @@ func buildSenderTypedData(domain config.Domain, signer string, nonce uint64, mes
 		PrimaryType: "Register",
 		Domain:      domainStruct(domain, chainID),
 		Message: apitypes.TypedDataMessage{
+			"sender":  sender,
 			"signer":  signer,
 			"message": message,
 			"nonce":   strconv.FormatUint(nonce, 10),
