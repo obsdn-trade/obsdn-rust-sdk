@@ -18,6 +18,11 @@ use crate::error::{Error, Result};
 
 /// Build `(timestamp_seconds_string, base64_signature)` for the WS `auth`
 /// frame using the same key/secret pair as the REST signer.
+///
+/// The server accepts timestamps within a +/- 60 second window of its own
+/// clock. If authentication fails with a "timestamp expired" error, the
+/// most likely cause is clock skew between the client machine and the
+/// server — synchronize via NTP.
 pub(crate) fn build_ws_auth(signer: &HmacSigner, now_secs: u64) -> (String, String) {
     let timestamp = now_secs.to_string();
     let prehash = format!("{},{}", signer.api_key(), timestamp);

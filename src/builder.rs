@@ -15,6 +15,8 @@ use crate::rest::{
     markets::MarketsApi, orders::OrdersApi, portfolio::PortfolioApi, price::PriceApi,
     subaccount::SubaccountApi, vault::VaultApi, RestClient,
 };
+use alloy_primitives::Address;
+
 use crate::sign::{order::OrderPayload, sdk_domain, sign_order, signature_hex, EipSigner};
 use crate::types::v1::Market;
 use crate::ws::WsClient;
@@ -35,6 +37,11 @@ pub struct Client {
     /// Lazy market metadata cache — populated on first
     /// [`Self::resolve_market`] (or `OrdersApi::place_easy`) call.
     markets_cache: Arc<MarketCache>,
+    /// Explicit sender (main wallet) address for delegated signing.
+    /// When set, EIP-712 payloads use this as `sender`/`from` while the
+    /// `eip_signer` key produces the cryptographic signature.
+    /// Falls back to `eip_signer.address()` when `None`.
+    sender_address: Option<Address>,
 }
 
 impl std::fmt::Debug for Client {
@@ -42,6 +49,7 @@ impl std::fmt::Debug for Client {
         f.debug_struct("Client")
             .field("rest", &self.rest)
             .field("eip_signer", &self.eip_signer.as_ref().map(|s| s.address()))
+            .field("sender_address", &self.sender_address)
             .field("domain", &"<Eip712Domain>")
             .finish()
     }
@@ -125,6 +133,19 @@ impl Client {
         self.eip_signer.as_ref()
     }
 
+    /// Sender (main wallet) address used in EIP-712 payloads.
+    ///
+    /// In delegated-signing mode (set via [`ClientBuilder::sender`]) this
+    /// returns the main wallet address while [`Self::eip_signer`] holds the
+    /// delegated key. In normal mode it falls back to the signer's address.
+    ///
+    /// Panics if no EIP signer is configured — callers that need the sender
+    /// address should check for a signer first.
+    pub fn sender_address(&self) -> Address {
+        self.sender_address
+            .unwrap_or_else(|| self.eip_signer.as_ref().expect("no eip_signer configured").address())
+    }
+
     /// EIP-712 domain for this client's environment. Pass to
     /// [`crate::sign::sign_order`] etc. when invoking the low-level signers
     /// directly.
@@ -178,6 +199,7 @@ pub struct ClientBuilder {
     base_url_override: Option<String>,
     signer: Option<HmacSigner>,
     eip_signer: Option<Arc<dyn EipSigner>>,
+    sender_address: Option<Address>,
     domain_override: Option<Eip712Domain>,
     timeout: Option<Duration>,
     user_agent: Option<String>,
@@ -223,6 +245,20 @@ impl ClientBuilder {
     /// key, or implement [`EipSigner`] for hardware wallets.
     pub fn eip_signer(mut self, signer: Arc<dyn EipSigner>) -> Self {
         self.eip_signer = Some(signer);
+        self
+    }
+
+    /// Set the sender (main wallet) address for delegated signing.
+    ///
+    /// In delegated-signing mode the EIP-712 payloads carry the *main wallet*
+    /// address as `sender`/`from`, while the [`Self::eip_signer`] key
+    /// produces the cryptographic signature. This mirrors the Go SDK's
+    /// `senderAddress` / `signerPrivateKey` separation.
+    ///
+    /// When omitted the signer's own address is used — correct for
+    /// non-delegated (direct) signing.
+    pub fn sender(mut self, addr: Address) -> Self {
+        self.sender_address = Some(addr);
         self
     }
 
@@ -292,6 +328,7 @@ impl ClientBuilder {
             env,
             hmac,
             markets_cache,
+            sender_address: self.sender_address,
         })
     }
 }

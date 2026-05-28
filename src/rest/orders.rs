@@ -140,6 +140,13 @@ impl OrdersApi {
     /// explicit value for deterministic test fixtures or when retrying
     /// idempotently.
     ///
+    /// **Precision:** `price` and `size` are `f64`, which provides ~15-17
+    /// significant decimal digits. This is sufficient for most trading use
+    /// cases. For sub-penny precision at high prices (e.g., exact
+    /// `0.01` increments above `$100,000`), use
+    /// [`crate::sign::scale_decimal_str`] with a raw [`PlaceOrderRequest`]
+    /// and [`crate::Client::sign_place_order`] instead.
+    ///
     /// **Scope:** LIMIT only. The exchange does not implement a true
     /// MARKET order — IOC at top-of-book is the supported substitute, set
     /// `tif = TimeInForce::Ioc` on a LIMIT and pick a price that crosses.
@@ -158,6 +165,16 @@ impl OrdersApi {
         let signer = client.eip_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip_signer configured; call ClientBuilder::eip_signer".into())
         })?;
+        // Pre-validate size and price before signing — zero/negative values
+        // would produce a valid EIP-712 signature over nonsensical fields.
+        if req.size <= 0.0 {
+            return Err(Error::Sign("order size must be positive".into()));
+        }
+        if req.price <= 0.0 && req.order_type != OrderType::Market {
+            return Err(Error::Sign(
+                "order price must be positive for non-market orders".into(),
+            ));
+        }
         // Reject unsupported order types BEFORE signing. Exchange does
         // not implement a true MARKET order — accepting MARKET here would
         // sign + post with surprising semantics. STOP / TWAP need extra
@@ -183,7 +200,7 @@ impl OrdersApi {
         };
 
         let payload = OrderPayload {
-            sender: signer.address(),
+            sender: client.sender_address(),
             market_index,
             side: match req.side {
                 OrderSide::Buy => SignOrderSide::Buy,

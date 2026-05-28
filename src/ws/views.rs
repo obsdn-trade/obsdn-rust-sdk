@@ -84,6 +84,9 @@ pub struct OracleView {
 }
 
 /// Public trade execution (`trade` channel — update only, no snapshot).
+///
+/// Note: trade timestamp is at the frame level — use `WsUpdate.ts`, not a
+/// field in this struct.
 #[derive(Debug, Clone, Deserialize)]
 pub struct TradeView {
     /// Unique trade id.
@@ -96,6 +99,171 @@ pub struct TradeView {
     pub sz: String,
     /// Trade size in quote asset as decimal string.
     pub quote_sz: String,
+}
+
+/// User position frame (`position` channel).
+///
+/// Snapshot is the full position set (JSON array); updates wrap the changed
+/// position in a single object. Fields match `pkg/jsonfast/position.go`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PositionView {
+    /// Market index (uint32).
+    #[serde(default)]
+    pub mkt_idx: u32,
+    /// Market symbol (e.g. `"BTC-PERP"`).
+    #[serde(default)]
+    pub mkt_id: String,
+    /// Net position size (positive = long, negative = short). Decimal string.
+    #[serde(default)]
+    pub net_sz: String,
+    /// Average entry price. Decimal string.
+    #[serde(default)]
+    pub avg_entry_px: String,
+    /// Quote balance. Decimal string.
+    #[serde(default)]
+    pub quote_bal: String,
+    /// Current mark price. Decimal string.
+    #[serde(default)]
+    pub mark_px: String,
+    /// Current index price. Decimal string.
+    #[serde(default)]
+    pub idx_px: String,
+    /// Margin mode enum string (`"MARGIN_MODE_CROSS"` / `"MARGIN_MODE_ISOLATED"`).
+    #[serde(default)]
+    pub mrgn_mode: String,
+    /// Position leverage. Decimal string.
+    #[serde(default)]
+    pub lev: String,
+    /// Margin balance for this position. Decimal string.
+    #[serde(default)]
+    pub mrgn_bal: String,
+    /// Initial margin requirement. Decimal string.
+    #[serde(default)]
+    pub init_mrgn_req: String,
+    /// Maintenance margin requirement. Decimal string.
+    #[serde(default)]
+    pub maint_mrgn_req: String,
+    /// Estimated liquidation price. Decimal string.
+    #[serde(default)]
+    pub liq_px: String,
+    /// Unrealized PnL. Decimal string.
+    #[serde(default)]
+    pub unrlzd_pnl: String,
+    /// Total cumulative funding payments. Decimal string.
+    #[serde(default)]
+    pub tot_fund_paid: String,
+    /// Isolated USDC balance. Decimal string.
+    #[serde(default)]
+    pub iso_usdc_bal: String,
+    /// Free isolated USDC balance. Decimal string.
+    #[serde(default)]
+    pub free_iso_usdc_bal: String,
+    /// Whether position is in isolated liquidation.
+    #[serde(default)]
+    pub in_iso_liq: bool,
+    /// Margin ratio (maintenance margin / margin balance). Decimal string.
+    #[serde(default)]
+    pub mrgn_ratio: String,
+}
+
+/// Collateral asset within a [`PortfolioView`].
+#[derive(Debug, Clone, Deserialize)]
+pub struct CollateralAssetView {
+    /// Token symbol (e.g. `"USDC"`, `"ETH"`).
+    #[serde(default)]
+    pub asset: String,
+    /// Token contract address.
+    #[serde(default)]
+    pub addr: String,
+    /// Token balance. Decimal string.
+    #[serde(default)]
+    pub bal: String,
+    /// Withdrawable amount. Decimal string.
+    #[serde(default)]
+    pub wdrawable_amt: String,
+    /// Market value in USD (before haircut). Decimal string.
+    #[serde(default)]
+    pub mkt_val_usd: String,
+    /// Collateral value in USD (after haircut). Decimal string.
+    #[serde(default)]
+    pub coll_val_usd: String,
+    /// Percentage of total collateral. Decimal string.
+    #[serde(default)]
+    pub coll_val_comp: String,
+}
+
+/// User portfolio frame (`portfolio` channel).
+///
+/// Both snapshot and update share the same shape — a single portfolio
+/// object. Fields match `pkg/jsonfast/portfolio.go`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PortfolioView {
+    /// Collateral mode enum string (`"COLLATERAL_MODE_USDC"` / `"COLLATERAL_MODE_MULTI"`).
+    #[serde(default)]
+    pub coll_mode: String,
+    /// Total collateral value in USD. Decimal string.
+    #[serde(default)]
+    pub tot_coll_val: String,
+    /// Collateral margin balance. Decimal string.
+    #[serde(default)]
+    pub coll_mrgn_bal: String,
+    /// Cross margin balance. Decimal string.
+    #[serde(default)]
+    pub cross_mrgn_bal: String,
+    /// Cross margin ratio. Decimal string.
+    #[serde(default)]
+    pub cross_mrgn_ratio: String,
+    /// Cross margin usage percentage. Decimal string.
+    #[serde(default)]
+    pub cross_mrgn_usg: String,
+    /// Cross account leverage. Decimal string.
+    #[serde(default)]
+    pub cross_acct_lev: String,
+    /// Free collateral. Decimal string.
+    #[serde(default)]
+    pub free_coll: String,
+    /// Total account value. Decimal string.
+    #[serde(default)]
+    pub tot_acct_val: String,
+    /// Total cross notional value. Decimal string.
+    #[serde(default)]
+    pub tot_cross_ntnl: String,
+    /// Total cross initial margin. Decimal string.
+    #[serde(default)]
+    pub tot_cross_init_mrgn: String,
+    /// Total cross maintenance margin. Decimal string.
+    #[serde(default)]
+    pub tot_cross_maint_mrgn: String,
+    /// Total unrealized PnL. Decimal string.
+    #[serde(default)]
+    pub tot_unrlzd_pnl: String,
+    /// Realized PnL. Decimal string.
+    #[serde(default)]
+    pub rlzd_pnl: String,
+    /// Margin health ratio. Decimal string.
+    #[serde(default)]
+    pub mrgn_health: String,
+    /// Total isolated order reserve. Decimal string.
+    #[serde(default)]
+    pub tot_iso_ord_rsrv: String,
+    /// Whether in cross liquidation.
+    #[serde(default)]
+    pub in_cross_liq: bool,
+    /// Whether there is a pending withdrawal.
+    #[serde(default)]
+    pub has_pnd_wdraw: bool,
+    /// Whether there is a pending stake vault request.
+    #[serde(default)]
+    pub has_pnd_stake: bool,
+    /// Whether there is a pending unstake vault request.
+    #[serde(default)]
+    pub has_pnd_unstake: bool,
+    /// Collateral assets breakdown.
+    #[serde(default)]
+    pub coll_assets: Vec<CollateralAssetView>,
+    /// All open positions.
+    #[serde(default)]
+    pub pos: Vec<PositionView>,
 }
 
 /// User order frame (`order` channel — payload is an array of orders).
@@ -185,6 +353,19 @@ impl WsUpdate {
     pub fn as_orders(&self) -> Result<Vec<OrderView>> {
         parse_view(self, ChannelName::Order)
     }
+
+    /// Decode `data` as a list of [`PositionView`]. Snapshot delivers all
+    /// positions as a JSON array; updates wrap a single position — both are
+    /// arrays on the wire.
+    pub fn as_positions(&self) -> Result<Vec<PositionView>> {
+        parse_view(self, ChannelName::Position)
+    }
+
+    /// Decode `data` as a [`PortfolioView`]. Both snapshot and update are
+    /// a single portfolio object.
+    pub fn as_portfolio(&self) -> Result<PortfolioView> {
+        parse_view(self, ChannelName::Portfolio)
+    }
 }
 
 #[cfg(test)]
@@ -253,6 +434,77 @@ mod tests {
         let u = fake_update(ChannelName::Book, json!({"bids": [], "asks": []}));
         let err = u.as_ticker().unwrap_err();
         assert!(matches!(err, Error::Decode(_)));
+    }
+
+    #[test]
+    fn position_view_roundtrip() {
+        let u = fake_update(
+            ChannelName::Position,
+            json!([{
+                "mkt_idx": 1,
+                "mkt_id": "BTC-PERP",
+                "net_sz": "0.5",
+                "avg_entry_px": "43000.00",
+                "quote_bal": "21500.00",
+                "mark_px": "43100.00",
+                "idx_px": "43050.00",
+                "mrgn_mode": "MARGIN_MODE_CROSS",
+                "lev": "10",
+                "mrgn_bal": "2150.00",
+                "init_mrgn_req": "215.00",
+                "maint_mrgn_req": "107.50",
+                "liq_px": "40000.00",
+                "unrlzd_pnl": "50.00",
+                "tot_fund_paid": "1.23",
+                "iso_usdc_bal": "0",
+                "free_iso_usdc_bal": "0",
+                "in_iso_liq": false,
+                "mrgn_ratio": "0.05"
+            }]),
+        );
+        let positions = u.as_positions().unwrap();
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0].mkt_id, "BTC-PERP");
+        assert_eq!(positions[0].net_sz, "0.5");
+        assert_eq!(positions[0].mrgn_mode, "MARGIN_MODE_CROSS");
+    }
+
+    #[test]
+    fn portfolio_view_roundtrip() {
+        let u = fake_update(
+            ChannelName::Portfolio,
+            json!({
+                "coll_mode": "COLLATERAL_MODE_USDC",
+                "tot_coll_val": "10000.00",
+                "coll_mrgn_bal": "5000.00",
+                "cross_mrgn_bal": "5000.00",
+                "cross_mrgn_ratio": "0.10",
+                "cross_mrgn_usg": "50.00",
+                "cross_acct_lev": "2.0",
+                "free_coll": "5000.00",
+                "tot_acct_val": "10500.00",
+                "tot_cross_ntnl": "10000.00",
+                "tot_cross_init_mrgn": "500.00",
+                "tot_cross_maint_mrgn": "250.00",
+                "tot_unrlzd_pnl": "500.00",
+                "rlzd_pnl": "100.00",
+                "mrgn_health": "95.00",
+                "tot_iso_ord_rsrv": "0",
+                "in_cross_liq": false,
+                "has_pnd_wdraw": false,
+                "has_pnd_stake": false,
+                "has_pnd_unstake": false,
+                "coll_assets": [
+                    {"asset": "USDC", "addr": "0xabc", "bal": "10000", "wdrawable_amt": "5000", "mkt_val_usd": "10000", "coll_val_usd": "10000", "coll_val_comp": "100"}
+                ],
+                "pos": []
+            }),
+        );
+        let portfolio = u.as_portfolio().unwrap();
+        assert_eq!(portfolio.coll_mode, "COLLATERAL_MODE_USDC");
+        assert_eq!(portfolio.tot_coll_val, "10000.00");
+        assert_eq!(portfolio.coll_assets.len(), 1);
+        assert_eq!(portfolio.coll_assets[0].asset, "USDC");
     }
 
     #[test]
