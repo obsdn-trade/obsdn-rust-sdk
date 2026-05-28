@@ -80,8 +80,9 @@ pub struct WsUpdate {
     pub kind: WsUpdateKind,
     /// Routing channel (`book`, `oracle`, ...).
     pub channel: ChannelName,
-    /// Global sequence number — monotonic per connection. Gaps surface
-    /// as [`WsEvent::Gap`] before the next [`WsEvent::Update`].
+    /// Server `gsn` — a global event watermark, monotonic but sparse per
+    /// subscription (channels emit selectively). Not a dense sequence; do
+    /// not infer dropped messages from gaps between consecutive frames.
     pub gsn: u64,
     /// Server-side timestamp in nanoseconds.
     pub ts: u64,
@@ -96,15 +97,12 @@ pub struct WsUpdate {
 /// Per-subscription event delivered by the managed [`crate::ws::WsClient`].
 ///
 /// The managed client surfaces both the data plane (snapshot/update frames
-/// from the server) and the lifecycle plane (reconnect, gap, auth failure)
-/// in a single stream so callers don't have to juggle two channels.
+/// from the server) and the lifecycle plane (reconnect, auth failure) in a
+/// single stream so callers don't have to juggle two channels.
 ///
 /// Variants:
 /// - [`WsEvent::Update`]: a snapshot or update frame. Inspect
 ///   `update.kind` to discriminate — both flow through this variant.
-/// - [`WsEvent::Gap`]: GSN skipped from `from..=to` (inclusive). Caller
-///   should resync via REST (e.g., `markets().get_orderbook(...)`)
-///   because pulse does not replay missed messages.
 /// - [`WsEvent::Reconnected`]: the underlying socket dropped and the
 ///   supervisor re-attached. Subscriptions and authentication were
 ///   replayed automatically. Emitted once per reconnect.
@@ -116,13 +114,6 @@ pub struct WsUpdate {
 pub enum WsEvent {
     /// Normal data frame (snapshot or update).
     Update(WsUpdate),
-    /// GSN skipped — caller must resync via REST snapshot.
-    Gap {
-        /// First missed GSN (inclusive).
-        from: u64,
-        /// Last missed GSN (inclusive).
-        to: u64,
-    },
     /// Underlying connection re-attached. Subs replayed.
     Reconnected,
     /// Auth replay rejected by the server. Carries the server's error

@@ -44,9 +44,6 @@ async fn main() -> Result<()> {
                     break;
                 }
             }
-            WsEvent::Gap { from, to } => {
-                tracing::warn!(from, to, "gap — would resync via REST in production");
-            }
             WsEvent::Reconnected => tracing::info!("reconnected"),
             WsEvent::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
         }

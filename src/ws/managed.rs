@@ -4,8 +4,7 @@
 //! reconnecting supervisor. The user sees a single persistent
 //! [`SubscriptionStream`] per channel; underlying socket churn is invisible
 //! except for the [`super::event::WsEvent::Reconnected`] /
-//! [`super::event::WsEvent::Gap`] / [`super::event::WsEvent::Unauthorized`]
-//! markers the supervisor injects.
+//! [`super::event::WsEvent::Unauthorized`] markers the supervisor injects.
 //!
 //! ## Lifetime
 //! - [`WsClient::new`] spawns the supervisor task immediately. It sits
@@ -22,9 +21,10 @@
 //!   subscription, then resumes pumping frames. A
 //!   [`super::event::WsEvent::Reconnected`] marker is emitted to every
 //!   sub stream once per reconnect.
-//! - GSN trackers reset on reconnect — pulse rejoins at the current head,
-//!   not a replay, so comparing GSNs across sessions would yield spurious
-//!   gaps. Callers who need byte-perfect catch-up must resync via REST.
+//! - No GSN gap detection — pulse `gsn` is a sparse global watermark, not a
+//!   dense per-sub sequence (see `super` module docs). On reconnect pulse
+//!   rejoins at the current head, not a replay; callers who need byte-perfect
+//!   catch-up must resync via REST.
 //! - Auth replay failures degrade to public-only mode and emit
 //!   [`super::event::WsEvent::Unauthorized`] on every sub. Public subs keep
 //!   working.
@@ -45,10 +45,9 @@ use crate::error::{Error, Result};
 use super::channel::{Channel, ChannelName};
 use super::connection::{Subscription, WsConnection};
 use super::event::{WsEvent, WsUpdate};
-use super::gsn::GsnTracker;
 
 /// Per-subscription user-facing buffer. Bounded so a stalled consumer can
-/// be detected and surfaced as a `Gap` rather than backpressuring the
+/// be detected and the sub dropped rather than backpressuring the
 /// supervisor (which would block ALL subs sharing the same socket).
 const SUB_USER_BUFFER: usize = 256;
 /// Outbound user→supervisor command channel depth.
@@ -96,8 +95,7 @@ impl WsClient {
 
     /// Subscribe to a channel. Returns a stream of [`WsEvent`]s that
     /// survives reconnects — internal connection swaps surface as
-    /// [`WsEvent::Reconnected`] markers and any GSN gap as
-    /// [`WsEvent::Gap`].
+    /// [`WsEvent::Reconnected`] markers.
     ///
     /// Subscribing while the supervisor is mid-reconnect is safe: the
     /// channel is registered immediately, the user receiver is returned,
@@ -220,7 +218,6 @@ struct ReplayMarks {
 struct SubSlot {
     channel: Channel,
     user_tx: mpsc::Sender<WsEvent>,
-    gsn: GsnTracker,
     /// First-subscribe ack. Held while the supervisor is mid-(re)connect or
     /// awaiting the server `subscribed` reply. Fired once the server has
     /// confirmed the subscription; cleared after — subsequent reconnects
@@ -273,11 +270,6 @@ impl Supervisor {
                 ConnectOutcome::Connected(c) => c,
                 ConnectOutcome::Stop => return,
             };
-            // Reset trackers BEFORE any data flows — fresh session means
-            // fresh GSN baseline.
-            for slot in self.subs.values_mut() {
-                slot.gsn.reset();
-            }
             // Auth replay → if it fails, downgrade to public-only.
             if self.auth_active {
                 match conn.authenticate().await {
@@ -479,7 +471,6 @@ impl Supervisor {
                     SubSlot {
                         channel,
                         user_tx,
-                        gsn: GsnTracker::new(),
                         pending: Some(PendingSub { ack, user_rx }),
                     },
                 );
@@ -622,7 +613,6 @@ impl Supervisor {
                             SubSlot {
                                 channel,
                                 user_tx,
-                                gsn: GsnTracker::new(),
                                 pending: None,
                             },
                         );
@@ -640,7 +630,6 @@ impl Supervisor {
                                 SubSlot {
                                     channel,
                                     user_tx,
-                                    gsn: GsnTracker::new(),
                                     pending: Some(PendingSub { ack, user_rx }),
                                 },
                             );
@@ -721,25 +710,7 @@ impl Supervisor {
             // drop it.
             return None;
         };
-        // GSN check first so the gap marker lands BEFORE the update that
-        // tripped it — gives consumers a chance to react before they see
-        // the post-gap data.
-        if let Some(gap) = slot.gsn.observe(update.gsn) {
-            // try_send avoids blocking the supervisor on a slow consumer.
-            // If the buffer is full, treat the consumer as gone — sending
-            // a gap into a buffer they're not reading is pointless.
-            if slot
-                .user_tx
-                .try_send(WsEvent::Gap {
-                    from: gap.from,
-                    to: gap.to,
-                })
-                .is_err()
-            {
-                return self.drop_sub(&key, conn).await;
-            }
-        }
-        // Update path also try_send: blocking await here would back up
+        // try_send: blocking await here would back up
         // the entire supervisor (cmd loop, other subs, conn.closed()
         // detection) on the slowest consumer. Phase doc Risk Assessment
         // mentions "drop-oldest policy" but tokio mpsc lacks that — we

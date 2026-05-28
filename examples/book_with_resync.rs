@@ -1,13 +1,14 @@
-//! Book subscriber with REST-based resync on `Gap`.
+//! Book subscriber with REST-based resync on reconnect.
 //!
 //! ```bash
 //! cargo run --example book_with_resync -- BTC-PERP
 //! ```
 //!
-//! Pulse does NOT replay missed updates — when GSNs skip, the local book
-//! is stale and must be rebuilt. This example fetches a fresh REST
-//! snapshot via `markets().get_order_book(...)` whenever the supervisor
-//! emits a `Gap` event.
+//! Pulse does NOT replay missed updates across a dropped connection. After
+//! the supervisor reconnects it auto-resubscribes and pulse sends a fresh
+//! `Snapshot` frame, so the local book rebuilds itself. This example also
+//! shows fetching a REST snapshot via `markets().get_order_book(...)` on
+//! `Reconnected` as a belt-and-suspenders rebuild.
 
 use std::collections::BTreeMap;
 
@@ -84,8 +85,8 @@ async fn main() -> Result<()> {
                 let (bid, ask, nb, na) = book.summary();
                 tracing::info!(?bid, ?ask, nb, na, gsn = u.gsn, "book");
             }
-            WsEvent::Gap { from, to } => {
-                tracing::warn!(from, to, "gap — refetching REST snapshot");
+            WsEvent::Reconnected => {
+                tracing::info!("reconnected — refetching REST snapshot");
                 let snap = client.markets().get_order_book(&market).await?;
                 tracing::info!(
                     levels_b = snap.book.as_ref().map(|b| b.bids.len()).unwrap_or(0),
@@ -93,9 +94,9 @@ async fn main() -> Result<()> {
                     "rest snapshot"
                 );
                 // Caller would seed `book` from `snap.book` here. The WS
-                // stream resumes at the live head — the gap window is gone.
+                // stream also delivers a fresh `Snapshot` frame on resub,
+                // which `replace_with` applies — either path rebuilds.
             }
-            WsEvent::Reconnected => tracing::info!("reconnected — next frame is a fresh snapshot"),
             WsEvent::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
         }
     }

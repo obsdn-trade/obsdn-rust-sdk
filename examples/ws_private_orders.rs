@@ -42,7 +42,6 @@ async fn main() -> Result<()> {
                     );
                 }
             }
-            WsEvent::Gap { from, to } => tracing::warn!(from, to, "gap"),
             WsEvent::Reconnected => tracing::info!("reconnected"),
             WsEvent::Unauthorized(msg) => {
                 tracing::error!(%msg, "unauthorized — auth replay failed");

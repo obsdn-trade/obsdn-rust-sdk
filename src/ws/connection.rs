@@ -537,12 +537,26 @@ where
             return;
         };
         let filter = frame.filter.unwrap_or_default();
-        let key: SubKey = (channel, filter.clone());
-        let Some(sender) = self.subscribers.get(&key) else {
+        // Server stamps order/position/trade update frames with the concrete
+        // market in `filter` even when we subscribed with `market: None`
+        // (wildcard, registered under the empty filter); the snapshot for
+        // that sub carries `filter:""`. Mirror the server's hierarchical
+        // match (subscription_manager.go IsUserSubscribed): exact
+        // (channel,filter) first, else the (channel,"") wildcard subscriber.
+        let exact: SubKey = (channel, filter.clone());
+        let key: SubKey = if self.subscribers.contains_key(&exact) {
+            exact
+        } else if !filter.is_empty() && self.subscribers.contains_key(&(channel, String::new())) {
+            (channel, String::new())
+        } else {
             // Could be a stale frame for a channel we already unsubscribed
             // from; server drains its outbox before honoring unsub.
             return;
         };
+        let sender = self
+            .subscribers
+            .get(&key)
+            .expect("key just confirmed present");
         let kind = match frame.kind {
             WireType::Snapshot => WsUpdateKind::Snapshot,
             _ => WsUpdateKind::Update,

@@ -1,9 +1,9 @@
 //! Phase 6 chaos / state-machine integration tests.
 //!
 //! Runs in-process against a small `MockPulse` that speaks just enough of
-//! the wire protocol to exercise reconnect, sub-replay, and GSN gap
-//! detection. Kept dependency-free (no extra dev-deps) by leaning on the
-//! same `tokio-tungstenite` already in the tree.
+//! the wire protocol to exercise reconnect, sub-replay, wildcard fan-out,
+//! and sparse-GSN handling. Kept dependency-free (no extra dev-deps) by
+//! leaning on the same `tokio-tungstenite` already in the tree.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -196,12 +196,17 @@ where
                 if let Message::Text(ref s) = msg {
                     // Filter outbound data frames against active subs so a
                     // stale push doesn't deliver to an unsubscribed channel.
+                    // Mirror real pulse fan-out: a concrete-filter frame is
+                    // delivered to an exact (ch,fi) subscriber OR a wildcard
+                    // (ch,"") subscriber (subscription_manager.go).
                     if let Ok(v) = serde_json::from_str::<Value>(s) {
                         let kind = v["type"].as_str().unwrap_or("");
                         if matches!(kind, "snapshot" | "update") {
                             let ch = v["channel"].as_str().unwrap_or("").to_string();
                             let fi = v["filter"].as_str().unwrap_or("").to_string();
-                            if !subs.contains_key(&(ch, fi)) {
+                            let subscribed = subs.contains_key(&(ch.clone(), fi.clone()))
+                                || (!fi.is_empty() && subs.contains_key(&(ch, String::new())));
+                            if !subscribed {
                                 continue;
                             }
                         }
@@ -322,7 +327,11 @@ async fn subscribe_and_receive_update() {
 }
 
 #[tokio::test]
-async fn gap_in_session_emits_gap_event() {
+async fn noncontiguous_gsn_does_not_emit_gap() {
+    // Pulse `gsn` is a sparse global event watermark, not a dense per-sub
+    // sequence — non-contiguous GSNs on one channel are normal (throttled /
+    // selectively-emitted frames skip numbers). The SDK must NOT infer a
+    // gap: both updates pass straight through, no synthetic event between.
     let mock = MockPulse::start().await;
     let client = build_client(mock.url());
     let ws = client.ws();
@@ -332,8 +341,6 @@ async fn gap_in_session_emits_gap_event() {
         })
         .await
         .expect("subscribe");
-    // gsn 1 then gsn 5 — supervisor should inject Gap{2,4} BEFORE the
-    // gsn=5 update.
     for gsn in [1, 5] {
         mock.send(MockCmd::Push {
             kind: "update",
@@ -344,23 +351,74 @@ async fn gap_in_session_emits_gap_event() {
         })
         .await;
     }
-    let mut events = Vec::new();
-    while events.len() < 3 {
-        let evt = timeout(Duration::from_secs(2), stream.next())
-            .await
-            .expect("event")
-            .expect("stream open");
-        events.push(evt);
-    }
-    // [Update gsn=1, Gap{2,4}, Update gsn=5]
-    match (&events[0], &events[1], &events[2]) {
-        (WsEvent::Update(a), WsEvent::Gap { from, to }, WsEvent::Update(b)) => {
+    let a = timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("first event")
+        .expect("stream open");
+    let b = timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("second event")
+        .expect("stream open");
+    match (a, b) {
+        (WsEvent::Update(a), WsEvent::Update(b)) => {
             assert_eq!(a.gsn, 1);
-            assert_eq!(*from, 2);
-            assert_eq!(*to, 4);
-            assert_eq!(b.gsn, 5);
+            assert_eq!(b.gsn, 5, "second update delivered as-is, no gap injected");
         }
-        other => panic!("unexpected event sequence: {other:?}"),
+        other => panic!("expected two consecutive Updates, got: {other:?}"),
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test]
+async fn wildcard_sub_routes_concrete_filter_updates() {
+    // A `market: None` sub registers under the empty filter, but the server
+    // stamps update frames with the concrete market (snapshot carries ""),
+    // mirroring nil's hierarchical wildcard match. The SDK must route the
+    // concrete-filter update back to the wildcard subscriber — else a
+    // market-maker subscribing to all-markets gets the snapshot then silence.
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws
+        .subscribe(Channel::Trade { market: None })
+        .await
+        .expect("subscribe");
+    // Snapshot for a wildcard sub carries filter="".
+    mock.send(MockCmd::Push {
+        kind: "snapshot",
+        channel: "trade",
+        filter: Some(""),
+        gsn: 1,
+        data: json!([]),
+    })
+    .await;
+    // Update carries the concrete market.
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "trade",
+        filter: Some("BTC-PERP"),
+        gsn: 2,
+        data: json!({"px": "1", "sz": "1"}),
+    })
+    .await;
+    let snap = timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("snapshot")
+        .expect("stream open");
+    let upd = timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("update routed to wildcard sub")
+        .expect("stream open");
+    match (snap, upd) {
+        (WsEvent::Update(s), WsEvent::Update(u)) => {
+            assert_eq!(s.filter, "");
+            assert_eq!(
+                u.filter, "BTC-PERP",
+                "wildcard sub sees concrete-market update"
+            );
+            assert_eq!(u.gsn, 2);
+        }
+        other => panic!("expected snapshot+update, got: {other:?}"),
     }
     ws.shutdown().await.expect("shutdown");
 }
@@ -432,11 +490,6 @@ async fn reconnect_emits_reconnected_and_resubscribes() {
             WsEvent::Update(u) => {
                 assert_eq!(u.gsn, 100, "post-reconnect update gsn");
                 saw_update = true;
-            }
-            // GSN tracker resets on reconnect, so a Gap here would be a
-            // bug — fail loud.
-            WsEvent::Gap { from, to } => {
-                panic!("unexpected gap across reconnect: {from}..={to}")
             }
             WsEvent::Unauthorized(m) => panic!("unexpected unauthorized: {m}"),
         }
