@@ -140,6 +140,13 @@ impl OrdersApi {
     /// explicit value for deterministic test fixtures or when retrying
     /// idempotently.
     ///
+    /// **Precision:** `price` and `size` are `f64`, which provides ~15-17
+    /// significant decimal digits. This is sufficient for most trading use
+    /// cases. For sub-penny precision at high prices (e.g., exact
+    /// `0.01` increments above `$100,000`), use
+    /// [`crate::sign::scale_decimal_str`] with a raw [`PlaceOrderRequest`]
+    /// and [`crate::Client::sign_place_order`] instead.
+    ///
     /// **Scope:** LIMIT only. The exchange does not implement a true
     /// MARKET order — IOC at top-of-book is the supported substitute, set
     /// `tif = TimeInForce::Ioc` on a LIMIT and pick a price that crosses.
@@ -172,6 +179,12 @@ impl OrdersApi {
                 )));
             }
         }
+        if !req.size.is_finite() || req.size <= 0.0 {
+            return Err(Error::Sign("order size must be a positive finite number".into()));
+        }
+        if !req.price.is_finite() || req.price <= 0.0 {
+            return Err(Error::Sign("order price must be a positive finite number".into()));
+        }
         let market = client.resolve_market(req.mkt_id).await?;
         let market_index = MarketCache::idx_as_u16(&market)?;
         let size_x18 = scale_f64(req.size)?;
@@ -183,7 +196,7 @@ impl OrdersApi {
         };
 
         let payload = OrderPayload {
-            sender: signer.address(),
+            sender: client.sender_address(),
             market_index,
             side: match req.side {
                 OrderSide::Buy => SignOrderSide::Buy,

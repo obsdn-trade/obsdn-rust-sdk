@@ -18,7 +18,10 @@ pub fn sdk_domain(env: &Env) -> Eip712Domain {
     match env {
         Env::Local | Env::Staging => staging_domain(),
         Env::Production => production_domain(),
-        Env::Custom { .. } => production_domain(),
+        Env::Custom { .. } => panic!(
+            "sdk_domain() cannot determine the correct domain for Env::Custom — \
+             use custom_domain() or ClientBuilder::eip712_domain() instead"
+        ),
     }
 }
 

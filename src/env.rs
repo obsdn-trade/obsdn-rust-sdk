@@ -9,7 +9,7 @@
 pub enum Env {
     /// Local dev: `http://localhost:8080` REST, `ws://localhost:8080/ws`.
     Local,
-    /// Staging public: `https://api.staging.obsdn.trade`.
+    /// Staging public: `https://nova.staging.obsdn.trade`.
     Staging,
     /// Production public: `https://api.obsdn.trade`.
     Production,

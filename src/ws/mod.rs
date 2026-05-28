@@ -43,4 +43,7 @@ pub use channel::{Channel, ChannelName};
 pub use event::{WsEvent, WsUpdate, WsUpdateKind};
 pub use gsn::GsnGap;
 pub use managed::{SubscriptionStream, WsClient};
-pub use views::{BookView, OracleView, OrderView, TickerLevel, TickerView, TradeView};
+pub use views::{
+    BookView, CollateralAssetView, OracleView, OrderView, PortfolioView, PositionView, TickerLevel,
+    TickerView, TradeView,
+};
