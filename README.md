@@ -2,9 +2,9 @@
 
 Async Rust SDK for the [OBSDN](https://obsdn.trade) perpetual exchange.
 
-- **REST** — full coverage of the public service surface (~50 RPCs across 11 handles: orders, markets, account, asset, auth, chain, general, portfolio, price, subaccount, vault).
-- **EIP-712 signing** — local secp256k1 signer with byte-equal output to the Go reference (`pkg/ethsig`). Order, Transfer, Withdraw, Vault {Create,Stake,Unstake}, Subaccount, Register, DelegatedSigner.
-- **WebSocket** — managed client with auto-reconnect, GSN gap detection, exponential backoff, auth replay, and typed views per channel (`book`, `ticker`, `oracle`, `trade`, `order`).
+- **REST** — full coverage of the public service surface (~50 RPCs across 11 handles: orders, markets, account, asset, auth, chain, general, portfolio, price, subaccount, vault). Includes leverage/margin-mode/margin-transfer and fee-tier endpoints.
+- **EIP-712 signing** — local secp256k1 signer with byte-equal output to the Go reference (`pkg/ethsig`). Order, Transfer, Withdraw, Vault {Create,Stake,Unstake}, Subaccount, Register, DelegatedSigner. Golden-tested against 10 Go fixture families.
+- **WebSocket** — managed client with auto-reconnect, GSN gap detection, exponential backoff, auth replay, and typed views per channel (`book` with checksum, `ticker`, `oracle`, `trade`, `order`).
 
 ## Status
 
@@ -113,7 +113,7 @@ All under `examples/`. Run with `cargo run --example NAME`.
 │   ├── sign/           # EIP-712 templates + LocalSigner
 │   ├── types/          # Generated wire types (committed under generated/)
 │   └── ws/             # Managed WS, typed views, GSN tracking
-└── tests/              # Codegen smoke, REST contract, EIP-712 golden, WS chaos
+└── tests/              # Golden, chaos, REST smoke, staging E2E
 ```
 
 ## Build / test
@@ -121,11 +121,26 @@ All under `examples/`. Run with `cargo run --example NAME`.
 ```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test
+cargo test                  # 86 offline tests
 cargo doc --no-deps
 ```
 
 `cargo build` does NOT require `buf` or `protoc` — wire types live committed under `src/types/generated/`.
+
+### Live integration tests
+
+```bash
+# Production smoke (unauthenticated public endpoints)
+OBSDN_SMOKE=1 cargo test --test integration_smoke -- --nocapture
+
+# Staging smoke (public + authed)
+OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture
+
+# E2E staging (register → faucet → place → cancel → leverage)
+OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
+```
+
+See [`docs/integration-testing.md`](docs/integration-testing.md) for details.
 
 ## Codegen
 
@@ -142,6 +157,7 @@ cargo run --release --manifest-path scripts/codegen-rust/Cargo.toml -- \
 ## Documentation
 
 - Architecture overview (ASCII diagrams): [`docs/architecture.md`](docs/architecture.md).
+- Integration testing guide: [`docs/integration-testing.md`](docs/integration-testing.md).
 - API reference: `cargo doc --open`. Internal-only proto fields are tagged `#[doc(hidden)]` so they don't render but stay reachable.
 - WebSocket protocol: see the OBSDN public docs site.
 
