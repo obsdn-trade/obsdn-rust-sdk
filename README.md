@@ -121,13 +121,22 @@ All under `examples/`. Run with `cargo run --example NAME`.
 ```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test                  # 86 offline tests
+cargo test                  # 87 offline tests (unit + WS chaos + REST/WS smoke)
 cargo doc --no-deps
 ```
 
 `cargo build` does NOT require `buf` or `protoc` — wire types live committed under `src/types/generated/`.
 
+Offline `cargo test` covers unit tests, EIP-712 golden fixtures, the WS chaos
+suite (in-proc mock: reconnect, sub-replay, wildcard routing, sparse GSN), and
+wiremock REST smoke. The live integration tests below are gated on env vars and
+**skip gracefully** when unset — so `cargo test` stays green offline and in
+credential-less CI.
+
 ### Live integration tests
+
+These hit real servers and self-skip without their env var (no failure when
+staging is unreachable). Run with `--test-threads=1` for the stateful E2E flow.
 
 ```bash
 # Production smoke (unauthenticated public endpoints)
@@ -136,11 +145,18 @@ OBSDN_SMOKE=1 cargo test --test integration_smoke -- --nocapture
 # Staging smoke (public + authed)
 OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture
 
-# E2E staging (register → faucet → place → cancel → leverage)
+# E2E staging — REST + live WS observer:
+#   e2e_combined_flow: register → faucet → ws auth → place/cancel via REST,
+#                      observing the order updates over the WS wildcard sub
+#   e2e_ws_public_book: public book snapshot + follow-up update (no auth)
 OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 ```
 
-See [`docs/integration-testing.md`](docs/integration-testing.md) for details.
+The E2E flow logs per-channel GSN without asserting contiguity — pulse `gsn` is
+a global event watermark, sparse per subscription by design.
+
+See [`docs/integration-testing.md`](docs/integration-testing.md) for details
+(env config, fixtures).
 
 ## Codegen
 

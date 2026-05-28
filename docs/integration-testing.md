@@ -32,23 +32,28 @@ OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture
 
 Hits live staging public endpoints: markets, fee-tiers, client-info, portfolio (with hardcoded test key). Gated by `OBSDN_STAGING=1`.
 
-### E2E Staging (full signing flow)
+### E2E Staging (REST + live WS observer)
 
 ```bash
 OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 ```
 
-Full end-to-end against live staging matching engine. Generates fresh keypairs on each run — no stored secrets needed. Gated by `OBSDN_STAGING=1`.
+Full end-to-end against the live staging matching engine **and** pulse WS. Gated by `OBSDN_STAGING=1`; self-skips when unset. Two tests:
 
-**Flow:**
+**`e2e_combined_flow`** — one account lifecycle, with the WS as live observer of the REST mutations:
 
-1. Generate sender keypair (pk=0x01) and signer keypair (pk=0x02)
+1. Sender keypair (pk=0x01) + signer keypair (pk=0x02)
 2. **Register signer** — sender signs 4-field `Register` struct (C2 proof), signer signs `DelegatedSigner`, POST `/auth/signers` returns API key
 3. **Faucet** — request 10k USDC on staging
-4. **Place order** — sign `Order` with `uint16 marketIndex` (C1 proof), POST `/orders`, verify accepted
-5. **Cancel order** — DELETE `/orders/{oid}`
-6. **Set leverage** — POST `/positions/BTC-PERP/leverage` (H1 proof)
-7. Cleanup — cancel all
+4. **WS authenticate** + subscribe `Order { market: None }` (wildcard); drain initial snapshot
+5. **Place order** via REST — sign `Order` with `uint16 marketIndex` (C1 proof) → **assert the order update arrives on the wildcard sub** stamped with the concrete market (`filter="BTC-PERP"`) — live proof of the WS wildcard-routing fix
+6. **Cancel order** via REST → assert the follow-up update arrives on the wildcard sub
+7. **Set leverage** — POST `/positions/BTC-PERP/leverage` (H1 proof)
+8. Cleanup — cancel all, WS shutdown
+
+**`e2e_ws_public_book`** — public book channel, no auth: asserts the first frame is a `Snapshot` with a populated book, then a follow-up `Update` arrives; validates live `as_book()` deserialization.
+
+Per-channel GSN is logged, never asserted contiguous — pulse `gsn` is a global event watermark, sparse per subscription by design (observed deltas of tens-to-hundreds between consecutive frames on one channel).
 
 **What it proves:**
 
@@ -57,6 +62,8 @@ Full end-to-end against live staging matching engine. Generates fresh keypairs o
 | C1: Order.marketIndex uint16 | Order placed + accepted by matching engine |
 | C2: Register 4-field struct | Signer registered, API key returned |
 | H1: Portfolio REST wrappers | SetLeverage endpoint responds |
+| WS wildcard routing | `Order { market: None }` receives concrete-market updates (place + cancel observed over WS) |
+| WS snapshot ordering | Public book delivers `Snapshot` before `Update` |
 
 ## Environment Config
 
@@ -64,8 +71,6 @@ Full end-to-end against live staging matching engine. Generates fresh keypairs o
 |-----|----------|----------|--------------------|
 | Staging | `nova.staging.obsdn.trade` | 10143 (Monad testnet) | `0xB95aE40b700FDBb0906b8Dc2AeBBDd94848325Df` |
 | Production | `api.obsdn.trade` | 143 (Monad mainnet) | `0x90c3747cd4E6bC6FbebB1b3C54D99737590eBE45` |
-
-Staging uses a self-signed TLS cert — the SDK's `danger_accept_invalid_certs(true)` builder option is required.
 
 Live domain values can be fetched from `GET /chain/config`.
 
