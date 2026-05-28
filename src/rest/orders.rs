@@ -180,10 +180,14 @@ impl OrdersApi {
             }
         }
         if !req.size.is_finite() || req.size <= 0.0 {
-            return Err(Error::Sign("order size must be a positive finite number".into()));
+            return Err(Error::Sign(
+                "order size must be a positive finite number".into(),
+            ));
         }
         if !req.price.is_finite() || req.price <= 0.0 {
-            return Err(Error::Sign("order price must be a positive finite number".into()));
+            return Err(Error::Sign(
+                "order price must be a positive finite number".into(),
+            ));
         }
         let market = client.resolve_market(req.mkt_id).await?;
         let market_index = MarketCache::idx_as_u16(&market)?;

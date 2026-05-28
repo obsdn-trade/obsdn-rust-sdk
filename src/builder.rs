@@ -142,8 +142,12 @@ impl Client {
     /// Panics if no EIP signer is configured — callers that need the sender
     /// address should check for a signer first.
     pub(crate) fn sender_address(&self) -> Address {
-        self.sender_address
-            .unwrap_or_else(|| self.eip_signer.as_ref().expect("no eip_signer configured").address())
+        self.sender_address.unwrap_or_else(|| {
+            self.eip_signer
+                .as_ref()
+                .expect("no eip_signer configured")
+                .address()
+        })
     }
 
     /// EIP-712 domain for this client's environment. Pass to
