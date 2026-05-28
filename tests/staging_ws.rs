@@ -1,0 +1,157 @@
+//! Additional staging WebSocket coverage against the live `pulse` service.
+//!
+//! Complements `e2e_staging.rs` (which covers the public book channel and the
+//! authenticated wildcard order flow) with: the ticker and oracle channels,
+//! a public all-markets (wildcard) trade check, and a position-channel
+//! snapshot decode. The single-object position *update* shape is covered
+//! deterministically by `views::tests::position_update_single_object_decodes`.
+//!
+//! Run: `OBSDN_STAGING=1 cargo test --test staging_ws -- --nocapture --test-threads=1`
+//!
+//! All tests skip unless `OBSDN_STAGING=1` so the suite compiles (and
+//! no-ops) in CI without network access.
+
+use std::time::Duration;
+
+use futures_util::StreamExt;
+use obsdn_sdk::ws::{Channel, SubscriptionStream, WsEvent, WsUpdate};
+use obsdn_sdk::{Client, Env};
+use tokio::time::timeout;
+
+fn skip_unless_staging() -> bool {
+    if std::env::var("OBSDN_STAGING").is_err() {
+        eprintln!("skipping: set OBSDN_STAGING=1 to enable");
+        return true;
+    }
+    false
+}
+
+fn unauthed() -> Client {
+    Client::builder()
+        .env(Env::Staging)
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("build staging client")
+}
+
+fn authed() -> Client {
+    let key = std::env::var("OBSDN_API_KEY")
+        .unwrap_or_else(|_| "0ede9a77f5651c4c6c2acd76b20078bc".to_string());
+    let secret = std::env::var("OBSDN_API_SECRET").unwrap_or_else(|_| {
+        "4b29e2587ee4b4cd89e78904f72d06ed644bca2f5c437643326c911912a3a958".to_string()
+    });
+    Client::builder()
+        .env(Env::Staging)
+        .api_key(key, secret)
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("build staging authed client")
+}
+
+/// Read events until the first data frame (snapshot or update) arrives or we
+/// time out. Panics on an auth failure.
+async fn first_data(stream: &mut SubscriptionStream, secs: u64) -> Option<WsUpdate> {
+    loop {
+        match timeout(Duration::from_secs(secs), stream.next()).await {
+            Ok(Some(WsEvent::Update(u))) => return Some(u),
+            Ok(Some(WsEvent::Unauthorized(m))) => panic!("ws auth rejected: {m}"),
+            Ok(Some(WsEvent::Reconnected)) => continue,
+            Ok(None) | Err(_) => return None,
+        }
+    }
+}
+
+#[tokio::test]
+async fn staging_ws_ticker() {
+    if skip_unless_staging() {
+        return;
+    }
+    let ws = unauthed().ws();
+    let mut s = ws
+        .subscribe(Channel::Ticker {
+            market: "BTC-PERP".into(),
+        })
+        .await
+        .expect("subscribe ticker");
+    let u = first_data(&mut s, 15)
+        .await
+        .expect("ticker frame within 15s");
+    let t = u.as_ticker().expect("ticker decodes");
+    eprintln!("OK: ticker bid={} ask={}", t.bid.px, t.ask.px);
+    ws.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test]
+async fn staging_ws_oracle() {
+    if skip_unless_staging() {
+        return;
+    }
+    let ws = unauthed().ws();
+    let mut s = ws
+        .subscribe(Channel::Oracle {
+            asset: "BTC".into(),
+        })
+        .await
+        .expect("subscribe oracle");
+    let u = first_data(&mut s, 15)
+        .await
+        .expect("oracle frame within 15s");
+    let o = u.as_oracle().expect("oracle decodes");
+    assert_eq!(o.asset, "BTC");
+    eprintln!("OK: oracle BTC mark_px={}", o.mark_px);
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// C1 live check: subscribe to the all-markets trade channel (`market:
+/// None`). Pulse stamps each trade frame with a concrete market filter; the
+/// wildcard routing must still deliver them. Trades are organic, so this is
+/// opportunistic — when the market is active it verifies routing end to end.
+#[tokio::test]
+async fn staging_ws_wildcard_trade_routes() {
+    if skip_unless_staging() {
+        return;
+    }
+    let ws = unauthed().ws();
+    let mut s = ws
+        .subscribe(Channel::Trade { market: None })
+        .await
+        .expect("subscribe all-markets trade");
+    match first_data(&mut s, 20).await {
+        Some(u) => {
+            let t = u.as_trade().expect("trade decodes");
+            assert!(
+                !u.filter.is_empty(),
+                "trade frame must carry a concrete market filter"
+            );
+            eprintln!("OK: wildcard trade routed live: {} px={}", u.filter, t.px);
+        }
+        None => eprintln!("NOTE: no trade activity in 20s window; wildcard routing not exercised"),
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// Position-channel snapshot must decode via `as_positions()` (array shape).
+#[tokio::test]
+async fn staging_ws_position_snapshot_decodes() {
+    if skip_unless_staging() {
+        return;
+    }
+    let client = authed();
+    let ws = client.ws();
+    ws.authenticate().await.expect("ws authenticate");
+    let mut s = ws
+        .subscribe(Channel::Position { market: None })
+        .await
+        .expect("subscribe all-markets position");
+    match first_data(&mut s, 15).await {
+        Some(u) => {
+            let positions = u.as_positions().expect("position snapshot decodes");
+            eprintln!(
+                "OK: position snapshot decoded ({} positions)",
+                positions.len()
+            );
+        }
+        None => eprintln!("NOTE: no position snapshot in 15s window (account may have none)"),
+    }
+    ws.shutdown().await.expect("shutdown");
+}

@@ -10917,6 +10917,234 @@ impl<'de> serde::Deserialize<'de> for GetOrderResponse {
         deserializer.deserialize_struct("nil.v1.GetOrderResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for GetPendingTransfersRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("nil.v1.GetPendingTransfersRequest", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetPendingTransfersRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GetPendingTransfersRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.GetPendingTransfersRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GetPendingTransfersRequest, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map_.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(GetPendingTransfersRequest {
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.GetPendingTransfersRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for GetPendingTransfersResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.items.is_empty() {
+            len += 1;
+        }
+        if self.last_conf_blk != 0 {
+            len += 1;
+        }
+        if self.cur_blk != 0 {
+            len += 1;
+        }
+        if self.req_confs != 0 {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("nil.v1.GetPendingTransfersResponse", len)?;
+        if !self.items.is_empty() {
+            struct_ser.serialize_field("items", &self.items)?;
+        }
+        if self.last_conf_blk != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("lastConfBlk", ToString::to_string(&self.last_conf_blk).as_str())?;
+        }
+        if self.cur_blk != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("curBlk", ToString::to_string(&self.cur_blk).as_str())?;
+        }
+        if self.req_confs != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("reqConfs", ToString::to_string(&self.req_confs).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetPendingTransfersResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "items",
+            "last_conf_blk",
+            "lastConfBlk",
+            "cur_blk",
+            "curBlk",
+            "req_confs",
+            "reqConfs",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Items,
+            LastConfBlk,
+            CurBlk,
+            ReqConfs,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "items" => Ok(GeneratedField::Items),
+                            "lastConfBlk" | "last_conf_blk" => Ok(GeneratedField::LastConfBlk),
+                            "curBlk" | "cur_blk" => Ok(GeneratedField::CurBlk),
+                            "reqConfs" | "req_confs" => Ok(GeneratedField::ReqConfs),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GetPendingTransfersResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.GetPendingTransfersResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GetPendingTransfersResponse, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut items__ = None;
+                let mut last_conf_blk__ = None;
+                let mut cur_blk__ = None;
+                let mut req_confs__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Items => {
+                            if items__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("items"));
+                            }
+                            items__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::LastConfBlk => {
+                            if last_conf_blk__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lastConfBlk"));
+                            }
+                            last_conf_blk__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::CurBlk => {
+                            if cur_blk__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("curBlk"));
+                            }
+                            cur_blk__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::ReqConfs => {
+                            if req_confs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("reqConfs"));
+                            }
+                            req_confs__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(GetPendingTransfersResponse {
+                    items: items__.unwrap_or_default(),
+                    last_conf_blk: last_conf_blk__.unwrap_or_default(),
+                    cur_blk: cur_blk__.unwrap_or_default(),
+                    req_confs: req_confs__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.GetPendingTransfersResponse", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for GetPnLHistoryRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -25676,6 +25904,712 @@ impl<'de> serde::Deserialize<'de> for Paging {
             }
         }
         deserializer.deserialize_struct("nil.v1.Paging", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for PendingDeposit {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.acct.is_empty() {
+            len += 1;
+        }
+        if !self.tkn.is_empty() {
+            len += 1;
+        }
+        if !self.amt.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("nil.v1.PendingDeposit", len)?;
+        if !self.acct.is_empty() {
+            struct_ser.serialize_field("acct", &self.acct)?;
+        }
+        if !self.tkn.is_empty() {
+            struct_ser.serialize_field("tkn", &self.tkn)?;
+        }
+        if !self.amt.is_empty() {
+            struct_ser.serialize_field("amt", &self.amt)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for PendingDeposit {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "acct",
+            "tkn",
+            "amt",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Acct,
+            Tkn,
+            Amt,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "acct" => Ok(GeneratedField::Acct),
+                            "tkn" => Ok(GeneratedField::Tkn),
+                            "amt" => Ok(GeneratedField::Amt),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = PendingDeposit;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.PendingDeposit")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<PendingDeposit, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut acct__ = None;
+                let mut tkn__ = None;
+                let mut amt__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Acct => {
+                            if acct__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("acct"));
+                            }
+                            acct__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tkn => {
+                            if tkn__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tkn"));
+                            }
+                            tkn__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Amt => {
+                            if amt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("amt"));
+                            }
+                            amt__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(PendingDeposit {
+                    acct: acct__.unwrap_or_default(),
+                    tkn: tkn__.unwrap_or_default(),
+                    amt: amt__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.PendingDeposit", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for PendingStakeVault {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.vlt.is_empty() {
+            len += 1;
+        }
+        if !self.stkr.is_empty() {
+            len += 1;
+        }
+        if !self.tkn.is_empty() {
+            len += 1;
+        }
+        if !self.amt.is_empty() {
+            len += 1;
+        }
+        if !self.shrs.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("nil.v1.PendingStakeVault", len)?;
+        if !self.vlt.is_empty() {
+            struct_ser.serialize_field("vlt", &self.vlt)?;
+        }
+        if !self.stkr.is_empty() {
+            struct_ser.serialize_field("stkr", &self.stkr)?;
+        }
+        if !self.tkn.is_empty() {
+            struct_ser.serialize_field("tkn", &self.tkn)?;
+        }
+        if !self.amt.is_empty() {
+            struct_ser.serialize_field("amt", &self.amt)?;
+        }
+        if !self.shrs.is_empty() {
+            struct_ser.serialize_field("shrs", &self.shrs)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for PendingStakeVault {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "vlt",
+            "stkr",
+            "tkn",
+            "amt",
+            "shrs",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Vlt,
+            Stkr,
+            Tkn,
+            Amt,
+            Shrs,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "vlt" => Ok(GeneratedField::Vlt),
+                            "stkr" => Ok(GeneratedField::Stkr),
+                            "tkn" => Ok(GeneratedField::Tkn),
+                            "amt" => Ok(GeneratedField::Amt),
+                            "shrs" => Ok(GeneratedField::Shrs),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = PendingStakeVault;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.PendingStakeVault")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<PendingStakeVault, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut vlt__ = None;
+                let mut stkr__ = None;
+                let mut tkn__ = None;
+                let mut amt__ = None;
+                let mut shrs__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Vlt => {
+                            if vlt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vlt"));
+                            }
+                            vlt__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Stkr => {
+                            if stkr__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stkr"));
+                            }
+                            stkr__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tkn => {
+                            if tkn__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tkn"));
+                            }
+                            tkn__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Amt => {
+                            if amt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("amt"));
+                            }
+                            amt__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Shrs => {
+                            if shrs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("shrs"));
+                            }
+                            shrs__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(PendingStakeVault {
+                    vlt: vlt__.unwrap_or_default(),
+                    stkr: stkr__.unwrap_or_default(),
+                    tkn: tkn__.unwrap_or_default(),
+                    amt: amt__.unwrap_or_default(),
+                    shrs: shrs__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.PendingStakeVault", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for PendingTransfer {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.tx_hash.is_empty() {
+            len += 1;
+        }
+        if self.log_idx != 0 {
+            len += 1;
+        }
+        if self.blk_num != 0 {
+            len += 1;
+        }
+        if self.blk_time != 0 {
+            len += 1;
+        }
+        if self.t != 0 {
+            len += 1;
+        }
+        if self.confs != 0 {
+            len += 1;
+        }
+        if self.data.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("nil.v1.PendingTransfer", len)?;
+        if !self.tx_hash.is_empty() {
+            struct_ser.serialize_field("txHash", &self.tx_hash)?;
+        }
+        if self.log_idx != 0 {
+            struct_ser.serialize_field("logIdx", &self.log_idx)?;
+        }
+        if self.blk_num != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("blkNum", ToString::to_string(&self.blk_num).as_str())?;
+        }
+        if self.blk_time != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("blkTime", ToString::to_string(&self.blk_time).as_str())?;
+        }
+        if self.t != 0 {
+            let v = TransferItemType::try_from(self.t)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.t)))?;
+            struct_ser.serialize_field("t", &v)?;
+        }
+        if self.confs != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field("confs", ToString::to_string(&self.confs).as_str())?;
+        }
+        if let Some(v) = self.data.as_ref() {
+            match v {
+                pending_transfer::Data::Dep(v) => {
+                    struct_ser.serialize_field("dep", v)?;
+                }
+                pending_transfer::Data::StkVlt(v) => {
+                    struct_ser.serialize_field("stkVlt", v)?;
+                }
+                pending_transfer::Data::UnstkVlt(v) => {
+                    struct_ser.serialize_field("unstkVlt", v)?;
+                }
+            }
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for PendingTransfer {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "tx_hash",
+            "txHash",
+            "log_idx",
+            "logIdx",
+            "blk_num",
+            "blkNum",
+            "blk_time",
+            "blkTime",
+            "t",
+            "confs",
+            "dep",
+            "stk_vlt",
+            "stkVlt",
+            "unstk_vlt",
+            "unstkVlt",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            TxHash,
+            LogIdx,
+            BlkNum,
+            BlkTime,
+            T,
+            Confs,
+            Dep,
+            StkVlt,
+            UnstkVlt,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "txHash" | "tx_hash" => Ok(GeneratedField::TxHash),
+                            "logIdx" | "log_idx" => Ok(GeneratedField::LogIdx),
+                            "blkNum" | "blk_num" => Ok(GeneratedField::BlkNum),
+                            "blkTime" | "blk_time" => Ok(GeneratedField::BlkTime),
+                            "t" => Ok(GeneratedField::T),
+                            "confs" => Ok(GeneratedField::Confs),
+                            "dep" => Ok(GeneratedField::Dep),
+                            "stkVlt" | "stk_vlt" => Ok(GeneratedField::StkVlt),
+                            "unstkVlt" | "unstk_vlt" => Ok(GeneratedField::UnstkVlt),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = PendingTransfer;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.PendingTransfer")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<PendingTransfer, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut tx_hash__ = None;
+                let mut log_idx__ = None;
+                let mut blk_num__ = None;
+                let mut blk_time__ = None;
+                let mut t__ = None;
+                let mut confs__ = None;
+                let mut data__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::TxHash => {
+                            if tx_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("txHash"));
+                            }
+                            tx_hash__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::LogIdx => {
+                            if log_idx__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("logIdx"));
+                            }
+                            log_idx__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::BlkNum => {
+                            if blk_num__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blkNum"));
+                            }
+                            blk_num__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::BlkTime => {
+                            if blk_time__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blkTime"));
+                            }
+                            blk_time__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::T => {
+                            if t__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("t"));
+                            }
+                            t__ = Some(map_.next_value::<TransferItemType>()? as i32);
+                        }
+                        GeneratedField::Confs => {
+                            if confs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("confs"));
+                            }
+                            confs__ = 
+                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::Dep => {
+                            if data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("dep"));
+                            }
+                            data__ = map_.next_value::<::std::option::Option<_>>()?.map(pending_transfer::Data::Dep)
+;
+                        }
+                        GeneratedField::StkVlt => {
+                            if data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stkVlt"));
+                            }
+                            data__ = map_.next_value::<::std::option::Option<_>>()?.map(pending_transfer::Data::StkVlt)
+;
+                        }
+                        GeneratedField::UnstkVlt => {
+                            if data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("unstkVlt"));
+                            }
+                            data__ = map_.next_value::<::std::option::Option<_>>()?.map(pending_transfer::Data::UnstkVlt)
+;
+                        }
+                    }
+                }
+                Ok(PendingTransfer {
+                    tx_hash: tx_hash__.unwrap_or_default(),
+                    log_idx: log_idx__.unwrap_or_default(),
+                    blk_num: blk_num__.unwrap_or_default(),
+                    blk_time: blk_time__.unwrap_or_default(),
+                    t: t__.unwrap_or_default(),
+                    confs: confs__.unwrap_or_default(),
+                    data: data__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.PendingTransfer", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for PendingUnstakeVault {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.vlt.is_empty() {
+            len += 1;
+        }
+        if !self.stkr.is_empty() {
+            len += 1;
+        }
+        if !self.tkn.is_empty() {
+            len += 1;
+        }
+        if !self.amt.is_empty() {
+            len += 1;
+        }
+        if !self.shrs.is_empty() {
+            len += 1;
+        }
+        if !self.fee.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("nil.v1.PendingUnstakeVault", len)?;
+        if !self.vlt.is_empty() {
+            struct_ser.serialize_field("vlt", &self.vlt)?;
+        }
+        if !self.stkr.is_empty() {
+            struct_ser.serialize_field("stkr", &self.stkr)?;
+        }
+        if !self.tkn.is_empty() {
+            struct_ser.serialize_field("tkn", &self.tkn)?;
+        }
+        if !self.amt.is_empty() {
+            struct_ser.serialize_field("amt", &self.amt)?;
+        }
+        if !self.shrs.is_empty() {
+            struct_ser.serialize_field("shrs", &self.shrs)?;
+        }
+        if !self.fee.is_empty() {
+            struct_ser.serialize_field("fee", &self.fee)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for PendingUnstakeVault {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "vlt",
+            "stkr",
+            "tkn",
+            "amt",
+            "shrs",
+            "fee",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Vlt,
+            Stkr,
+            Tkn,
+            Amt,
+            Shrs,
+            Fee,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "vlt" => Ok(GeneratedField::Vlt),
+                            "stkr" => Ok(GeneratedField::Stkr),
+                            "tkn" => Ok(GeneratedField::Tkn),
+                            "amt" => Ok(GeneratedField::Amt),
+                            "shrs" => Ok(GeneratedField::Shrs),
+                            "fee" => Ok(GeneratedField::Fee),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = PendingUnstakeVault;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct nil.v1.PendingUnstakeVault")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<PendingUnstakeVault, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut vlt__ = None;
+                let mut stkr__ = None;
+                let mut tkn__ = None;
+                let mut amt__ = None;
+                let mut shrs__ = None;
+                let mut fee__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Vlt => {
+                            if vlt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vlt"));
+                            }
+                            vlt__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Stkr => {
+                            if stkr__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stkr"));
+                            }
+                            stkr__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tkn => {
+                            if tkn__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tkn"));
+                            }
+                            tkn__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Amt => {
+                            if amt__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("amt"));
+                            }
+                            amt__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Shrs => {
+                            if shrs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("shrs"));
+                            }
+                            shrs__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Fee => {
+                            if fee__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("fee"));
+                            }
+                            fee__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(PendingUnstakeVault {
+                    vlt: vlt__.unwrap_or_default(),
+                    stkr: stkr__.unwrap_or_default(),
+                    tkn: tkn__.unwrap_or_default(),
+                    amt: amt__.unwrap_or_default(),
+                    shrs: shrs__.unwrap_or_default(),
+                    fee: fee__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("nil.v1.PendingUnstakeVault", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for PlaceOrderGroupRequest {

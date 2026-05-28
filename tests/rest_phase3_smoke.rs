@@ -17,7 +17,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> Client {
     Client::builder()
-        .env(Env::Local)
+        .env(Env::Staging)
         .rest_base_url(server.uri())
         .api_key("KEY", "SECRET")
         .build()

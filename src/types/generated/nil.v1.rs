@@ -441,7 +441,7 @@ pub struct Order {
     /// Order side (BUY or SELL).
     #[prost(enumeration = "OrderSide", tag = "3")]
     pub sd: i32,
-    /// Order type (MARKET, LIMIT, STOP).
+    /// Order type (LIMIT, MARKET, STOP, TWAP).
     #[prost(enumeration = "OrderType", tag = "4")]
     pub ot: i32,
     /// Order size in base currency units (e.g., 0.3 BTC).
@@ -456,7 +456,7 @@ pub struct Order {
     /// Unique nonce value for replay protection.
     #[prost(uint64, tag = "8")]
     pub nonce: u64,
-    /// Self-trade prevention flag (CANCEL_MAKER or CANCEL_TAKER).
+    /// Self-trade prevention flag (CANCEL_TAKER, CANCEL_MAKER, CANCEL_BOTH).
     #[prost(enumeration = "SelfTradePrevention", tag = "9")]
     pub stp: i32,
     /// If true, order only executes as maker; rejected if it would take liquidity.
@@ -583,8 +583,8 @@ pub struct Portfolio {
     /// Cross margin balance available for cross-margined positions.
     #[prost(string, tag = "4")]
     pub cross_mrgn_bal: ::prost::alloc::string::String,
-    /// Cross margin ratio (maintenance margin / cross margin balance).
-    /// Positions liquidated when this reaches 100%.
+    /// Cross margin ratio expressed as a decimal (maintenance margin / cross margin balance).
+    /// Cross liquidation begins when this reaches 1.0. See `cross_mrgn_usg` for the percent form of initial-margin usage.
     #[prost(string, tag = "5")]
     pub cross_mrgn_ratio: ::prost::alloc::string::String,
     /// Cross margin usage percentage.
@@ -720,7 +720,7 @@ pub struct Position {
     /// Whether position is in isolated liquidation.
     #[prost(bool, tag = "18")]
     pub in_iso_liq: bool,
-    /// Margin ratio (maintenance margin / margin balance).
+    /// Margin ratio for this position (position maintenance margin / position margin balance). Liquidation occurs at 1.0 (cross) or when the isolated margin balance drops below maintenance.
     #[prost(string, tag = "19")]
     pub mrgn_ratio: ::prost::alloc::string::String,
 }
@@ -1237,7 +1237,7 @@ pub struct PlaceOrderRequest {
     /// Order side (BUY, SELL, etc.).
     #[prost(enumeration = "OrderSide", tag = "2")]
     pub sd: i32,
-    /// Order type (LIMIT, MARKET, STOP, etc.).
+    /// Order type (LIMIT, MARKET, STOP, TWAP).
     #[prost(enumeration = "OrderType", tag = "3")]
     pub ot: i32,
     /// Order quantity in base asset units.
@@ -1261,7 +1261,7 @@ pub struct PlaceOrderRequest {
     /// Client-assigned order identifier (max 32 chars, alphanumeric and -_: only).
     #[prost(string, tag = "10")]
     pub cl_oid: ::prost::alloc::string::String,
-    /// Unique nonce (typically Unix timestamp in nanoseconds).
+    /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes of server time.
     #[prost(uint64, tag = "11")]
     pub nonce: u64,
     /// EIP-712 signature of the order payload.
@@ -1294,6 +1294,15 @@ pub struct PlaceOrderResponse {
     pub ord: ::core::option::Option<Order>,
 }
 /// PlaceOrderGroupRequest creates a group of related orders.
+///
+/// **BRACKET group constraints (all enforced server-side, violations return 400):**
+///    - 2-3 orders total: 1 parent + 1-2 children (TP and/or SL).
+///    - Parent must be LIMIT, MARKET, or STOP and must not be reduce-only.
+///    - Children must be STOP orders on the opposite side of the parent.
+///    - Children must be reduce-only with time-in-force IOC.
+///    - All orders must share the same market and size.
+///    - TP stop price must be above (long) / below (short) parent entry price.
+///    - SL stop price must be below (long) / above (short) parent entry price.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PlaceOrderGroupRequest {
     /// Type of order group.
@@ -1316,6 +1325,7 @@ pub struct PlaceOrderGroupResponse {
     pub ords: ::prost::alloc::vec::Vec<Order>,
 }
 /// PlaceTWAPOrdersRequest creates a batch of TWAP sub-orders.
+/// Maximum 100 sub-orders per batch.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PlaceTwapOrdersRequest {
     /// Market ID (e.g., "BTC-PERP").
@@ -1345,7 +1355,7 @@ pub mod place_twap_orders_request {
         /// Order quantity in base asset units.
         #[prost(double, tag = "2")]
         pub sz: f64,
-        /// Unique nonce (typically Unix timestamp in nanoseconds).
+        /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes of server time.
         #[prost(uint64, tag = "3")]
         pub nonce: u64,
         /// EIP-712 signature of the order payload.
@@ -1693,7 +1703,7 @@ pub struct GetPortfolioResponse {
 /// FeeTier represents the trading fee rates and tier info for the user.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FeeTier {
-    /// Tier display name (e.g., "Regular", "VIP 1", "VIP").
+    /// Tier display name (e.g., "Regular", "VIP 1", "VIP 2", "VIP 3", "VIP 4", "VIP 5", "VIP").
     #[prost(string, tag = "1")]
     pub tier_nm: ::prost::alloc::string::String,
     /// Maker fee rate.
@@ -1742,7 +1752,7 @@ pub struct SetLeverageRequest {
     /// Market ID (e.g., "BTC-PERP", "ETH-PERP").
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// New leverage value (1-100).
+    /// New leverage value. Minimum is 1; maximum is the market's max_leverage (see GET /markets).
     #[prost(uint32, tag = "2")]
     pub lev: u32,
 }
@@ -1772,7 +1782,7 @@ pub struct TransferMarginRequest {
     /// Market ID (e.g., "BTC-PERP", "ETH-PERP").
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Amount to transfer (positive = add, negative = remove).
+    /// Amount to transfer (positive = add to isolated, negative = remove to cross). Must be non-zero with at most 2 decimal places. Requires isolated margin mode and a non-zero position size. Sufficient free balance (cross or isolated USDC) is required.
     #[prost(string, tag = "2")]
     pub amt: ::prost::alloc::string::String,
 }
@@ -1798,11 +1808,11 @@ pub struct GetPositionHistoryRequest {
     /// Filter by market ID (optional).
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Start timestamp in nanoseconds for filtering positions (inclusive).
+    /// Start timestamp in nanoseconds for filtering positions by close time (updated_at), inclusive.
     /// If omitted, no lower bound is applied.
     #[prost(int64, tag = "2")]
     pub start_ts: i64,
-    /// End timestamp in nanoseconds for filtering positions (exclusive).
+    /// End timestamp in nanoseconds for filtering positions by close time (updated_at), exclusive.
     /// If omitted, no upper bound is applied.
     #[prost(int64, tag = "3")]
     pub end_ts: i64,
@@ -1825,16 +1835,16 @@ pub struct GetFundingPaymentsRequest {
     /// Filter by market ID (optional).
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Start time in nanoseconds (optional).
+    /// Start time in nanoseconds (optional). If omitted, no lower bound is applied.
     #[prost(int64, tag = "2")]
     pub start_ts: i64,
-    /// End time in nanoseconds (optional).
+    /// End time in nanoseconds (optional, default: now).
     #[prost(int64, tag = "3")]
     pub end_ts: i64,
     /// Maximum results to return (default: 100, max: 1000).
     #[prost(int32, tag = "4")]
     pub lmt: i32,
-    /// Sort order. Supports "funding_rate_hour" (asc) or "-funding_rate_hour" (desc).
+    /// Sort order. Supports "funding_rate_hour" (asc) or "-funding_rate_hour" (desc). Default: `-funding_rate_hour` (descending).
     #[prost(string, tag = "5")]
     pub sorted_by: ::prost::alloc::string::String,
 }
@@ -1864,13 +1874,13 @@ pub struct FundingPayment {
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetPortfolioHistoryRequest {
-    /// Start time in nanoseconds (optional, default: 1 hour ago).
+    /// Start time in nanoseconds (optional, default: 1 hour ago). start_ts must be no more than 366 days before now.
     #[prost(int64, tag = "1")]
     pub start_ts: i64,
     /// End time in nanoseconds (optional, default: now).
     #[prost(int64, tag = "2")]
     pub end_ts: i64,
-    /// Resolution in nanoseconds (optional, default: 60000000000 = 1 minute).
+    /// Resolution in nanoseconds. Accepted values: 1m (60000000000), 5m (300000000000), 1h (3600000000000), 4h (14400000000000), 1d (86400000000000), 1w (604800000000000). Other values default to 1m. (end-start)/intv must be <= 500 buckets.
     #[prost(int64, tag = "3")]
     pub intv: i64,
 }
@@ -1897,7 +1907,7 @@ pub struct GetPnLHistoryRequest {
     /// End time in nanoseconds (optional, default: now).
     #[prost(int64, tag = "2")]
     pub end_ts: i64,
-    /// Resolution in nanoseconds (optional, default: 60000000000 = 1 minute).
+    /// Resolution in nanoseconds. Accepted values: 1m (60000000000), 5m (300000000000), 1h (3600000000000), 4h (14400000000000), 1d (86400000000000), 1w (604800000000000). Other values default to 1m. (end-start)/intv must be <= 500 buckets.
     #[prost(int64, tag = "3")]
     pub intv: i64,
 }
@@ -1938,7 +1948,7 @@ pub struct GetTradingCalendarRequest {
     /// Start date in "YYYY-MM-DD" format (default: 1 year ago).
     #[prost(string, tag = "1")]
     pub start_date: ::prost::alloc::string::String,
-    /// End date in "YYYY-MM-DD" format (default: today, max 365 days from start).
+    /// End date in "YYYY-MM-DD" format (default: today, max 365 days from start). End date must be strictly after start_date. End dates after today are silently clamped to today (UTC).
     #[prost(string, tag = "2")]
     pub end_date: ::prost::alloc::string::String,
 }
@@ -1960,7 +1970,7 @@ pub struct TradingCalendarDay {
     /// Activity level for heatmap (0=none, 1=low, 2=medium, 3=high, 4=very high).
     #[prost(int32, tag = "5")]
     pub activity_level: i32,
-    /// Whether this day's data is synthetically generated (pre-reset dates).
+    /// Whether this day's data is synthetically generated (pre-reset dates). Currently always false (synthetic data is disabled).
     #[prost(bool, tag = "6")]
     pub is_synthetic: bool,
     /// Daily PnL in USD (account_value_end - account_value_start - net_deposits).
@@ -2524,7 +2534,9 @@ pub struct GetMarketsResponse {
 /// Market represents a trading market on OBSDN.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Market {
-    /// Market signing index.
+    /// Market index used in the on-chain contract for order signing (matches the
+    /// `marketIndex` in the EIP-712 Order typed data). Stable for the life of
+    /// the market; required when constructing signed orders.
     #[prost(string, tag = "1")]
     pub idx: ::prost::alloc::string::String,
     /// Unique market ID (e.g., "BTC-PERP", "ETH-PERP").
@@ -2569,7 +2581,7 @@ pub struct Market {
     /// Total trading volume in the last 24 hours (quote asset units).
     #[prost(string, tag = "15")]
     pub qvol_24h: ::prost::alloc::string::String,
-    /// Price change percentage in the last 24 hours.
+    /// Absolute price change in the last 24 hours (quote asset units, e.g. USD).
     #[prost(string, tag = "16")]
     pub chg_24h: ::prost::alloc::string::String,
     /// Highest price in the last 24 hours.
@@ -2584,10 +2596,12 @@ pub struct Market {
     /// Total open interest.
     #[prost(string, tag = "20")]
     pub oi: ::prost::alloc::string::String,
-    /// Funding interval in nanoseconds.
+    /// Funding interval in nanoseconds. Always 3600000000000 ns (1 hour);
+    /// identical across all markets.
     #[prost(string, tag = "21")]
     pub fund_intv: ::prost::alloc::string::String,
-    /// Timestamp of the next funding payment (nanoseconds).
+    /// Timestamp of the next funding payment (nanoseconds). Always the next
+    /// top-of-hour; identical across all markets.
     #[prost(string, tag = "22")]
     pub next_fund_ts: ::prost::alloc::string::String,
     /// Predicted funding rate for the next interval.
@@ -2610,7 +2624,8 @@ pub struct Market {
     #[prost(string, tag = "28")]
     pub icon_url: ::prost::alloc::string::String,
     /// Market trading mode: "trading", "post_only", "wind_down", "halted", "delisting", "delisted".
-    /// FE should use this instead of enabled/post_only booleans to determine allowed actions.
+    /// Frontend integrations MUST use `mode`; `enabled` and `post_only` cannot
+    /// distinguish `wind_down`/`halted`/`delisting`/`delisted`.
     #[prost(string, tag = "29")]
     pub mode: ::prost::alloc::string::String,
 }
@@ -2630,10 +2645,13 @@ pub struct GetOrderBookResponse {
     /// Order book data containing bids and asks.
     #[prost(message, optional, tag = "2")]
     pub book: ::core::option::Option<OrderBook>,
-    /// Timestamp of the order book snapshot (nanoseconds).
+    /// Timestamp of the last update applied to the book (nanoseconds), not
+    /// request time.
     #[prost(uint64, tag = "3")]
     pub ts: u64,
-    /// Global sequence number for this order book update.
+    /// Global sequence number of the last update applied to the book. Matches
+    /// the orderbook WS channel — use it to align REST snapshots with subsequent
+    /// WS deltas.
     #[prost(uint64, tag = "4")]
     pub gsn: u64,
 }
@@ -2682,7 +2700,8 @@ pub struct GetMarketTradesRequest {
     /// Page number for pagination, starting at 1 (default: 1).
     #[prost(int64, tag = "4")]
     pub pg: i64,
-    /// Number of records per page (default: 100).
+    /// Number of records per page. Default: 100, max: 1000 (values above 1000
+    /// return InvalidArgument).
     #[prost(int64, tag = "5")]
     pub lmt: i64,
 }
@@ -2740,7 +2759,7 @@ pub struct GetMarketCandlesRequest {
     /// Market ID (e.g., "BTC-PERP", "ETH-PERP").
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Candle interval duration in nanoseconds (default: 1 hour if not set).
+    /// Candle interval in nanoseconds. Accepted: 1m, 5m, 15m, 1h, 2h, 4h, 8h, 1d, 1w.
     #[prost(int64, tag = "2")]
     pub intv: i64,
     /// Start time in nanoseconds (default: now() - 1 hour if not set).
@@ -2763,7 +2782,7 @@ pub struct Candle {
     /// Market ID for this candle.
     #[prost(string, tag = "1")]
     pub mkt_id: ::prost::alloc::string::String,
-    /// Candle interval (e.g., "1m", "5m", "15m", "1h").
+    /// Candle interval. Accepted resolutions: 1m, 5m, 15m, 1h, 2h, 4h, 8h, 1d, 1w.
     #[prost(string, tag = "2")]
     pub intv: ::prost::alloc::string::String,
     /// Candle start timestamp in nanoseconds.
@@ -2797,7 +2816,8 @@ pub struct GetFundingRateHistoryRequest {
     /// End timestamp in nanoseconds to filter results up to (exclusive).
     #[prost(int64, tag = "3")]
     pub end_ts: i64,
-    /// Maximum number of records to return per page (default: 20).
+    /// Maximum number of records to return per page. Defaults to 100 when omitted;
+    /// values above 1000 are silently clamped to 1000.
     #[prost(int64, tag = "4")]
     pub lmt: i64,
     /// Page number for pagination (default: 1).
@@ -2813,7 +2833,8 @@ pub struct GetFundingRateHistoryResponse {
     /// List of funding rate history items.
     #[prost(message, repeated, tag = "2")]
     pub items: ::prost::alloc::vec::Vec<FundingRateItem>,
-    /// Paging information.
+    /// Paging information. Only `pg` and `tot` are populated in the paging
+    /// response; `per_pg`, `last_pg`, `from`, `to` are always 0.
     #[prost(message, optional, tag = "3")]
     pub pgn: ::core::option::Option<Paging>,
 }
@@ -2864,7 +2885,8 @@ pub struct GetAccountTradeHistoryRequest {
     /// Page number for pagination, starting at 1 (default: 1).
     #[prost(int64, tag = "4")]
     pub pg: i64,
-    /// Number of records per page (default: 100).
+    /// Number of records per page. Default: 100, max: 1000 (values above 1000
+    /// return InvalidArgument).
     #[prost(int64, tag = "5")]
     pub lmt: i64,
 }
@@ -2877,7 +2899,8 @@ pub struct GetAccountTradeHistoryResponse {
     /// List of trades for the account.
     #[prost(message, repeated, tag = "2")]
     pub trades: ::prost::alloc::vec::Vec<AccountTrade>,
-    /// Current page number.
+    /// Current page number. Pagination is returned as flat fields (`pg`, `tot`);
+    /// `per_pg`, `last_pg`, `from`, `to` are not available.
     #[prost(int64, tag = "3")]
     pub pg: i64,
     /// Total number of trades matching the query.
@@ -2963,7 +2986,7 @@ pub mod get_account_response {
         /// Current status of the vault.
         #[prost(enumeration = "super::AccountStatus", tag = "3")]
         pub st: i32,
-        /// Unix timestamp when the vault was created.
+        /// Unix timestamp in seconds when the vault was created.
         #[prost(int64, tag = "4")]
         pub crt_ts: i64,
     }
@@ -2976,7 +2999,7 @@ pub mod get_account_response {
         /// Current status of the subaccount.
         #[prost(enumeration = "super::AccountStatus", tag = "2")]
         pub st: i32,
-        /// Unix timestamp when the subaccount was created.
+        /// Unix timestamp in seconds when the subaccount was created.
         #[prost(int64, tag = "3")]
         pub crt_ts: i64,
         /// Display name of the subaccount.
@@ -2985,6 +3008,9 @@ pub mod get_account_response {
     }
 }
 /// CreateSubaccountRequest is the request for CreateSubaccount.
+/// Name must be 1-50 characters and must not contain banned words. Maximum 10
+/// subaccounts per main account. The subaccount address must have no prior
+/// balance, deposits, orders, vault roles, or existing children.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateSubaccountRequest {
     /// Subaccount wallet address (e.g., "0x1234...").
@@ -3082,7 +3108,8 @@ pub struct WithdrawCollateralRequest {
     /// Amount to withdraw in decimal format (e.g., "10.5" for 10.5 USDC).
     #[prost(string, tag = "2")]
     pub amt: ::prost::alloc::string::String,
-    /// Unique nonce to prevent replay attacks.
+    /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes
+    /// of the server's current time. Used to prevent replay attacks.
     #[prost(uint64, tag = "3")]
     pub nonce: u64,
     /// EIP-712 signature of the withdrawal request.
@@ -3158,7 +3185,7 @@ pub struct TransferItem {
     /// Transfer amount in decimal format (e.g., "10.5" for 10.5 USDC).
     #[prost(string, tag = "7")]
     pub amt: ::prost::alloc::string::String,
-    /// Unix timestamp of the block when the transfer occurred.
+    /// Unix timestamp (seconds) of the block when the transfer occurred.
     #[prost(uint64, tag = "8")]
     pub blk_ts: u64,
     /// Whether the transfer is still pending confirmation.
@@ -3179,6 +3206,117 @@ pub struct TransferItem {
     /// Net change amount after fees in decimal format.
     #[prost(string, tag = "14")]
     pub net_chg_amt: ::prost::alloc::string::String,
+}
+/// GetPendingTransfersRequest is the request for GetPendingTransfers.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetPendingTransfersRequest {}
+/// GetPendingTransfersResponse is the response for GetPendingTransfers.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetPendingTransfersResponse {
+    /// List of pending transfer items.
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<PendingTransfer>,
+    /// Last block that has been confirmed/processed by the system.
+    #[prost(uint64, tag = "2")]
+    pub last_conf_blk: u64,
+    /// Current block number on the blockchain.
+    #[prost(uint64, tag = "3")]
+    pub cur_blk: u64,
+    /// Number of block confirmations required before a transfer is considered confirmed.
+    #[prost(uint64, tag = "4")]
+    pub req_confs: u64,
+}
+/// PendingTransfer represents a pending (unconfirmed) transfer event from the blockchain.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PendingTransfer {
+    /// Transaction hash on the blockchain.
+    #[prost(string, tag = "1")]
+    pub tx_hash: ::prost::alloc::string::String,
+    /// Log index within the transaction.
+    #[prost(uint32, tag = "2")]
+    pub log_idx: u32,
+    /// Block number where the event was emitted.
+    #[prost(uint64, tag = "3")]
+    pub blk_num: u64,
+    /// Unix timestamp of the block.
+    #[prost(uint64, tag = "4")]
+    pub blk_time: u64,
+    /// Type of transfer (deposit, stake_vault, unstake_vault).
+    #[prost(enumeration = "TransferItemType", tag = "5")]
+    pub t: i32,
+    /// Number of confirmations received so far.
+    #[prost(uint64, tag = "6")]
+    pub confs: u64,
+    /// Type-specific data.
+    #[prost(oneof = "pending_transfer::Data", tags = "10, 11, 12")]
+    pub data: ::core::option::Option<pending_transfer::Data>,
+}
+/// Nested message and enum types in `PendingTransfer`.
+pub mod pending_transfer {
+    /// Type-specific data.
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Data {
+        #[prost(message, tag = "10")]
+        Dep(super::PendingDeposit),
+        #[prost(message, tag = "11")]
+        StkVlt(super::PendingStakeVault),
+        #[prost(message, tag = "12")]
+        UnstkVlt(super::PendingUnstakeVault),
+    }
+}
+/// PendingDeposit represents pending deposit event data.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PendingDeposit {
+    /// Account address that received the deposit.
+    #[prost(string, tag = "1")]
+    pub acct: ::prost::alloc::string::String,
+    /// Token contract address of the deposited asset.
+    #[prost(string, tag = "2")]
+    pub tkn: ::prost::alloc::string::String,
+    /// Deposit amount in decimal format.
+    #[prost(string, tag = "3")]
+    pub amt: ::prost::alloc::string::String,
+}
+/// PendingStakeVault represents pending vault stake event data.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PendingStakeVault {
+    /// Vault address receiving the stake.
+    #[prost(string, tag = "1")]
+    pub vlt: ::prost::alloc::string::String,
+    /// Staker's wallet address.
+    #[prost(string, tag = "2")]
+    pub stkr: ::prost::alloc::string::String,
+    /// Token contract address of the staked asset.
+    #[prost(string, tag = "3")]
+    pub tkn: ::prost::alloc::string::String,
+    /// Staked amount in decimal format.
+    #[prost(string, tag = "4")]
+    pub amt: ::prost::alloc::string::String,
+    /// Number of vault shares received.
+    #[prost(string, tag = "5")]
+    pub shrs: ::prost::alloc::string::String,
+}
+/// PendingUnstakeVault represents pending vault unstake event data.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PendingUnstakeVault {
+    /// Vault address from which funds are unstaked.
+    #[prost(string, tag = "1")]
+    pub vlt: ::prost::alloc::string::String,
+    /// Staker's wallet address.
+    #[prost(string, tag = "2")]
+    pub stkr: ::prost::alloc::string::String,
+    /// Token contract address of the unstaked asset.
+    #[prost(string, tag = "3")]
+    pub tkn: ::prost::alloc::string::String,
+    /// Unstaked amount in decimal format.
+    #[prost(string, tag = "4")]
+    pub amt: ::prost::alloc::string::String,
+    /// Number of vault shares burned.
+    #[prost(string, tag = "5")]
+    pub shrs: ::prost::alloc::string::String,
+    /// Fee amount charged for early unstaking.
+    #[prost(string, tag = "6")]
+    pub fee: ::prost::alloc::string::String,
 }
 /// GetWithdrawalRequestsRequest is the request for GetWithdrawalRequests.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3239,10 +3377,10 @@ pub struct WithdrawalRequestItem {
     /// Current status of the request.
     #[prost(enumeration = "WithdrawalRequestStatus", tag = "6")]
     pub st: i32,
-    /// Unix timestamp when the request was created.
+    /// Unix timestamp (seconds) when the request was created.
     #[prost(uint64, tag = "7")]
     pub crt_ts: u64,
-    /// Unix timestamp when the request was last updated.
+    /// Unix timestamp (seconds) when the request was last updated.
     #[prost(uint64, tag = "8")]
     pub upd_ts: u64,
     /// Transaction hash when settled on-chain (empty if pending).
@@ -3279,7 +3417,8 @@ pub struct SendFundsRequest {
     /// Amount to transfer in decimal format (e.g., "10.5" for 10.5 USDC).
     #[prost(string, tag = "4")]
     pub amt: ::prost::alloc::string::String,
-    /// Unique nonce to prevent replay attacks.
+    /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes
+    /// of the server's current time. Used to prevent replay attacks.
     #[prost(uint64, tag = "5")]
     pub nonce: u64,
     /// EIP-712 signature of the transfer request (signed by main account).
@@ -3520,13 +3659,13 @@ pub struct GetSubaccountPortfolioHistoryRequest {
     /// Subaccount wallet address (e.g., "0x1234...").
     #[prost(string, tag = "1")]
     pub sub_addr: ::prost::alloc::string::String,
-    /// Start time in nanoseconds (optional, default: 1 hour ago).
+    /// Start time in nanoseconds (optional, default: 1 hour ago). start_ts must be no more than 366 days before now.
     #[prost(int64, tag = "2")]
     pub start_ts: i64,
     /// End time in nanoseconds (optional, default: now).
     #[prost(int64, tag = "3")]
     pub end_ts: i64,
-    /// Resolution in nanoseconds (optional, default: 60000000000 = 1 minute).
+    /// Resolution in nanoseconds. Accepted values: 1m (60000000000), 5m (300000000000), 1h (3600000000000), 4h (14400000000000), 1d (86400000000000), 1w (604800000000000). Other values default to 1m. (end-start)/intv must be <= 500 buckets.
     #[prost(int64, tag = "4")]
     pub intv: i64,
 }
@@ -4275,7 +4414,8 @@ pub struct RedeemAccessCodeResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPricesRequest {
-    /// Assets to query. Empty means all assets.
+    /// Assets to query. Empty means all assets. Unknown asset symbols are silently
+    /// dropped from the response (no error).
     #[prost(string, repeated, tag = "1")]
     pub assets: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
@@ -4287,16 +4427,19 @@ pub struct GetPricesResponse {
 /// Price holds mark and index prices for an asset.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Price {
+    /// Asset symbol (matches Market.base_sym, not mkt_id).
     #[prost(string, tag = "1")]
     pub asset: ::prost::alloc::string::String,
+    /// Mark price.
     #[prost(string, tag = "2")]
     pub mark_px: ::prost::alloc::string::String,
+    /// Index price.
     #[prost(string, tag = "3")]
     pub idx_px: ::prost::alloc::string::String,
-    /// Unix nano timestamp
+    /// Unix nano timestamp of the mark price update.
     #[prost(int64, tag = "4")]
     pub mark_px_ts: i64,
-    /// Unix nano timestamp
+    /// Unix nano timestamp of the index price update.
     #[prost(int64, tag = "5")]
     pub idx_px_ts: i64,
 }
@@ -4334,10 +4477,10 @@ pub struct GetChainConfigResponse {
 /// See <https://eips.ethereum.org/EIPS/eip-712> for the EIP-712 specification.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Domain {
-    /// EIP-712 domain name (e.g., "Obsidian Exchange")
+    /// EIP-712 domain name (e.g., "Obsidian")
     #[prost(string, tag = "1")]
     pub nm: ::prost::alloc::string::String,
-    /// EIP-712 domain version (e.g., "1.0")
+    /// EIP-712 domain version (e.g., "1")
     #[prost(string, tag = "2")]
     pub ver: ::prost::alloc::string::String,
     /// Chain ID as string for EIP-712 (e.g., "1" for Ethereum mainnet)
@@ -4369,7 +4512,7 @@ pub struct NativeCurrency {
 /// RPC URLs for wallet connection
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RpcUrls {
-    /// Default HTTP RPC endpoints
+    /// Default HTTP RPC endpoints.
     #[prost(string, repeated, tag = "1")]
     pub http: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }

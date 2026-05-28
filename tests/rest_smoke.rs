@@ -26,7 +26,7 @@ fn mock_market() -> Market {
 
 fn build_client(server: &MockServer) -> Client {
     Client::builder()
-        .env(Env::Local)
+        .env(Env::Staging)
         .rest_base_url(server.uri())
         .api_key("KEY", "SECRET")
         .build()
@@ -134,7 +134,7 @@ async fn place_order_injects_hmac_headers() {
 async fn place_order_without_signer_returns_auth_error() {
     let server = MockServer::start().await;
     let client = Client::builder()
-        .env(Env::Local)
+        .env(Env::Staging)
         .rest_base_url(server.uri())
         .build()
         .expect("build no-auth client");

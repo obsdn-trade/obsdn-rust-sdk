@@ -354,11 +354,34 @@ impl WsUpdate {
         parse_view(self, ChannelName::Order)
     }
 
-    /// Decode `data` as a list of [`PositionView`]. Snapshot delivers all
-    /// positions as a JSON array; updates wrap a single position — both are
-    /// arrays on the wire.
+    /// Decode `data` as a list of [`PositionView`].
+    ///
+    /// The two wire shapes differ: a **snapshot** delivers all positions as
+    /// a JSON array (`MarshalProtoSlice`), but a live **update** delivers a
+    /// *single* position object (`MarshalProto`) — see
+    /// `services/pulse/channel/channel_position.go`. We accept either and
+    /// always return a `Vec` so callers don't have to branch on `kind`.
     pub fn as_positions(&self) -> Result<Vec<PositionView>> {
-        parse_view(self, ChannelName::Position)
+        if self.channel != ChannelName::Position {
+            return Err(Error::Decode(serde::de::Error::custom(format!(
+                "expected channel {:?}, got {:?}",
+                ChannelName::Position,
+                self.channel
+            ))));
+        }
+        match &self.data {
+            // Snapshot: array of positions.
+            serde_json::Value::Array(_) => {
+                serde_json::from_value(self.data.clone()).map_err(Error::from)
+            }
+            // Defensive: empty/absent payload → no positions.
+            serde_json::Value::Null => Ok(Vec::new()),
+            // Update: a single position object.
+            _ => {
+                let one: PositionView = serde_json::from_value(self.data.clone())?;
+                Ok(vec![one])
+            }
+        }
     }
 
     /// Decode `data` as a [`PortfolioView`]. Both snapshot and update are
@@ -467,6 +490,44 @@ mod tests {
         assert_eq!(positions[0].mkt_id, "BTC-PERP");
         assert_eq!(positions[0].net_sz, "0.5");
         assert_eq!(positions[0].mrgn_mode, "MARGIN_MODE_CROSS");
+    }
+
+    #[test]
+    fn position_update_single_object_decodes() {
+        // A live position UPDATE arrives as a single object, not an array
+        // (server uses MarshalProto, not MarshalProtoSlice). Regression
+        // test for the silent-decode-failure bug.
+        let u = WsUpdate {
+            kind: WsUpdateKind::Update,
+            channel: ChannelName::Position,
+            gsn: 2,
+            ts: 0,
+            filter: "BTC-PERP".to_string(),
+            data: json!({
+                "mkt_idx": 1,
+                "mkt_id": "BTC-PERP",
+                "net_sz": "0.5",
+                "avg_entry_px": "43000.00",
+                "quote_bal": "21500.00",
+                "mark_px": "43100.00",
+                "idx_px": "43050.00",
+                "mrgn_mode": "MARGIN_MODE_CROSS",
+                "lev": "10",
+                "mrgn_bal": "2150.00",
+                "init_mrgn_req": "215.00",
+                "maint_mrgn_req": "107.50",
+                "liq_px": "40000.00",
+                "unrlzd_pnl": "50.00",
+                "tot_fund_paid": "1.23",
+                "iso_usdc_bal": "0",
+                "free_iso_usdc_bal": "0",
+                "in_iso_liq": false,
+                "mrgn_ratio": "0.05"
+            }),
+        };
+        let positions = u.as_positions().unwrap();
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0].mkt_id, "BTC-PERP");
     }
 
     #[test]

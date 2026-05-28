@@ -1,8 +1,11 @@
 //! Per-environment EIP-712 domain values.
 //!
-//! Mirrors `pkg/config/chain.go::Domain`. Staging uses base-sepolia
-//! (`configs/shared/chain/base_sepolia.yaml`), production uses Monad
-//! mainnet (`configs/shared/chain/monad_mainnet.yaml`).
+//! Mirrors the chain configs each environment's backend loads:
+//! - **Staging** → monad-testnet (`configs/shared/chain/monad_testnet.yaml`)
+//! - **Production** → monad-mainnet (`configs/shared/chain/monad_mainnet.yaml`)
+//!
+//! Other targets (a forked staging stack, an internal host, a local backend)
+//! go through [`custom_domain`] paired with [`crate::Env::Custom`].
 
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{eip712_domain, Eip712Domain};
@@ -13,10 +16,12 @@ use crate::env::Env;
 /// value. Go uses one `config.Domain` for all signers (orders, transfers,
 /// withdrawals, vaults, registers); we keep that 1:1.
 ///
-/// **Staging / Local** → base-sepolia. **Production** → Monad mainnet.
+/// **Staging** → monad-testnet. **Production** → monad-mainnet. Each must
+/// match the chain config the corresponding backend loads, or every
+/// signature is rejected.
 pub fn sdk_domain(env: &Env) -> Eip712Domain {
     match env {
-        Env::Local | Env::Staging => staging_domain(),
+        Env::Staging => staging_domain(),
         Env::Production => production_domain(),
         Env::Custom { .. } => panic!(
             "sdk_domain() cannot determine the correct domain for Env::Custom — \
