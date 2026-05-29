@@ -1,4 +1,4 @@
-//! Orders REST surface — `OrderService` in `api/proto/nil/v1/order.proto`.
+//! Orders REST surface - `OrderService` in `api/proto/nil/v1/order.proto`.
 
 use std::sync::Arc;
 
@@ -22,7 +22,7 @@ use crate::types::v1::{
 };
 
 /// Cheap handle to the order endpoints. Holds an `Arc` to the shared
-/// [`RestClient`] — clone freely.
+/// [`RestClient`] - clone freely.
 ///
 /// Constructed via [`crate::Client::orders`]. `client` is the back-reference
 /// used by [`Self::place_easy`] for resolve→sign→post in one call.
@@ -37,7 +37,7 @@ impl OrdersApi {
         Self { rest, client }
     }
 
-    /// `POST /orders` — place a single order.
+    /// `POST /orders` - place a single order.
     ///
     /// **Auth:** required. EIP-712 `sig` must be populated by the caller
     /// (Phase 4 will provide a typed signer).
@@ -45,7 +45,7 @@ impl OrdersApi {
         self.rest.post("/orders", &req, Auth::Required).await
     }
 
-    /// `POST /orders/group` — place a group of related orders (BRACKET).
+    /// `POST /orders/group` - place a group of related orders (BRACKET).
     /// **Auth:** required.
     pub async fn place_group(
         &self,
@@ -54,13 +54,13 @@ impl OrdersApi {
         self.rest.post("/orders/group", &req, Auth::Required).await
     }
 
-    /// `POST /orders/twap` — place TWAP sub-orders.
+    /// `POST /orders/twap` - place TWAP sub-orders.
     /// **Auth:** required.
     pub async fn place_twap(&self, req: PlaceTwapOrdersRequest) -> Result<PlaceTwapOrdersResponse> {
         self.rest.post("/orders/twap", &req, Auth::Required).await
     }
 
-    /// `DELETE /orders/{oid}` — cancel by order ID.
+    /// `DELETE /orders/{oid}` - cancel by order ID.
     /// **Auth:** required.
     pub async fn cancel(&self, oid: &str) -> Result<CancelOrderResponse> {
         let path = format!("/orders/{}", percent_encode_segment(oid));
@@ -69,7 +69,7 @@ impl OrdersApi {
         self.rest.delete(&path, Auth::Required).await
     }
 
-    /// `DELETE /orders/by-client-id/{cl_oid}` — cancel by client-assigned ID.
+    /// `DELETE /orders/by-client-id/{cl_oid}` - cancel by client-assigned ID.
     /// **Auth:** required.
     pub async fn cancel_by_client_id(&self, cl_oid: &str) -> Result<CancelOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
@@ -77,7 +77,7 @@ impl OrdersApi {
         self.rest.delete(&path, Auth::Required).await
     }
 
-    /// `DELETE /orders` — cancel multiple orders by criteria.
+    /// `DELETE /orders` - cancel multiple orders by criteria.
     /// **Auth:** required.
     pub async fn cancel_many(&self, req: CancelOrdersRequest) -> Result<CancelOrdersResponse> {
         self.rest
@@ -85,17 +85,17 @@ impl OrdersApi {
             .await
     }
 
-    /// `DELETE /orders/all` — cancel all open orders, optionally filtered.
+    /// `DELETE /orders/all` - cancel all open orders, optionally filtered.
     /// **Auth:** required.
     pub async fn cancel_all(&self, req: CancelAllOrdersRequest) -> Result<CancelAllOrdersResponse> {
-        // No `body: "*"` in the http annotation — server reads filters
+        // No `body: "*"` in the http annotation - server reads filters
         // from query params.
         self.rest
             .delete_with_query("/orders/all", &req, Auth::Required)
             .await
     }
 
-    /// `GET /orders/{oid}` — fetch a single order.
+    /// `GET /orders/{oid}` - fetch a single order.
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, oid: &str) -> Result<GetOrderResponse> {
         let path = format!("/orders/{}", percent_encode_segment(oid));
@@ -103,7 +103,7 @@ impl OrdersApi {
         self.rest.get(&path, Auth::Required).await
     }
 
-    /// `GET /orders/by-client-id/{cl_oid}` — fetch by client-assigned ID.
+    /// `GET /orders/by-client-id/{cl_oid}` - fetch by client-assigned ID.
     /// **Auth:** required (read-only allowed).
     pub async fn get_by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
@@ -111,7 +111,7 @@ impl OrdersApi {
         self.rest.get(&path, Auth::Required).await
     }
 
-    /// `GET /orders` — list open orders.
+    /// `GET /orders` - list open orders.
     /// **Auth:** required (read-only allowed).
     pub async fn list_open(&self, req: ListOpenOrdersRequest) -> Result<ListOpenOrdersResponse> {
         self.rest
@@ -119,7 +119,7 @@ impl OrdersApi {
             .await
     }
 
-    /// `GET /orders/history` — list historical orders with pagination.
+    /// `GET /orders/history` - list historical orders with pagination.
     /// **Auth:** required (read-only allowed).
     pub async fn list_history(
         &self,
@@ -136,7 +136,7 @@ impl OrdersApi {
     /// to 18-decimal fixed-point, signs the EIP-712 `Order` payload with
     /// the configured signer, and POSTs `/orders`.
     ///
-    /// `nonce` defaults to wall-clock nanoseconds when zero — pass an
+    /// `nonce` defaults to wall-clock nanoseconds when zero - pass an
     /// explicit value for deterministic test fixtures or when retrying
     /// idempotently.
     ///
@@ -148,7 +148,7 @@ impl OrdersApi {
     /// and [`crate::Client::sign_place_order`] instead.
     ///
     /// **Scope:** LIMIT only. The exchange does not implement a true
-    /// MARKET order — IOC at top-of-book is the supported substitute, set
+    /// MARKET order - IOC at top-of-book is the supported substitute, set
     /// `tif = TimeInForce::Ioc` on a LIMIT and pick a price that crosses.
     /// STOP / TWAP / order-group flows require fields (`stop_t`,
     /// `stop_px`, `exp_ts`, `sched_ts`, ...) that this helper
@@ -157,8 +157,8 @@ impl OrdersApi {
     /// `place_easy` with any non-`Limit` order type returns `Error::Sign`.
     ///
     /// Errors:
-    /// - `Error::Config` — `mkt_id` is unknown.
-    /// - `Error::Sign` — no `eip_signer` configured, scaling failed, or
+    /// - `Error::Config` - `mkt_id` is unknown.
+    /// - `Error::Sign` - no `eip_signer` configured, scaling failed, or
     ///   `order_type` is not `Limit`.
     pub async fn place_easy(&self, req: PlaceEasy<'_>) -> Result<PlaceOrderResponse> {
         let client = &self.client;
@@ -166,7 +166,7 @@ impl OrdersApi {
             Error::Sign("no eip_signer configured; call ClientBuilder::eip_signer".into())
         })?;
         // Reject unsupported order types BEFORE signing. Exchange does
-        // not implement a true MARKET order — accepting MARKET here would
+        // not implement a true MARKET order - accepting MARKET here would
         // sign + post with surprising semantics. STOP / TWAP need extra
         // fields this helper doesn't expose.
         match req.order_type {
@@ -241,15 +241,15 @@ impl OrdersApi {
 
 /// Inputs for [`OrdersApi::place_easy`]. Mirrors
 /// [`PlaceOrderRequest`] minus the fields the helper fills in (`nonce`,
-/// `sig`). Optional fields default to "off"/"unspecified" — the same
+/// `sig`). Optional fields default to "off"/"unspecified" - the same
 /// proto defaults a hand-built request would produce.
 #[derive(Debug, Clone)]
 pub struct PlaceEasy<'a> {
     /// Market symbol (e.g. `"BTC-PERP"`).
     pub mkt_id: &'a str,
-    /// Buy or sell — anything else returns `Error::Sign`.
+    /// Buy or sell - anything else returns `Error::Sign`.
     pub side: OrderSide,
-    /// `Limit` only. The exchange has no true MARKET order — use a
+    /// `Limit` only. The exchange has no true MARKET order - use a
     /// crossing limit with `tif = TimeInForce::Ioc` for that behavior.
     /// MARKET / STOP / TWAP / GTT / scheduled types are rejected here;
     /// see [`OrdersApi::place_easy`] doc for the rationale.
@@ -298,7 +298,7 @@ impl<'a> PlaceEasy<'a> {
     }
 }
 
-/// Wall-clock nanos since the Unix epoch — matches the Go `time.Now().UnixNano()`
+/// Wall-clock nanos since the Unix epoch - matches the Go `time.Now().UnixNano()`
 /// pattern used as the default order nonce upstream
 /// (`pkg/exc/client.go::Place`).
 fn now_unix_nanos() -> u64 {
@@ -306,7 +306,7 @@ fn now_unix_nanos() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
-        // Never panics for any realistic clock — a pre-1970 wall clock
+        // Never panics for any realistic clock - a pre-1970 wall clock
         // would be a bigger problem than nonce uniqueness.
         .unwrap_or(0)
 }

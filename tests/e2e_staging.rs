@@ -8,7 +8,7 @@
 //!   RPCs) on the REST side AND the WS wildcard-routing fix on the same flow:
 //!   `Order { market: None }` must receive updates the server stamps with a
 //!   concrete market.
-//! - `e2e_ws_public_book`: public book channel, no auth — snapshot-first
+//! - `e2e_ws_public_book`: public book channel, no auth - snapshot-first
 //!   ordering + a follow-up update, live `as_book` deserialization.
 //!
 //! Run: OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
@@ -46,7 +46,7 @@ fn nonce() -> u64 {
         .as_nanos() as u64
 }
 
-/// Generous per-event ceiling — staging can be quiet and a placed/cancelled
+/// Generous per-event ceiling - staging can be quiet and a placed/cancelled
 /// order has to round-trip through the matching engine before its update fans
 /// back out over the socket.
 const EVENT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -74,7 +74,7 @@ async fn setup_test_account() -> TestAccount {
     let n = nonce();
     let message = "rust-sdk-e2e-test".to_string();
 
-    // C2: Register struct now includes sender field — this proves the 4-field struct works.
+    // C2: Register struct now includes sender field - this proves the 4-field struct works.
     let sndr_sig = sign::sign_register(
         &sender,
         &domain,
@@ -142,7 +142,7 @@ async fn setup_test_account() -> TestAccount {
 }
 
 /// Place a resting (far-from-market) limit buy so it sits on the book without
-/// matching — returns its oid. Far price keeps the position flat, so the flow
+/// matching - returns its oid. Far price keeps the position flat, so the flow
 /// exercises the order channel only. Proves C1 (uint16 marketIndex signature).
 async fn place_resting_order(acct: &TestAccount, market: &str) -> String {
     let sender_addr = obsdn_sdk::EipSigner::address(acct.sender.as_ref());
@@ -199,7 +199,7 @@ where
         match tokio::time::timeout(EVENT_TIMEOUT, stream.next()).await {
             Ok(Some(WsEvent::Update(u))) => return Some(u),
             Ok(Some(WsEvent::Reconnected)) => {
-                eprintln!("  (reconnected — continuing)");
+                eprintln!("  (reconnected - continuing)");
                 continue;
             }
             Ok(Some(WsEvent::Unauthorized(msg))) => panic!("unexpected Unauthorized: {msg}"),
@@ -253,7 +253,7 @@ async fn e2e_combined_flow() {
     let client = &acct.client;
     let sender_addr = obsdn_sdk::EipSigner::address(acct.sender.as_ref());
 
-    // --- Faucet staging USDC (best-effort — may need Twingate) ---
+    // --- Faucet staging USDC (best-effort - may need Twingate) ---
     let faucet_resp = client
         .account()
         .faucet(FaucetRequest {
@@ -278,7 +278,7 @@ async fn e2e_combined_flow() {
         .await
         .expect("subscribe order wildcard");
 
-    // Drain the initial snapshot (current open orders — may be empty for a
+    // Drain the initial snapshot (current open orders - may be empty for a
     // fresh account but still arrives as a frame).
     if let Some(snap) = next_update(&mut orders).await {
         eprintln!(
@@ -335,13 +335,13 @@ async fn e2e_combined_flow() {
     ws.shutdown().await.ok();
 
     eprintln!("\n=== E2E COMBINED FLOW PASSED ===");
-    eprintln!("  C2: Register 4-field struct       — VERIFIED (signer registered)");
-    eprintln!("  C1: Order uint16 marketIndex      — VERIFIED (order placed + accepted)");
-    eprintln!("  HIGH-1: WS wildcard order routing — VERIFIED (place + cancel observed over WS)");
-    eprintln!("  H1: SetLeverage endpoint          — TESTED");
+    eprintln!("  C2: Register 4-field struct       - VERIFIED (signer registered)");
+    eprintln!("  C1: Order uint16 marketIndex      - VERIFIED (order placed + accepted)");
+    eprintln!("  HIGH-1: WS wildcard order routing - VERIFIED (place + cancel observed over WS)");
+    eprintln!("  H1: SetLeverage endpoint          - TESTED");
 }
 
-/// Public book channel — no auth. First frame must be a `Snapshot` with a
+/// Public book channel - no auth. First frame must be a `Snapshot` with a
 /// populated book; a follow-up frame should arrive (staging book churns).
 /// Proves snapshot-before-update ordering and live `as_book` deserialization.
 #[tokio::test]

@@ -5,7 +5,7 @@
 //! adds opt-in typed deserializers for the channels callers actually
 //! consume in tight loops.
 //!
-//! All numeric fields stay as `String` — pulse encodes prices/sizes as
+//! All numeric fields stay as `String` - pulse encodes prices/sizes as
 //! decimal strings (no f64 round-trip risk) and the EIP-712 signing
 //! pipeline already handles the `String → u128` scaling. Use
 //! [`crate::sign::scale_decimal_str`] when you need the integer form.
@@ -34,7 +34,7 @@ fn parse_view<T: for<'de> Deserialize<'de>>(update: &WsUpdate, expected: Channel
 /// Order-book frame (`book` channel).
 ///
 /// Snapshot and update share the same shape. Distinguish via
-/// `update.kind` — snapshots replace state, updates patch it (`size = "0"`
+/// `update.kind` - snapshots replace state, updates patch it (`size = "0"`
 /// removes the level). See `docs/api/ws-integration.md#order-book-maintenance`
 /// for the maintenance algorithm.
 #[derive(Debug, Clone, Deserialize)]
@@ -45,7 +45,7 @@ pub struct BookView {
     /// `[price, size]` rows. Snapshot: ascending by price.
     #[serde(default)]
     pub asks: Vec<[String; 2]>,
-    /// CRC32-IEEE of the full book state — validate local book after applying diffs.
+    /// CRC32-IEEE of the full book state - validate local book after applying diffs.
     #[serde(default)]
     pub checksum: u32,
 }
@@ -73,9 +73,9 @@ pub struct TickerLevel {
 pub struct OracleView {
     /// Asset symbol (`"BTC"`, `"ETH"`, ...).
     pub asset: String,
-    /// Mark price — used for margin/liquidation. Decimal string.
+    /// Mark price - used for margin/liquidation. Decimal string.
     pub mark_px: String,
-    /// Index price — spot reference. Decimal string.
+    /// Index price - spot reference. Decimal string.
     pub idx_px: String,
     /// Mark price timestamp (nanoseconds, JSON string).
     pub mark_px_ts: String,
@@ -83,9 +83,9 @@ pub struct OracleView {
     pub idx_px_ts: String,
 }
 
-/// Public trade execution (`trade` channel — update only, no snapshot).
+/// Public trade execution (`trade` channel - update only, no snapshot).
 ///
-/// Note: trade timestamp is at the frame level — use `WsUpdate.ts`, not a
+/// Note: trade timestamp is at the frame level - use `WsUpdate.ts`, not a
 /// field in this struct.
 #[derive(Debug, Clone, Deserialize)]
 pub struct TradeView {
@@ -194,7 +194,7 @@ pub struct CollateralAssetView {
 
 /// User portfolio frame (`portfolio` channel).
 ///
-/// Both snapshot and update share the same shape — a single portfolio
+/// Both snapshot and update share the same shape - a single portfolio
 /// object. Fields match `pkg/jsonfast/portfolio.go`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PortfolioView {
@@ -266,10 +266,10 @@ pub struct PortfolioView {
     pub pos: Vec<PositionView>,
 }
 
-/// User order frame (`order` channel — payload is an array of orders).
+/// User order frame (`order` channel - payload is an array of orders).
 ///
 /// Snapshot is the open-orders set; updates wrap the changed orders in an
-/// array. Most fields use string-encoded numbers and enum strings — see
+/// array. Most fields use string-encoded numbers and enum strings - see
 /// `docs/api/ws-integration.md#order--user-orders-private` for the full
 /// catalog. Unknown fields are ignored to allow server additions.
 #[derive(Debug, Clone, Deserialize)]
@@ -358,7 +358,7 @@ impl WsUpdate {
     ///
     /// The two wire shapes differ: a **snapshot** delivers all positions as
     /// a JSON array (`MarshalProtoSlice`), but a live **update** delivers a
-    /// *single* position object (`MarshalProto`) — see
+    /// *single* position object (`MarshalProto`) - see
     /// `services/pulse/channel/channel_position.go`. We accept either and
     /// always return a `Vec` so callers don't have to branch on `kind`.
     pub fn as_positions(&self) -> Result<Vec<PositionView>> {

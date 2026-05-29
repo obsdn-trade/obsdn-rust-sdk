@@ -5,7 +5,7 @@
 //! `pkg/models/scalar.go::(Amount).X18()` and `(Price).X18()`). Go uses
 //! shopspring `decimal.Decimal` for arbitrary precision, then
 //! `BigInt()` truncates toward zero. This module mirrors that path with no
-//! third-party decimal dep — a tiny string-based scaler that handles the
+//! third-party decimal dep - a tiny string-based scaler that handles the
 //! shapes a REST caller can produce.
 //!
 //! Why string-based? `f64 * 1e18` loses precision near u128 boundaries;
@@ -51,7 +51,7 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
         return Err(Error::Sign(format!("non-digit in decimal: {s}")));
     }
 
-    // Pad/truncate fractional part to exactly 18 digits — equivalent to
+    // Pad/truncate fractional part to exactly 18 digits - equivalent to
     // shopspring `Shift(18).BigInt()` which scales then truncates toward
     // zero (see scalar.go).
     let mut padded = String::with_capacity(int_part.len() + 18);
@@ -72,7 +72,7 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
 /// Scale an `f64` by `10^18` via the shopspring path: format with the
 /// shortest round-trip decimal repr, then call [`scale_decimal_str`].
 ///
-/// Returns `Error::Sign` on NaN/Inf — the REST layer already rejects those
+/// Returns `Error::Sign` on NaN/Inf - the REST layer already rejects those
 /// upstream, but we re-check here so a misuse from a non-REST caller (e.g.,
 /// signing an offline order) is loud.
 pub fn scale_f64(v: f64) -> Result<u128> {
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn excess_fractional_digits_truncate_toward_zero() {
-        // 19 fractional digits — last digit dropped, no rounding.
+        // 19 fractional digits - last digit dropped, no rounding.
         assert_eq!(
             scale_decimal_str("1.0000000000000000019").unwrap(),
             1_000_000_000_000_000_001u128

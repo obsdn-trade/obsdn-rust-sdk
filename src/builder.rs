@@ -1,4 +1,4 @@
-//! `Client` + `ClientBuilder` — public entry point.
+//! `Client` + `ClientBuilder` - public entry point.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,11 +30,11 @@ pub struct Client {
     rest: Arc<RestClient>,
     eip_signer: Option<Arc<dyn EipSigner>>,
     domain: Eip712Domain,
-    /// Retained for [`Self::ws`] — Phase 5 needs the WS URL + (optional)
+    /// Retained for [`Self::ws`] - Phase 5 needs the WS URL + (optional)
     /// HMAC creds to authenticate private channels.
     env: Env,
     hmac: Option<HmacSigner>,
-    /// Lazy market metadata cache — populated on first
+    /// Lazy market metadata cache - populated on first
     /// [`Self::resolve_market`] (or `OrdersApi::place_easy`) call.
     markets_cache: Arc<MarketCache>,
     /// Explicit sender (main wallet) address for delegated signing.
@@ -139,7 +139,7 @@ impl Client {
     /// returns the main wallet address while [`Self::eip_signer`] holds the
     /// delegated key. In normal mode it falls back to the signer's address.
     ///
-    /// Panics if no EIP signer is configured — callers that need the sender
+    /// Panics if no EIP signer is configured - callers that need the sender
     /// address should check for a signer first.
     pub(crate) fn sender_address(&self) -> Address {
         self.sender_address.unwrap_or_else(|| {
@@ -161,7 +161,7 @@ impl Client {
     /// signature into `req.sig`. Requires an attached EIP-712 signer (set
     /// via [`ClientBuilder::eip_signer`]).
     ///
-    /// Low-level — callers populate `payload.market_index` and
+    /// Low-level - callers populate `payload.market_index` and
     /// `payload.sender` themselves. In delegated-signing mode, set
     /// `payload.sender` to the main wallet address (not the signer's).
     /// Prefer [`crate::rest::orders::OrdersApi::place_easy`] for the
@@ -180,7 +180,7 @@ impl Client {
     }
 
     /// Resolve a market by `mkt_id` (e.g. `"BTC-PERP"`) via the lazy cache.
-    /// Returns the full [`Market`] proto — caller picks the fields they
+    /// Returns the full [`Market`] proto - caller picks the fields they
     /// need (`idx`, `base_incr`, `mark_px`, ...).
     pub async fn resolve_market(&self, mkt_id: &str) -> Result<Market> {
         self.markets_cache.resolve(mkt_id).await
@@ -233,7 +233,7 @@ impl ClientBuilder {
         self
     }
 
-    /// Override REST base URL — useful for tests (wiremock, local stubs).
+    /// Override REST base URL - useful for tests (wiremock, local stubs).
     /// Takes precedence over [`Self::env`] for the REST client; WS routing
     /// (Phase 5+) still respects `env`.
     pub fn rest_base_url(mut self, url: impl Into<String>) -> Self {
@@ -262,7 +262,7 @@ impl ClientBuilder {
     /// produces the cryptographic signature. This mirrors the Go SDK's
     /// `senderAddress` / `signerPrivateKey` separation.
     ///
-    /// When omitted the signer's own address is used — correct for
+    /// When omitted the signer's own address is used - correct for
     /// non-delegated (direct) signing.
     pub fn sender(mut self, addr: Address) -> Self {
         self.sender_address = Some(addr);
@@ -288,7 +288,7 @@ impl ClientBuilder {
         self
     }
 
-    /// Skip TLS certificate verification. **Staging/testing only** — never
+    /// Skip TLS certificate verification. **Staging/testing only** - never
     /// enable in production.
     pub fn danger_accept_invalid_certs(mut self, accept: bool) -> Self {
         self.danger_accept_invalid_certs = accept;
@@ -319,7 +319,7 @@ impl ClientBuilder {
             (_, Some(d)) => d,
             (Env::Custom { .. }, None) => {
                 return Err(Error::Config(
-                    "Env::Custom requires an explicit .eip712_domain() — \
+                    "Env::Custom requires an explicit .eip712_domain() - \
                      the SDK cannot guess the correct chain_id / verifying_contract"
                         .into(),
                 ));

@@ -1,4 +1,4 @@
-//! Subaccount-related EIP-712 signers — `CreateSubaccount` and
+//! Subaccount-related EIP-712 signers - `CreateSubaccount` and
 //! `RegisterChildAccountSigner`.
 
 use alloy_primitives::Address;
@@ -27,7 +27,7 @@ sol! {
     }
 }
 
-/// `CreateSubaccount` payload — authorize a new subaccount address under
+/// `CreateSubaccount` payload - authorize a new subaccount address under
 /// a main wallet.
 #[derive(Debug, Clone)]
 pub struct CreateSubaccountPayload {
@@ -56,7 +56,7 @@ pub fn sign_create_subaccount(
     signer.sign_hash_sync(hash)
 }
 
-/// `RegisterChildAccountSigner` payload — authorize an extra signing key
+/// `RegisterChildAccountSigner` payload - authorize an extra signing key
 /// for a child account.
 #[derive(Debug, Clone)]
 pub struct RegisterChildAccountSignerPayload {

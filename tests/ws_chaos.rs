@@ -48,7 +48,7 @@ struct MockState {
     out: Option<mpsc::Sender<Message>>,
     /// Reject next auth with this message (one-shot).
     reject_next_auth: Option<String>,
-    /// Connection counter — incremented every accept. Doubles as a
+    /// Connection counter - incremented every accept. Doubles as a
     /// `connection_id` and lets tests assert that a reconnect actually
     /// happened.
     conn_seq: u64,
@@ -159,7 +159,7 @@ where
     };
 
     // Buffered outbound channel so push commands are non-blocking.
-    // The sender is owned exclusively by `state.out` — handle_conn does
+    // The sender is owned exclusively by `state.out` - handle_conn does
     // NOT retain a local clone. That way `MockCmd::KillConn` (which sets
     // `state.out = None`) drops the only sender and out_rx returns None,
     // unblocking this task's select! and forcing a clean close.
@@ -221,7 +221,7 @@ where
             // Inbound: client commands. We handle just sub/unsub/auth/ping.
             inbound = ws.next() => {
                 let Some(Ok(Message::Text(s))) = inbound else {
-                    // Close, error, ping/pong, or other — bail.
+                    // Close, error, ping/pong, or other - bail.
                     let _ = ws.close(None).await;
                     let mut st = state.lock().await;
                     st.out = None;
@@ -262,7 +262,7 @@ where
                         if ws.send(Message::Text(pong.to_string())).await.is_err() { return; }
                     }
                     _ => {
-                        // Unknown op — surface as error per the wire shape.
+                        // Unknown op - surface as error per the wire shape.
                         let resp = json!({ "type": "error", "message": format!("unknown op: {op}") });
                         let _ = ws.send(Message::Text(resp.to_string())).await;
                     }
@@ -329,7 +329,7 @@ async fn subscribe_and_receive_update() {
 #[tokio::test]
 async fn noncontiguous_gsn_does_not_emit_gap() {
     // Pulse `gsn` is a sparse global event watermark, not a dense per-sub
-    // sequence — non-contiguous GSNs on one channel are normal (throttled /
+    // sequence - non-contiguous GSNs on one channel are normal (throttled /
     // selectively-emitted frames skip numbers). The SDK must NOT infer a
     // gap: both updates pass straight through, no synthetic event between.
     let mock = MockPulse::start().await;
@@ -374,7 +374,7 @@ async fn wildcard_sub_routes_concrete_filter_updates() {
     // A `market: None` sub registers under the empty filter, but the server
     // stamps update frames with the concrete market (snapshot carries ""),
     // mirroring nil's hierarchical wildcard match. The SDK must route the
-    // concrete-filter update back to the wildcard subscriber — else a
+    // concrete-filter update back to the wildcard subscriber - else a
     // market-maker subscribing to all-markets gets the snapshot then silence.
     let mock = MockPulse::start().await;
     let client = build_client(mock.url());
@@ -463,7 +463,7 @@ async fn reconnect_emits_reconnected_and_resubscribes() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 
-    // After reconnect, push another update — supervisor should have
+    // After reconnect, push another update - supervisor should have
     // re-subscribed before this lands. Allow plenty of slack: the first
     // event we see may be either the Reconnected marker or, if the push
     // races ahead, an Update. Drain until we've seen both.
@@ -511,7 +511,7 @@ async fn auth_replay_failure_emits_unauthorized_after_reconnect() {
         .build()
         .expect("build client");
     let ws = client.ws();
-    // Subscribe first so the supervisor opens a connection. Public sub —
+    // Subscribe first so the supervisor opens a connection. Public sub -
     // pulse mock allows it without auth.
     let mut stream = ws
         .subscribe(Channel::Book {
@@ -574,7 +574,7 @@ async fn shutdown_closes_subscription_streams() {
 /// call would error "subscription request in flight".
 ///
 /// We trigger cancellation via `tokio::select!` with an immediate
-/// shutdown signal — deterministic vs racing a wall-clock timeout
+/// shutdown signal - deterministic vs racing a wall-clock timeout
 /// against the localhost WS handshake.
 #[tokio::test]
 async fn dropped_subscribe_future_does_not_pin_channel() {
@@ -596,7 +596,7 @@ async fn dropped_subscribe_future_does_not_pin_channel() {
     let _ = task.await;
     // Give the supervisor a chance to connect + GC.
     tokio::time::sleep(Duration::from_millis(300)).await;
-    // Second subscribe to the SAME channel must succeed — registry must
+    // Second subscribe to the SAME channel must succeed - registry must
     // not block it as "already subscribed" / "in flight".
     let mut stream = timeout(
         Duration::from_secs(2),
@@ -643,13 +643,13 @@ async fn closed_signal_race_immediate_kill_after_welcome() {
     // Kill immediately. This races: supervisor may have just entered
     // drive() and may not yet be blocked on closed().
     mock.send(MockCmd::KillConn).await;
-    // Within 5s, supervisor must reconnect (conn_seq >= 2) — the watch
+    // Within 5s, supervisor must reconnect (conn_seq >= 2) - the watch
     // channel guarantees the close signal isn't lost even if
     // closed().await happens after the driver exited.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     while mock.conn_seq().await < 2 {
         if tokio::time::Instant::now() >= deadline {
-            panic!("mock did not observe reconnect within 5s — closed signal lost");
+            panic!("mock did not observe reconnect within 5s - closed signal lost");
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
@@ -696,14 +696,14 @@ async fn disconnected_authenticate_blocks_until_replay() {
         .await
         .expect("first subscribe");
     mock.send(MockCmd::KillConn).await;
-    // Authenticate now — supervisor may still be in backoff or mid-connect.
+    // Authenticate now - supervisor may still be in backoff or mid-connect.
     // With our fix, this blocks until next successful auth.
     let addr = timeout(Duration::from_secs(5), ws.authenticate())
         .await
         .expect("auth completes within 5s")
         .expect("auth ok");
     assert_eq!(addr, "0xMOCKADDR");
-    // Drain stream — should see Reconnected. Bound time so a hung
+    // Drain stream - should see Reconnected. Bound time so a hung
     // supervisor can't deadlock the test.
     let _ = timeout(Duration::from_secs(2), async {
         while let Some(e) = stream.next().await {
@@ -724,7 +724,7 @@ async fn slow_consumer_does_not_deadlock_supervisor() {
     let mock = MockPulse::start().await;
     let client = build_client(mock.url());
     let ws = client.ws();
-    // Subscribe but never read from `stream` — let buffer fill.
+    // Subscribe but never read from `stream` - let buffer fill.
     let _stream = ws
         .subscribe(Channel::Book {
             market: "BTC-PERP".into(),
@@ -745,7 +745,7 @@ async fn slow_consumer_does_not_deadlock_supervisor() {
     }
     // Give the supervisor time to process.
     tokio::time::sleep(Duration::from_millis(300)).await;
-    // Critical: subscribe to a DIFFERENT channel — if supervisor is
+    // Critical: subscribe to a DIFFERENT channel - if supervisor is
     // wedged on the slow sub, this hangs. Bound the wait.
     let mut other = timeout(
         Duration::from_secs(2),
@@ -754,7 +754,7 @@ async fn slow_consumer_does_not_deadlock_supervisor() {
         }),
     )
     .await
-    .expect("subscribe to other channel within 2s — supervisor wedged otherwise")
+    .expect("subscribe to other channel within 2s - supervisor wedged otherwise")
     .expect("subscribe ok");
     mock.send(MockCmd::Push {
         kind: "snapshot",
@@ -789,7 +789,7 @@ async fn drop_subscription_then_resubscribe_works() {
             .expect("subscribe");
         // Drop _stream at end of scope.
     }
-    // Push a frame — supervisor sees user_tx Closed → unsubscribes
+    // Push a frame - supervisor sees user_tx Closed → unsubscribes
     // server-side and clears the slot.
     mock.send(MockCmd::Push {
         kind: "update",
@@ -801,7 +801,7 @@ async fn drop_subscription_then_resubscribe_works() {
     .await;
     // Give time for the cleanup.
     tokio::time::sleep(Duration::from_millis(200)).await;
-    // Fresh subscribe — must succeed (slot was GC'd).
+    // Fresh subscribe - must succeed (slot was GC'd).
     let mut stream = timeout(
         Duration::from_secs(2),
         ws.subscribe(Channel::Book {
@@ -828,7 +828,7 @@ async fn drop_subscription_then_resubscribe_works() {
 }
 
 /// First-time subscribe AFTER a reconnect already happened should NOT
-/// receive `Reconnected` as its first event — from this caller's POV
+/// receive `Reconnected` as its first event - from this caller's POV
 /// they just subscribed.
 #[tokio::test]
 async fn first_subscribe_after_reconnect_does_not_see_reconnected() {
@@ -860,7 +860,7 @@ async fn first_subscribe_after_reconnect_does_not_see_reconnected() {
         }
     })
     .await;
-    // Now subscribe to a DIFFERENT channel — fresh sub. Push a frame.
+    // Now subscribe to a DIFFERENT channel - fresh sub. Push a frame.
     let mut fresh = ws
         .subscribe(Channel::Ticker {
             market: "ETH-PERP".into(),
@@ -879,7 +879,7 @@ async fn first_subscribe_after_reconnect_does_not_see_reconnected() {
         .await
         .expect("first event")
         .expect("open");
-    // Caller's first event MUST be data, not Reconnected — we never
+    // Caller's first event MUST be data, not Reconnected - we never
     // experienced a disconnect from this sub's POV.
     assert!(
         matches!(first, WsEvent::Update(_)),
@@ -917,7 +917,7 @@ async fn mid_replay_conn_death_preserves_subs() {
         })
         .await
         .expect("first ticker");
-    // Kill conn #1 — supervisor reconnects to conn #2 and begins replay.
+    // Kill conn #1 - supervisor reconnects to conn #2 and begins replay.
     mock.send(MockCmd::KillConn).await;
     // Wait until we see conn #2 then immediately kill it. Racy by design:
     // we want the kill to land while conn #2's replay loop is still
@@ -930,16 +930,16 @@ async fn mid_replay_conn_death_preserves_subs() {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     mock.send(MockCmd::KillConn).await;
-    // Wait for conn #3 — supervisor must reconnect AGAIN with both
+    // Wait for conn #3 - supervisor must reconnect AGAIN with both
     // registry slots intact.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     while mock.conn_seq().await < 3 {
         if tokio::time::Instant::now() >= deadline {
-            panic!("no conn #3 — supervisor stalled");
+            panic!("no conn #3 - supervisor stalled");
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    // Push to both channels. Both streams must still deliver — proving
+    // Push to both channels. Both streams must still deliver - proving
     // the supervisor re-subscribed both.
     mock.send(MockCmd::Push {
         kind: "snapshot",
@@ -957,15 +957,15 @@ async fn mid_replay_conn_death_preserves_subs() {
         data: json!({"bid":{"px":"1","sz":"1"},"ask":{"px":"2","sz":"1"}}),
     })
     .await;
-    // Drain each stream until we see Update — Reconnected may interleave.
+    // Drain each stream until we see Update - Reconnected may interleave.
     async fn await_update<S: futures_util::Stream<Item = WsEvent> + Unpin>(s: &mut S) {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         loop {
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
             let evt = match timeout(remaining, s.next()).await {
                 Ok(Some(e)) => e,
-                Ok(None) => panic!("stream ended unexpectedly — sub got dropped from registry"),
-                Err(_) => panic!("no Update within deadline — sub silently lost"),
+                Ok(None) => panic!("stream ended unexpectedly - sub got dropped from registry"),
+                Err(_) => panic!("no Update within deadline - sub silently lost"),
             };
             if matches!(evt, WsEvent::Update(_)) {
                 return;

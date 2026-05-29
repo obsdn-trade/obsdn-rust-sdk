@@ -39,11 +39,11 @@ const DEFAULT_USER_AGENT: &str = concat!("obsdn-sdk-rust/", env!("CARGO_PKG_VERS
 /// `GetMarkets`).
 #[derive(Debug, Clone, Copy)]
 pub enum Auth {
-    /// Authenticated endpoint — fail with `Error::Auth` if no signer.
+    /// Authenticated endpoint - fail with `Error::Auth` if no signer.
     Required,
     /// Add headers if a signer is present, otherwise pass through.
     Optional,
-    /// Public endpoint — never add HMAC headers.
+    /// Public endpoint - never add HMAC headers.
     None,
 }
 
@@ -92,7 +92,7 @@ impl RestClient {
     }
 
     /// Issue a request and decode the gateway's `{"data": T, "request_id": ...}`
-    /// envelope. `path` is appended to the base URL exactly — pass an
+    /// envelope. `path` is appended to the base URL exactly - pass an
     /// already-encoded path with leading slash. `body` is `Some(serializable)`
     /// to send a JSON body, or `None` for empty.
     pub(crate) async fn request<TReq, TResp>(
@@ -127,7 +127,7 @@ impl RestClient {
     }
 
     /// GET with a request struct flattened to query string. The struct's
-    /// path-param fields (if any) MUST be cleared before passing — they
+    /// path-param fields (if any) MUST be cleared before passing - they
     /// are otherwise echoed as redundant query params.
     pub(crate) async fn get_with_query<TReq, TResp>(
         self: &Arc<Self>,
@@ -209,7 +209,7 @@ impl RestClient {
         auth: Auth,
     ) -> Result<Bytes> {
         // Direct concatenation mirrors `pkg/exc/client.go` (`baseURL + path`)
-        // — `Url::join` resolves relative refs (it would drop the last
+        // - `Url::join` resolves relative refs (it would drop the last
         // segment when joining `"orders"` onto a base without a trailing
         // slash), which is the wrong semantics for our flat REST surface.
         // Caller passes a full path with leading slash (e.g., `"/orders"`).

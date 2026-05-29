@@ -4,7 +4,7 @@
 //! cargo run --example ws_book -- BTC-PERP
 //! ```
 //!
-//! Public channel — no auth required. Stops after 10 frames.
+//! Public channel - no auth required. Stops after 10 frames.
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;

@@ -1,3 +1,4 @@
 target/
+.omc/
 src/types/generated/google.api.rs
 src/types/generated/grpc.gateway.protoc_gen_openapiv2.options.rs

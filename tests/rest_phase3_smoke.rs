@@ -1,4 +1,4 @@
-//! Phase 3 smoke tests — extended REST surface.
+//! Phase 3 smoke tests - extended REST surface.
 //!
 //! Covers patterns Phase 2 didn't:
 //!   1. Path parameter substitution + URL encoding (cancel by oid).
@@ -133,7 +133,7 @@ async fn cancel_all_uses_delete_with_query() {
         .unwrap();
 }
 
-/// Quick exercise of every API accessor — confirms wiring + types
+/// Quick exercise of every API accessor - confirms wiring + types
 /// resolve. We don't actually invoke RPCs (would need 10+ mock setups);
 /// just instantiate each handle.
 #[tokio::test]

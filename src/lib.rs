@@ -5,7 +5,7 @@
 //! orders/transfers/withdrawals, and a managed WebSocket client with
 //! auto-reconnect, GSN gap detection, and typed channel views.
 //!
-//! ## Quick start — REST
+//! ## Quick start - REST
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,7 +21,7 @@
 //! # Ok(()) }
 //! ```
 //!
-//! ## Quick start — place an order
+//! ## Quick start - place an order
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +44,7 @@
 //! # Ok(()) }
 //! ```
 //!
-//! ## Quick start — WebSocket
+//! ## Quick start - WebSocket
 //!
 //! ```no_run
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,6 +69,7 @@
 //! See `examples/` for end-to-end flows (place_order,
 //! ws_book, transfer, withdraw, book_with_resync, ...).
 
+#![forbid(unsafe_code)]
 #![warn(rust_2018_idioms)]
 #![warn(missing_docs)]
 

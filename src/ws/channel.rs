@@ -1,7 +1,7 @@
 //! Subscription channels.
 //!
 //! Mirrors `services/pulse/channel/channel.go`. The lower-case wire names are
-//! the canonical identifiers — typed via [`ChannelName`] for routing and
+//! the canonical identifiers - typed via [`ChannelName`] for routing and
 //! [`Channel`] for the user-facing API which carries the per-channel filter.
 
 use serde::{Deserialize, Serialize};
@@ -11,23 +11,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ChannelName {
-    /// `oracle` — price feed per asset.
+    /// `oracle` - price feed per asset.
     Oracle,
-    /// `trade` — public trade executions.
+    /// `trade` - public trade executions.
     Trade,
-    /// `book` — order-book depth.
+    /// `book` - order-book depth.
     Book,
-    /// `ticker` — best bid/ask.
+    /// `ticker` - best bid/ask.
     Ticker,
-    /// `order` — private user-order updates.
+    /// `order` - private user-order updates.
     Order,
-    /// `position` — private user-position updates.
+    /// `position` - private user-position updates.
     Position,
-    /// `portfolio` — private portfolio summary.
+    /// `portfolio` - private portfolio summary.
     Portfolio,
-    /// `notification` — private deposit/withdraw alerts.
+    /// `notification` - private deposit/withdraw alerts.
     Notification,
-    /// `event` — debug stream of all sequenced events.
+    /// `event` - debug stream of all sequenced events.
     Event,
 }
 
@@ -59,46 +59,46 @@ impl ChannelName {
     }
 }
 
-/// User-facing subscription request. Carries the channel name and its filter
-/// — the SDK validates the filter shape against the channel before sending,
+/// User-facing subscription request. Carries the channel name and its filter -
+/// the SDK validates the filter shape against the channel before sending,
 /// matching `ClientRequest::ValidateSubscription` server-side.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Channel {
-    /// `oracle` — `asset` (e.g. `"BTC"`) is required.
+    /// `oracle` - `asset` (e.g. `"BTC"`) is required.
     Oracle {
         /// Asset symbol filter (required).
         asset: String,
     },
-    /// `trade` — `market` filter optional (omit for all-markets stream).
+    /// `trade` - `market` filter optional (omit for all-markets stream).
     Trade {
         /// Optional market filter (`Some("BTC-PERP")` or `None`).
         market: Option<String>,
     },
-    /// `book` — `market` (e.g. `"BTC-PERP"`) is required.
+    /// `book` - `market` (e.g. `"BTC-PERP"`) is required.
     Book {
         /// Market symbol filter (required).
         market: String,
     },
-    /// `ticker` — `market` is required.
+    /// `ticker` - `market` is required.
     Ticker {
         /// Market symbol filter (required).
         market: String,
     },
-    /// `order` — private. `market` filter optional.
+    /// `order` - private. `market` filter optional.
     Order {
-        /// Optional market filter — `None` streams all markets.
+        /// Optional market filter - `None` streams all markets.
         market: Option<String>,
     },
-    /// `position` — private. `market` filter optional.
+    /// `position` - private. `market` filter optional.
     Position {
         /// Optional market filter.
         market: Option<String>,
     },
-    /// `portfolio` — private. No filter accepted.
+    /// `portfolio` - private. No filter accepted.
     Portfolio,
-    /// `notification` — private. No filter accepted.
+    /// `notification` - private. No filter accepted.
     Notification,
-    /// `event` — debug only. Optional event-type filter.
+    /// `event` - debug only. Optional event-type filter.
     Event {
         /// Optional event-type filter (e.g. `"ORDER_PLACED"`).
         event: Option<String>,

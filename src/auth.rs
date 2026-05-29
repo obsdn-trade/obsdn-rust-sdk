@@ -8,7 +8,7 @@
 //! ```
 //!
 //! `timestamp` is Unix seconds as a decimal string. `path` is the URL path
-//! ONLY — query string is excluded (verified against
+//! ONLY - query string is excluded (verified against
 //! `pkg/gateway/options.go::prehashMetadata` which reads `r.URL.Path`).
 //! `body` is the raw bytes of the request body, or empty string for GET /
 //! DELETE without a body.
@@ -51,7 +51,7 @@ impl HmacSigner {
         sign_hmac(&self.secret.0, timestamp, method, path, body)
     }
 
-    /// Raw secret bytes — crate-internal so other modules (`ws::auth`) can
+    /// Raw secret bytes - crate-internal so other modules (`ws::auth`) can
     /// share the HMAC primitive without re-implementing the secret-zeroing
     /// wrapper. The slice borrow keeps the caller from copying out the
     /// secret.
@@ -72,7 +72,7 @@ impl std::fmt::Debug for HmacSigner {
 
 /// Owned secret bytes that zero on drop. Use `Vec<u8>` directly so the
 /// derived `Clone` produces an independent buffer (each clone wipes its own
-/// copy on drop — no shared ownership of secret bytes).
+/// copy on drop - no shared ownership of secret bytes).
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub(crate) struct SecretBytes(Vec<u8>);
 
@@ -108,7 +108,7 @@ fn ascii_upper(s: &str) -> std::borrow::Cow<'_, str> {
 mod tests {
     use super::*;
 
-    /// Golden vector — must match
+    /// Golden vector - must match
     /// `pkg/auth/hmac_test.go::TestComputeHMACSignature` semantics. We
     /// recompute the expected value here from the same inputs the Go test
     /// uses, then assert byte-for-byte equality. If Go's encoding ever
@@ -126,7 +126,7 @@ mod tests {
         // prehash = "1234567890POST/v1/orders{\"symbol\":\"BTC-USD\",\"side\":\"buy\"}"
         // Verified against Go on 2026-04-27 by running
         // `auth.ComputeHMACSignature` over the same inputs. Hardcoding so
-        // future changes either pass or trigger a visible regression — the
+        // future changes either pass or trigger a visible regression - the
         // silent-mismatch risk flagged in the phase doc.
         let expected = "VNdJ7rUFSZvZN2gTGoo/Vz7MQ1S/FEf2GMbgp3fQ+ow=";
 

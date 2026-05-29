@@ -1,10 +1,10 @@
-//! Vault EIP-712 signers — `CreateVault`, `StakeVault`, `UnstakeVault`.
+//! Vault EIP-712 signers - `CreateVault`, `StakeVault`, `UnstakeVault`.
 //!
 //! Mirrors templates `create_vault.json.tmpl`, `stake_vault.json.tmpl`,
 //! `unstake_vault.json.tmpl` + their `sign_*.go` counterparts.
 //!
 //! Note the type asymmetry vs Order/Transfer/Withdraw: vault `amount` is
-//! `uint256` in the templates (not `uint128`) — accept `U256` directly so
+//! `uint256` in the templates (not `uint128`) - accept `U256` directly so
 //! callers can hash values that overflow `u128`.
 
 use alloy_primitives::{Address, U256};
@@ -73,7 +73,7 @@ pub fn sign_create_vault(
     signer.sign_hash_sync(hash)
 }
 
-/// `StakeVault` payload — stake tokens into a vault.
+/// `StakeVault` payload - stake tokens into a vault.
 #[derive(Debug, Clone)]
 pub struct StakeVaultPayload {
     /// Vault address receiving the stake.
@@ -110,7 +110,7 @@ pub fn sign_stake_vault(
     signer.sign_hash_sync(hash)
 }
 
-/// `UnstakeVault` payload — withdraw stake from a vault.
+/// `UnstakeVault` payload - withdraw stake from a vault.
 #[derive(Debug, Clone)]
 pub struct UnstakeVaultPayload {
     /// Vault address.

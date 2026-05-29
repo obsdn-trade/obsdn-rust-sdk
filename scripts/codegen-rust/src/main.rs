@@ -78,7 +78,7 @@ fn main() {
         .arg("-o")
         .arg(&export_dir)
         .status()
-        .expect("`buf export` failed — install buf and run `make codegen` once first");
+        .expect("`buf export` failed - install buf and run `make codegen` once first");
     assert!(status.success(), "buf export exited non-zero");
 
     // 2. Discover compilable .proto files under nil/v1, excluding admin
@@ -134,7 +134,7 @@ fn main() {
         .build(&[".nil.v1"])
         .expect("pbjson build failed");
 
-    // descriptors.bin is an internal artifact — drop it so the committed
+    // descriptors.bin is an internal artifact - drop it so the committed
     // tree stays minimal. Keep only the human-readable .rs sources.
     let _ = std::fs::remove_file(&descriptor_path);
 
@@ -144,7 +144,7 @@ fn main() {
         assert!(p.exists(), "expected output missing: {}", p.display());
     }
 
-    eprintln!("ok — wrote nil.v1.rs + nil.v1.serde.rs");
+    eprintln!("ok - wrote nil.v1.rs + nil.v1.serde.rs");
     eprintln!("commit the result under {}", out_dir.display());
 
     let _ = Path::new(""); // silence unused import on some toolchains

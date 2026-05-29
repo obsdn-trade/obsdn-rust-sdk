@@ -1,4 +1,4 @@
-//! Auth REST surface — `AuthService` in `api/proto/nil/v1/auth.proto`.
+//! Auth REST surface - `AuthService` in `api/proto/nil/v1/auth.proto`.
 //!
 //! Named `auth_api` (not `auth`) to avoid clashing with the SDK's HMAC
 //! signing module at `crate::auth`.
@@ -25,7 +25,7 @@ impl AuthApi {
         Self { rest }
     }
 
-    /// `POST /auth/signers` — register a signer + bootstrap an API key.
+    /// `POST /auth/signers` - register a signer + bootstrap an API key.
     /// **Auth:** none. Wallet + signer signatures inside the body.
     pub async fn register_signer(
         &self,
@@ -34,14 +34,14 @@ impl AuthApi {
         self.rest.post("/auth/signers", &req, Auth::None).await
     }
 
-    /// `POST /auth/api-keys` — issue an additional API key for the
+    /// `POST /auth/api-keys` - issue an additional API key for the
     /// authenticated wallet.
     /// **Auth:** required.
     pub async fn create_api_key(&self, req: CreateApiKeyRequest) -> Result<CreateApiKeyResponse> {
         self.rest.post("/auth/api-keys", &req, Auth::Required).await
     }
 
-    /// `GET /auth/api-keys` — list API keys for the authenticated wallet.
+    /// `GET /auth/api-keys` - list API keys for the authenticated wallet.
     /// **Auth:** required (read-only allowed).
     pub async fn get_api_keys(&self, req: GetApiKeysRequest) -> Result<GetApiKeysResponse> {
         self.rest
@@ -49,7 +49,7 @@ impl AuthApi {
             .await
     }
 
-    /// `DELETE /auth/api-keys` — revoke API keys.
+    /// `DELETE /auth/api-keys` - revoke API keys.
     /// **Auth:** required.
     pub async fn delete_api_keys(
         &self,
@@ -60,7 +60,7 @@ impl AuthApi {
             .await
     }
 
-    /// `POST /auth/child-accounts/signers` — register a signer for a child
+    /// `POST /auth/child-accounts/signers` - register a signer for a child
     /// (subaccount) wallet.
     /// **Auth:** required.
     pub async fn register_child_account_signer(
@@ -72,7 +72,7 @@ impl AuthApi {
             .await
     }
 
-    /// `GET /auth/child-accounts/api-keys` — list API keys for child accounts.
+    /// `GET /auth/child-accounts/api-keys` - list API keys for child accounts.
     /// **Auth:** required (read-only allowed).
     pub async fn get_child_account_api_keys(
         &self,

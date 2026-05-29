@@ -1,4 +1,4 @@
-//! Portfolio REST surface — `PortfolioService` in
+//! Portfolio REST surface - `PortfolioService` in
 //! `api/proto/nil/v1/portfolio.proto`.
 
 use std::sync::Arc;
@@ -26,7 +26,7 @@ impl PortfolioApi {
         Self { rest }
     }
 
-    /// `GET /portfolio` — current portfolio (collateral, positions, margin).
+    /// `GET /portfolio` - current portfolio (collateral, positions, margin).
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, req: GetPortfolioRequest) -> Result<GetPortfolioResponse> {
         self.rest
@@ -34,7 +34,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `GET /positions/history` — historical position changes.
+    /// `GET /positions/history` - historical position changes.
     /// **Auth:** required (read-only allowed).
     pub async fn get_position_history(
         &self,
@@ -45,7 +45,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `GET /funding/payments` — funding payments paid/received.
+    /// `GET /funding/payments` - funding payments paid/received.
     /// **Auth:** required (read-only allowed).
     pub async fn get_funding_payments(
         &self,
@@ -56,7 +56,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `GET /portfolio/history` — historical portfolio snapshots.
+    /// `GET /portfolio/history` - historical portfolio snapshots.
     /// **Auth:** required (read-only allowed).
     pub async fn get_history(
         &self,
@@ -67,7 +67,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `GET /portfolio/pnl-history` — historical PnL.
+    /// `GET /portfolio/pnl-history` - historical PnL.
     /// **Auth:** required (read-only allowed).
     pub async fn get_pnl_history(
         &self,
@@ -78,7 +78,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `POST /portfolio/preview` — preview portfolio change after a hypothetical order.
+    /// `POST /portfolio/preview` - preview portfolio change after a hypothetical order.
     /// **Auth:** required (read-only allowed). **INTERNAL** endpoint.
     #[doc(hidden)]
     pub async fn preview_order(&self, req: PlaceOrderRequest) -> Result<GetPortfolioResponse> {
@@ -87,7 +87,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `GET /portfolio/trading-calendar` — market trading hours.
+    /// `GET /portfolio/trading-calendar` - market trading hours.
     /// **Auth:** required (read-only allowed).
     pub async fn get_trading_calendar(
         &self,
@@ -98,7 +98,7 @@ impl PortfolioApi {
             .await
     }
 
-    /// `POST /positions/{mkt_id}/leverage` — update leverage for a market position.
+    /// `POST /positions/{mkt_id}/leverage` - update leverage for a market position.
     /// **Auth:** required.
     pub async fn set_leverage(&self, req: SetLeverageRequest) -> Result<SetLeverageResponse> {
         let path = format!(
@@ -108,7 +108,7 @@ impl PortfolioApi {
         self.rest.post(&path, &req, Auth::Required).await
     }
 
-    /// `POST /positions/{mkt_id}/margin-mode` — switch cross/isolated margin.
+    /// `POST /positions/{mkt_id}/margin-mode` - switch cross/isolated margin.
     /// **Auth:** required.
     pub async fn set_margin_mode(
         &self,
@@ -121,7 +121,7 @@ impl PortfolioApi {
         self.rest.post(&path, &req, Auth::Required).await
     }
 
-    /// `POST /positions/{mkt_id}/margin` — add/remove margin on an isolated position.
+    /// `POST /positions/{mkt_id}/margin` - add/remove margin on an isolated position.
     /// **Auth:** required.
     pub async fn transfer_margin(
         &self,

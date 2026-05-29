@@ -1,4 +1,4 @@
-//! Golden hash tests — Rust-side EIP-712 signing must produce byte-equal
+//! Golden hash tests - Rust-side EIP-712 signing must produce byte-equal
 //! struct hashes / digests / signatures vs. the Go signer.
 //!
 //! Fixtures under `tests/fixtures/eip712/*.json` are captured by
@@ -158,7 +158,7 @@ fn order_hash_matches_go() {
         price,
         nonce,
     };
-    // We need the sol struct to assert struct_hash too — recreate via the
+    // We need the sol struct to assert struct_hash too - recreate via the
     // public helper that returns the digest, then reach the inner via a
     // mirror struct. Easier: build the sol struct directly by re-using the
     // same conversion the public sign path does (one-liner).

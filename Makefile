@@ -4,7 +4,7 @@
 fmt:
 	cargo fmt
 
-# Style gate — fail if anything is unformatted (mirrors CI `cargo fmt --check`).
+# Style gate - fail if anything is unformatted (mirrors CI `cargo fmt --check`).
 style:
 	cargo fmt --check
 

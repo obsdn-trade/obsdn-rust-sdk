@@ -12,7 +12,7 @@ use alloy_sol_types::{eip712_domain, Eip712Domain};
 
 use crate::env::Env;
 
-/// Standard SDK domain — every template family in this crate uses this same
+/// Standard SDK domain - every template family in this crate uses this same
 /// value. Go uses one `config.Domain` for all signers (orders, transfers,
 /// withdrawals, vaults, registers); we keep that 1:1.
 ///
@@ -24,14 +24,14 @@ pub fn sdk_domain(env: &Env) -> Eip712Domain {
         Env::Staging => staging_domain(),
         Env::Production => production_domain(),
         Env::Custom { .. } => panic!(
-            "sdk_domain() cannot determine the correct domain for Env::Custom — \
+            "sdk_domain() cannot determine the correct domain for Env::Custom - \
              use custom_domain() or ClientBuilder::eip712_domain() instead"
         ),
     }
 }
 
 /// Backwards-compatible alias for callers that thought of the domain as
-/// "the order domain" — every template currently shares the same domain.
+/// "the order domain" - every template currently shares the same domain.
 pub fn order_domain(env: &Env) -> Eip712Domain {
     sdk_domain(env)
 }
@@ -57,9 +57,9 @@ fn staging_domain() -> Eip712Domain {
     }
 }
 
-/// Production domain — Monad mainnet (chain 143).
+/// Production domain - Monad mainnet (chain 143).
 /// Values at time of writing; canonical source: `GET /chain/config`.
-/// These rarely change — any change will be announced publicly.
+/// These rarely change - any change will be announced publicly.
 fn production_domain() -> Eip712Domain {
     eip712_domain! {
         name: "Obsidian",
