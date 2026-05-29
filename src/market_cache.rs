@@ -8,9 +8,9 @@
 //!
 //! Refresh is single-flight per client: concurrent callers awaiting the
 //! same expired snapshot share one in-flight REST call. Failures are NOT
-//! cached — a transient error doesn't poison the cache.
+//! cached - a transient error doesn't poison the cache.
 //!
-//! TTL default 60s — markets are static (`idx`/`mkt_id` never change at
+//! TTL default 60s - markets are static (`idx`/`mkt_id` never change at
 //! runtime); the TTL only protects against operator-driven market
 //! adds/removes propagating to active SDK clients within a minute.
 
@@ -29,7 +29,7 @@ pub const DEFAULT_TTL: Duration = Duration::from_secs(60);
 
 #[derive(Clone)]
 struct Snapshot {
-    /// Symbol (`mkt_id`) → Market. Cheap clone — `Market` itself is small
+    /// Symbol (`mkt_id`) → Market. Cheap clone - `Market` itself is small
     /// strings.
     by_symbol: Arc<HashMap<String, Market>>,
     fetched_at: Instant,
@@ -43,7 +43,7 @@ pub(crate) struct MarketCache {
     rest: MarketsApi,
     ttl: Duration,
     // Single mutex protects both the snapshot cell and the
-    // refresh-in-progress flag — under TTL expiry we want exactly one
+    // refresh-in-progress flag - under TTL expiry we want exactly one
     // flight, and the cache is a cold path (a single ms of contention
     // dwarfs the network call we're avoiding).
     state: Mutex<Option<Snapshot>>,
@@ -80,7 +80,7 @@ impl MarketCache {
                 return Ok(snap.clone());
             }
         }
-        // Fetch under the lock — single-flight by construction. Other
+        // Fetch under the lock - single-flight by construction. Other
         // callers block on the mutex; once we publish the snapshot they
         // see it and skip the REST call.
         let resp = self.rest.get_markets().await?;
@@ -98,7 +98,7 @@ impl MarketCache {
 
     /// Look up a market by its `mkt_id` (e.g. `"BTC-PERP"`). Refreshes
     /// transparently on TTL expiry. Returns `Error::Config` if unknown
-    /// after a fresh fetch — caller should treat this as a permanent
+    /// after a fresh fetch - caller should treat this as a permanent
     /// configuration error, not a retryable failure.
     pub(crate) async fn resolve(&self, mkt_id: &str) -> Result<Market> {
         let snap = self.snapshot().await?;

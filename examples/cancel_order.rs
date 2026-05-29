@@ -5,7 +5,7 @@
 //!     cargo run --example cancel_order -- <order-id>
 //! ```
 //!
-//! Cancels do NOT require an EIP-712 signer — server treats the HMAC'd
+//! Cancels do NOT require an EIP-712 signer - server treats the HMAC'd
 //! REST request as authorization. The order id is the UUID returned from
 //! `OrdersApi::place`.
 

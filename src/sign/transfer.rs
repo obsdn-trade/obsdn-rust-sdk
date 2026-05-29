@@ -1,4 +1,4 @@
-//! `Transfer` EIP-712 signer — mirrors
+//! `Transfer` EIP-712 signer - mirrors
 //! `pkg/ethsig/template/transfer.json.tmpl` + `sign_transfer.go`.
 
 use alloy_primitives::Address;
@@ -10,7 +10,7 @@ use crate::sign::EipSigner;
 sol! {
     /// Spot/sub-account transfer between two addresses on the same chain.
     /// `amount` is `uint128` (matches Go template), with the same 18-decimal
-    /// scaling convention as Order.size — see [`crate::sign::scale_decimal_str`].
+    /// scaling convention as Order.size - see [`crate::sign::scale_decimal_str`].
     #[derive(Debug)]
     struct Transfer {
         address from;

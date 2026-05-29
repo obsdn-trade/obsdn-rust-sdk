@@ -1,16 +1,45 @@
-# obsdn-sdk (Rust)
+# obsdn-sdk
 
-Async Rust SDK for the [OBSDN](https://obsdn.trade) perpetual exchange.
+[![CI](https://github.com/obsdn-trade/obsdn-rust-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/obsdn-trade/obsdn-rust-sdk/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
+[![MSRV](https://img.shields.io/badge/MSRV-1.95-blue.svg)](Cargo.toml)
 
-- **REST** — full coverage of the public service surface (~50 RPCs across 11 handles: orders, markets, account, asset, auth, chain, general, portfolio, price, subaccount, vault). Includes leverage/margin-mode/margin-transfer and fee-tier endpoints.
-- **EIP-712 signing** — local secp256k1 signer with byte-equal output to the Go reference (`pkg/ethsig`). Order, Transfer, Withdraw, Vault {Create,Stake,Unstake}, Subaccount, Register, DelegatedSigner. Golden-tested against 10 Go fixture families.
-- **WebSocket** — managed client with auto-reconnect, GSN gap detection, exponential backoff, auth replay, and typed views per channel (`book` with checksum, `ticker`, `oracle`, `trade`, `order`).
+Async Rust client for the [OBSDN](https://obsdn.trade) perpetual exchange - REST, EIP-712 order signing, and a managed WebSocket feed in one crate.
+
+The client is built on `tokio`, `reqwest`, and `tokio-tungstenite` with `rustls` (no OpenSSL). Wire types are generated from the exchange's protobuf definitions and committed to the repository, so `cargo build` needs no `protoc` or `buf`.
+
+## Contents
+
+- [Features](#features)
+- [Status](#status)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Getting started](#getting-started)
+- [Examples](#examples)
+- [Project layout](#project-layout)
+- [Building and testing](#building-and-testing)
+- [Code generation](#code-generation)
+- [Documentation](#documentation)
+- [Safety](#safety)
+- [Supported Rust versions](#supported-rust-versions)
+- [Getting help](#getting-help)
+- [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
+- [License](#license)
+
+## Features
+
+- **REST** - the public service surface (~50 RPCs) across 11 typed handles: `orders`, `markets`, `account`, `asset`, `auth_api`, `chain`, `general`, `portfolio`, `price`, `subaccount`, and `vault`. Covers leverage, margin mode, margin transfer, and fee-tier endpoints. Authenticated requests are signed with HMAC.
+- **EIP-712 signing** - a local secp256k1 signer (`LocalSigner`) whose output is byte-equal to the Go reference implementation, verified against golden fixtures. Templates: Order, Transfer, Withdraw, Vault (Create / Stake / Unstake), Subaccount, Register, and DelegatedSigner.
+- **WebSocket** - a managed client with automatic reconnect, exponential backoff, HMAC auth replay, and GSN (global sequence number) gap detection. Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, and `order`.
 
 ## Status
 
-`publish = false` — not on crates.io. Intended to be imported / forked by integrating market-makers.
+This crate is `0.1.0` and pre-1.0: the public API may change between releases. It is distributed via git rather than crates.io ([installation](#installation)). The `master` branch tracks the latest changes; pin a commit if you need a stable reference.
 
-## Install (git dependency)
+## Installation
+
+Add it as a git dependency:
 
 ```toml
 [dependencies]
@@ -18,7 +47,7 @@ obsdn-sdk = { git = "https://github.com/obsdn-trade/obsdn-rust-sdk", branch = "m
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-Or as a git submodule:
+Or vendor it as a git submodule:
 
 ```bash
 git submodule add git@github.com:obsdn-trade/obsdn-rust-sdk.git vendor/obsdn-sdk
@@ -28,84 +57,116 @@ git submodule add git@github.com:obsdn-trade/obsdn-rust-sdk.git vendor/obsdn-sdk
 obsdn-sdk = { path = "vendor/obsdn-sdk" }
 ```
 
-## Environment variables
+## Configuration
 
-| Variable             | Purpose                                                                  |
-|----------------------|--------------------------------------------------------------------------|
-| `OBSDN_API_KEY`      | HMAC API key — required for authenticated endpoints / private channels. |
-| `OBSDN_API_SECRET`   | HMAC API secret. Pair with `OBSDN_API_KEY`.                              |
-| `OBSDN_PRIVATE_KEY`  | secp256k1 private key (hex, `0x`-prefixed or bare) for EIP-712 signing.  |
-| `RUST_LOG`           | Standard `tracing-subscriber` filter (e.g. `obsdn_sdk=debug,info`).      |
+The client targets `Production` (`https://api.obsdn.trade`) by default. To point at a non-public host (an internal host, a forked stack, or a local backend), pass `Env::Custom` with your own REST/WS URLs and a matching EIP-712 domain via `ClientBuilder::eip712_domain`.
 
-> ⚠️ Never commit secrets. Use a local `.env` (gitignored) or your secret manager.
+Credentials are read from the environment in the examples:
 
-## Quick start
+| Variable            | Purpose                                                                 |
+|---------------------|-------------------------------------------------------------------------|
+| `OBSDN_API_KEY`     | HMAC API key - required for authenticated endpoints and private channels. |
+| `OBSDN_API_SECRET`  | HMAC API secret. Pair with `OBSDN_API_KEY`.                             |
+| `OBSDN_PRIVATE_KEY` | secp256k1 private key (hex, `0x`-prefixed or bare) for EIP-712 signing. |
+| `RUST_LOG`          | `tracing-subscriber` filter, e.g. `obsdn_sdk=debug,info`.               |
+
+## Getting started
+
+Read public market data:
 
 ```rust
-use obsdn_sdk::{Client, Env};
+use obsdn_sdk::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Defaults to production; authenticated with HMAC credentials.
     let client = Client::builder()
-        .env(Env::Production)
         .api_key(std::env::var("OBSDN_API_KEY")?, std::env::var("OBSDN_API_SECRET")?)
         .build()?;
+
+    // Call a REST handle: `markets()` exposes the markets endpoints.
     let markets = client.markets().get_markets().await?;
     println!("{} markets available", markets.mkts.len());
     Ok(())
 }
 ```
 
-Place an order in three lines (resolve market index + sign + post via the
-ergonomic helper):
+Place an order - `place_easy` resolves the market index, signs the EIP-712 payload, and posts it:
 
 ```rust
 use std::sync::Arc;
 use obsdn_sdk::rest::orders::PlaceEasy;
 use obsdn_sdk::types::v1::OrderSide;
-use obsdn_sdk::{Client, Env, LocalSigner};
+use obsdn_sdk::{Client, LocalSigner};
 
+// The signer holds the secp256k1 key used for EIP-712 signing.
 let signer = Arc::new(LocalSigner::from_hex(&std::env::var("OBSDN_PRIVATE_KEY")?)?);
+
 let client = Client::builder()
-    .env(Env::Production)
-    .api_key(key, secret)
-    .eip_signer(signer)
+    .api_key(std::env::var("OBSDN_API_KEY")?, std::env::var("OBSDN_API_SECRET")?)
+    .eip_signer(signer) // attach the signer so orders can be signed
     .build()?;
+
+// A limit buy: 0.001 BTC-PERP at 50,000. `place_easy` handles index lookup,
+// signing, and the POST.
 client
     .orders()
     .place_easy(PlaceEasy::limit("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
     .await?;
 ```
 
+Stream the order book over the managed WebSocket:
+
+```rust
+use futures_util::StreamExt;
+use obsdn_sdk::ws::{Channel, WsEvent};
+use obsdn_sdk::Client;
+
+let client = Client::builder().build()?;
+
+// `subscribe` returns a stream that survives reconnects and replays the
+// subscription automatically.
+let mut stream = client
+    .ws()
+    .subscribe(Channel::Book { market: "BTC-PERP".into() })
+    .await?;
+
+while let Some(evt) = stream.next().await {
+    // `as_book` gives a typed view over the raw update frame.
+    if let WsEvent::Update(u) = evt {
+        let book = u.as_book()?;
+        println!("{} bids / {} asks", book.bids.len(), book.asks.len());
+    }
+}
+```
+
 ## Examples
 
-All under `examples/`. Run with `cargo run --example NAME`.
+The `examples/` directory holds runnable end-to-end flows. Run one with `cargo run --example NAME`.
 
-| Example              | What it shows                                                            |
-|----------------------|--------------------------------------------------------------------------|
-| `place_order`        | REST + EIP-712 signing via `place_easy`. Quotes 5% under mark.           |
-| `cancel_order`       | Cancel by order id (HMAC-only, no EIP-712 needed).                       |
-| `ws_book`            | Public managed WS, typed `BookView`, prints 10 frames.                   |
-| `ws_private_orders`  | HMAC auth on WS + `Channel::Order`, streams every order lifecycle event. |
-| `transfer`           | Sign EIP-712 `Transfer`, post `/transfers/send-funds`.                   |
-| `withdraw`           | Sign EIP-712 `Withdraw`, post `/transfers/withdraw`.                     |
-| `book_with_resync`   | Maintain a local book; on `Gap`, refetch via REST snapshot.              |
+| Example             | What it shows                                                            |
+|---------------------|--------------------------------------------------------------------------|
+| `place_order`       | REST + EIP-712 signing via `place_easy`. Quotes 5% under mark.           |
+| `cancel_order`      | Cancel by order id (HMAC only, no EIP-712 needed).                       |
+| `ws_book`           | Public managed WebSocket, typed `BookView`, prints 10 frames.            |
+| `ws_private_orders` | HMAC auth on WebSocket + `Channel::Order`, streams order lifecycle events. |
+| `transfer`          | Sign EIP-712 `Transfer`, post `/transfers/send-funds`.                   |
+| `withdraw`          | Sign EIP-712 `Withdraw`, post `/transfers/withdraw`.                     |
+| `book_with_resync`  | Maintain a local book; on `Gap`, refetch via REST snapshot.              |
 
-## Layout
+## Project layout
 
 ```
 .
 ├── Cargo.toml          # Crate manifest
-├── Cargo.lock          # Committed for reproducibility
-├── README.md           # ← you are here
+├── Cargo.lock          # Committed for reproducible builds
 ├── examples/           # Runnable cargo examples (see above)
 ├── scripts/
-│   ├── codegen-rust/   # Out-of-band proto codegen (see "Codegen" below)
+│   ├── codegen-rust/   # Out-of-band proto codegen (see "Code generation")
 │   └── ...             # Go-side EIP-712 fixture exporter
 ├── src/
 │   ├── lib.rs
 │   ├── builder.rs      # Client + ClientBuilder
-│   ├── env.rs          # Local / Staging / Production / Custom
 │   ├── error.rs
 │   ├── auth.rs         # HMAC signer
 │   ├── market_cache.rs # Lazy market-index cache (TTL 60s)
@@ -116,29 +177,24 @@ All under `examples/`. Run with `cargo run --example NAME`.
 └── tests/              # Golden, chaos, REST smoke, staging E2E
 ```
 
-## Build / test
+## Building and testing
 
 ```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test                  # 87 offline tests (unit + WS chaos + REST/WS smoke)
+cargo test
 cargo doc --no-deps
 ```
 
-Or via the Makefile (mirrors CI): `make style` (fmt check), `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
+The Makefile mirrors CI: `make style`, `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
 
-`cargo build` does NOT require `buf` or `protoc` — wire types live committed under `src/types/generated/`.
+`cargo build` does not require `buf` or `protoc` - wire types are committed under `src/types/generated/`.
 
-Offline `cargo test` covers unit tests, EIP-712 golden fixtures, the WS chaos
-suite (in-proc mock: reconnect, sub-replay, wildcard routing, sparse GSN), and
-wiremock REST smoke. The live integration tests below are gated on env vars and
-**skip gracefully** when unset — so `cargo test` stays green offline and in
-credential-less CI.
+The offline `cargo test` suite covers unit tests, EIP-712 golden fixtures, the WebSocket chaos suite (in-process mock for reconnect, sub-replay, wildcard routing, and sparse GSN), and wiremock REST smoke. The live integration tests below are gated on environment variables and skip when those are unset, so the offline suite stays green in credential-less CI.
 
 ### Live integration tests
 
-These hit real servers and self-skip without their env var (no failure when
-staging is unreachable). Run with `--test-threads=1` for the stateful E2E flow.
+These hit real servers and self-skip without their environment variable. Run the stateful E2E flow with `--test-threads=1`.
 
 ```bash
 # Production smoke (unauthenticated public endpoints)
@@ -147,38 +203,56 @@ OBSDN_SMOKE=1 cargo test --test integration_smoke -- --nocapture
 # Staging smoke (public + authed)
 OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture
 
-# E2E staging — REST + live WS observer:
+# E2E staging - REST + live WS observer:
 #   e2e_combined_flow: register → faucet → ws auth → place/cancel via REST,
-#                      observing the order updates over the WS wildcard sub
+#                      observing order updates over the WS wildcard sub
 #   e2e_ws_public_book: public book snapshot + follow-up update (no auth)
 OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 ```
 
-The E2E flow logs per-channel GSN without asserting contiguity — pulse `gsn` is
-a global event watermark, sparse per subscription by design.
+See [`docs/integration-testing.md`](docs/integration-testing.md) for environment configuration and fixtures.
 
-See [`docs/integration-testing.md`](docs/integration-testing.md) for details
-(env config, fixtures).
+## Code generation
 
-## Codegen
-
-Wire types are regenerated via the codegen binary at `scripts/codegen-rust/`. Point it at a checkout of the OBSDN proto definitions:
+Wire types are regenerated with the codegen binary at `scripts/codegen-rust/`. Point it at a checkout of the OBSDN proto definitions (`buf` must be on `PATH`):
 
 ```bash
 cargo run --release --manifest-path scripts/codegen-rust/Cargo.toml -- \
-  --proto-dir   <path-to-api/proto> \
-  --out-dir     src/types/generated
+  --proto-dir <path-to-api/proto> \
+  --out-dir   src/types/generated
 ```
 
-`buf` must be on PATH for this. Commit the regenerated files; CI fails if `git diff --exit-code src/types/generated/` is dirty.
+Commit the regenerated files; CI fails if `git diff --exit-code src/types/generated/` is dirty.
 
 ## Documentation
 
-- Architecture overview (ASCII diagrams): [`docs/architecture.md`](docs/architecture.md).
+- API reference: `cargo doc --open`. Internal-only proto fields are tagged `#[doc(hidden)]`, so they stay reachable without rendering.
+- Architecture overview (with diagrams): [`docs/architecture.md`](docs/architecture.md).
 - Integration testing guide: [`docs/integration-testing.md`](docs/integration-testing.md).
-- API reference: `cargo doc --open`. Internal-only proto fields are tagged `#[doc(hidden)]` so they don't render but stay reachable.
-- WebSocket protocol: see the OBSDN public docs site.
+- WebSocket protocol: see the [OBSDN documentation site](https://docs.obsdn.trade/).
+
+## Safety
+
+This crate sets `#![forbid(unsafe_code)]` - the entire client is implemented in safe Rust. TLS is provided by `rustls`, so there is no OpenSSL dependency.
+
+## Supported Rust versions
+
+The minimum supported Rust version is **1.95**, pinned in `Cargo.toml` (`rust-version`) and checked in CI. Raising the MSRV is a breaking change and is called out in the changelog.
+
+## Getting help
+
+Open an issue on [GitHub](https://github.com/obsdn-trade/obsdn-rust-sdk/issues) for bugs or questions about the SDK. For exchange API semantics, see the [OBSDN documentation site](https://docs.obsdn.trade/).
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR, run `make check` (formatting, lint, tests, and docs) and keep generated wire types in sync if you touch the proto definitions. Commits follow the conventional-commit style used in the history.
+
+## Disclaimer
+
+Trading perpetual futures carries financial risk. This software is provided "as is", without warranty of any kind. You are responsible for any orders, transfers, and withdrawals you sign and submit with it. Review the source and test against staging before using it with real funds.
 
 ## License
 
-Dual-licensed under MIT or Apache 2.0.
+Licensed under the [MIT License](LICENSE-MIT).
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this crate by you shall be licensed as MIT, without any additional terms or conditions.

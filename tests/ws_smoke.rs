@@ -44,7 +44,7 @@ async fn ws_book_subscribe_smoke() {
         .expect("subscribe book BTC-PERP");
 
     // Snapshot is sent shortly after the `subscribed` ack. Allow up to
-    // 5s. The first event MUST be an Update with kind=Snapshot — the
+    // 5s. The first event MUST be an Update with kind=Snapshot - the
     // managed client never injects Reconnected before any data.
     let first = tokio::time::timeout(Duration::from_secs(5), stream.next())
         .await

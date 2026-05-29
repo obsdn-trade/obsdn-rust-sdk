@@ -1,4 +1,4 @@
-//! Subaccount REST surface — `SubaccountService` in
+//! Subaccount REST surface - `SubaccountService` in
 //! `api/proto/nil/v1/subaccount.proto`.
 
 use std::sync::Arc;
@@ -24,13 +24,13 @@ impl SubaccountApi {
         Self { rest }
     }
 
-    /// `POST /subaccounts` — create a new subaccount.
+    /// `POST /subaccounts` - create a new subaccount.
     /// **Auth:** required.
     pub async fn create(&self, req: CreateSubaccountRequest) -> Result<CreateSubaccountResponse> {
         self.rest.post("/subaccounts", &req, Auth::Required).await
     }
 
-    /// `POST /subaccounts/frozen` — freeze/unfreeze a subaccount.
+    /// `POST /subaccounts/frozen` - freeze/unfreeze a subaccount.
     /// **Auth:** required.
     pub async fn set_frozen(
         &self,
@@ -41,7 +41,7 @@ impl SubaccountApi {
             .await
     }
 
-    /// `GET /subaccounts/portfolio` — portfolio for a subaccount.
+    /// `GET /subaccounts/portfolio` - portfolio for a subaccount.
     /// **Auth:** required (read-only allowed).
     pub async fn get_portfolio(
         &self,
@@ -52,7 +52,7 @@ impl SubaccountApi {
             .await
     }
 
-    /// `GET /subaccounts/collateral` — collateral assets for a subaccount.
+    /// `GET /subaccounts/collateral` - collateral assets for a subaccount.
     /// **Auth:** required (read-only allowed).
     pub async fn get_collateral(
         &self,
@@ -63,7 +63,7 @@ impl SubaccountApi {
             .await
     }
 
-    /// `GET /subaccounts/portfolio/history` — historical portfolio snapshots.
+    /// `GET /subaccounts/portfolio/history` - historical portfolio snapshots.
     /// **Auth:** required (read-only allowed).
     pub async fn get_portfolio_history(
         &self,
@@ -74,7 +74,7 @@ impl SubaccountApi {
             .await
     }
 
-    /// `DELETE /subaccounts` — delete a subaccount.
+    /// `DELETE /subaccounts` - delete a subaccount.
     /// **Auth:** required.
     pub async fn delete(&self, req: DeleteSubaccountRequest) -> Result<DeleteSubaccountResponse> {
         self.rest

@@ -1,7 +1,7 @@
-//! API-key registration EIP-712 signers — `Register` (signed by sender)
+//! API-key registration EIP-712 signers - `Register` (signed by sender)
 //! and `DelegatedSigner` (signed by signer key, proves ownership).
 //!
-//! These two signatures together flow through `RegisterSigner` —
+//! These two signatures together flow through `RegisterSigner` -
 //! see `services/nova/auth_service.go` and Go SDK
 //! `pkg/exc/client.go::RegisterSigner`.
 
@@ -31,7 +31,7 @@ sol! {
     }
 }
 
-/// `Register` payload — signed by the **sender** (main wallet) to
+/// `Register` payload - signed by the **sender** (main wallet) to
 /// authorize a new signer key.
 #[derive(Debug, Clone)]
 pub struct RegisterPayload {
@@ -66,7 +66,7 @@ pub fn sign_register(
     signer.sign_hash_sync(hash)
 }
 
-/// `DelegatedSigner` payload — signed by the **signer key** to prove
+/// `DelegatedSigner` payload - signed by the **signer key** to prove
 /// ownership of the main account it's being authorized for.
 #[derive(Debug, Clone)]
 pub struct DelegatedSignerPayload {

@@ -21,7 +21,7 @@
 //!   subscription, then resumes pumping frames. A
 //!   [`super::event::WsEvent::Reconnected`] marker is emitted to every
 //!   sub stream once per reconnect.
-//! - No GSN gap detection — pulse `gsn` is a sparse global watermark, not a
+//! - No GSN gap detection - pulse `gsn` is a sparse global watermark, not a
 //!   dense per-sub sequence (see `super` module docs). On reconnect pulse
 //!   rejoins at the current head, not a replay; callers who need byte-perfect
 //!   catch-up must resync via REST.
@@ -52,18 +52,18 @@ use super::event::{WsEvent, WsUpdate};
 const SUB_USER_BUFFER: usize = 256;
 /// Outbound user→supervisor command channel depth.
 const CMD_BUFFER: usize = 64;
-/// Probe ping cadence — short enough to detect dead sockets quickly,
+/// Probe ping cadence - short enough to detect dead sockets quickly,
 /// long enough not to add measurable load.
 const PROBE_INTERVAL: Duration = Duration::from_secs(15);
 /// Per-attempt timeout when calling [`WsConnection::ping`] for liveness.
-/// Short — we'd rather declare dead and reconnect than hang.
+/// Short - we'd rather declare dead and reconnect than hang.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Routing key for the registry: `(ChannelName, filter_string)`. Filter is
 /// `""` for filter-less channels (`portfolio`, `notification`).
 type SubKey = (ChannelName, String);
 
-/// Public managed WebSocket client. Cheap to clone — backed by an
+/// Public managed WebSocket client. Cheap to clone - backed by an
 /// `Arc<Handle>`; cloning shares the supervisor task.
 #[derive(Clone)]
 pub struct WsClient {
@@ -94,7 +94,7 @@ impl WsClient {
     }
 
     /// Subscribe to a channel. Returns a stream of [`WsEvent`]s that
-    /// survives reconnects — internal connection swaps surface as
+    /// survives reconnects - internal connection swaps surface as
     /// [`WsEvent::Reconnected`] markers.
     ///
     /// Subscribing while the supervisor is mid-reconnect is safe: the
@@ -136,7 +136,7 @@ impl WsClient {
 
     /// Authenticate the connection. Required before subscribing to any
     /// private channel (`order`, `position`, `portfolio`, `notification`).
-    /// The credential intent is sticky — supervisor replays it on every
+    /// The credential intent is sticky - supervisor replays it on every
     /// reconnect. Returns the wallet address the server resolved.
     pub async fn authenticate(&self) -> Result<String> {
         let (ack_tx, ack_rx) = oneshot::channel();
@@ -169,7 +169,7 @@ impl WsClient {
 }
 
 /// Stream of [`WsEvent`]s for a single subscription. Drop to free the
-/// receiver — the supervisor notices the closed channel and unsubscribes
+/// receiver - the supervisor notices the closed channel and unsubscribes
 /// server-side. Holding the stream across disconnects is safe; the
 /// supervisor pumps fresh frames into it after every reconnect.
 pub struct SubscriptionStream {
@@ -208,7 +208,7 @@ enum SupCommand {
 
 /// Outcome bag for the per-replay first-ack tracking. The supervisor
 /// records which keys had their first ack fired *this* connect cycle so
-/// `broadcast(Reconnected)` can skip them — a brand-new sub never
+/// `broadcast(Reconnected)` can skip them - a brand-new sub never
 /// experienced a reconnect from its caller's perspective.
 #[derive(Default)]
 struct ReplayMarks {
@@ -220,7 +220,7 @@ struct SubSlot {
     user_tx: mpsc::Sender<WsEvent>,
     /// First-subscribe ack. Held while the supervisor is mid-(re)connect or
     /// awaiting the server `subscribed` reply. Fired once the server has
-    /// confirmed the subscription; cleared after — subsequent reconnects
+    /// confirmed the subscription; cleared after - subsequent reconnects
     /// re-attach the sub silently.
     pending: Option<PendingSub>,
 }
@@ -234,7 +234,7 @@ struct Supervisor {
     env: Env,
     hmac: Option<HmacSigner>,
     cmd_rx: mpsc::Receiver<SupCommand>,
-    /// Persistent registry — survives reconnects.
+    /// Persistent registry - survives reconnects.
     subs: HashMap<SubKey, SubSlot>,
     /// User has called `authenticate()` at least once → replay on every
     /// reconnect.
@@ -301,7 +301,7 @@ impl Supervisor {
             // forever (the registry would still report "already
             // subscribed"). C2 in code-review.
             self.gc_orphan_pending();
-            // Sub replay — server validation failures drop that sub; a
+            // Sub replay - server validation failures drop that sub; a
             // mid-replay connection death does NOT (we leave the registry
             // intact and let the outer loop reconnect, otherwise a single
             // flaky reconnect would permanently lose every still-pending
@@ -322,7 +322,7 @@ impl Supervisor {
                 match conn.subscribe(slot.channel.clone()).await {
                     Ok(stream) => {
                         streams.insert(key.clone(), stream);
-                        // First-time subscribe ack fires NOW — caller has
+                        // First-time subscribe ack fires NOW - caller has
                         // been blocked on `subscribe().await` since the
                         // command was registered. Subsequent reconnects
                         // see `pending = None` and silently re-attach.
@@ -352,7 +352,7 @@ impl Supervisor {
                         // Conn died between connect_with_backoff returning
                         // and now. Leave the slot in the registry so the
                         // next reconnect re-tries it. Pending first-time
-                        // subscribers stay parked — they're conceptually
+                        // subscribers stay parked - they're conceptually
                         // still "subscribing", not failed.
                         tracing::info!(
                             ?key,
@@ -365,7 +365,7 @@ impl Supervisor {
                     Err(e) => {
                         // Server-side rejection: auth-required private sub
                         // on a now-public connection, validation error,
-                        // etc. Drop the sub from the registry — replaying
+                        // etc. Drop the sub from the registry - replaying
                         // it would just fail the same way.
                         let detail = format!("resubscribe failed: {e}");
                         tracing::warn!(?key, error = %detail, "resub failed; dropping sub");
@@ -382,14 +382,14 @@ impl Supervisor {
             if conn_died_during_replay {
                 // Skip Reconnected broadcast (caller would see Reconnected
                 // followed immediately by another Reconnected once the
-                // *real* reconnect completes). Don't reset backoff — the
+                // *real* reconnect completes). Don't reset backoff - the
                 // conn proved unstable. Loop back and reconnect.
                 drop(conn);
                 continue;
             }
             backoff.reset();
             if !first {
-                // Skip subs that JUST got their first ack this cycle —
+                // Skip subs that JUST got their first ack this cycle -
                 // from the caller's POV they didn't experience a
                 // reconnect, they just freshly subscribed.
                 self.broadcast(WsEvent::Reconnected, &marks).await;
@@ -519,7 +519,7 @@ impl Supervisor {
                 if let Some(p) = slot.pending.take() {
                     let _ = p.ack.send(Err(Error::Ws(format!("{err}"))));
                     // No point keeping a sub the caller never received the
-                    // receiver for — drop it.
+                    // receiver for - drop it.
                     self.subs.remove(&key);
                 }
             }
@@ -541,7 +541,7 @@ impl Supervisor {
         probe.tick().await;
         loop {
             tokio::select! {
-                biased; // user commands first — they're rarer than data
+                biased; // user commands first - they're rarer than data
                 cmd = self.cmd_rx.recv() => {
                     match cmd {
                         Some(c) => {
@@ -554,7 +554,7 @@ impl Supervisor {
                 }
                 _ = conn.closed() => {
                     // Driver task exited (peer close, read/send error, or
-                    // explicit close). Reconnect immediately — don't wait
+                    // explicit close). Reconnect immediately - don't wait
                     // for the probe.
                     tracing::info!("ws driver exited; reconnecting");
                     return DriveExit::ConnDropped;
@@ -620,7 +620,7 @@ impl Supervisor {
                         let _ = ack.send(Ok(user_rx));
                     }
                     Err(e) => {
-                        // Could be "connection task is gone" — treat as
+                        // Could be "connection task is gone" - treat as
                         // disconnect, register intent for next reconnect,
                         // hand the user a stream that begins on reconnect.
                         if is_conn_gone(&e) {
@@ -647,7 +647,7 @@ impl Supervisor {
                         let _ = p.ack.send(Err(Error::Ws("subscription cancelled".into())));
                     }
                 }
-                // Best-effort wire unsub — if the conn is dead we ignore
+                // Best-effort wire unsub - if the conn is dead we ignore
                 // the error since the supervisor already cleared local
                 // state.
                 match conn.unsubscribe(channel).await {
@@ -678,7 +678,7 @@ impl Supervisor {
                     }
                     Err(e) if is_conn_gone(&e) => {
                         // Park the ack alongside the disconnected-state
-                        // pending list — connect-loop fires it after the
+                        // pending list - connect-loop fires it after the
                         // next successful auth replay.
                         self.auth_active = true;
                         self.pending_auth_acks.push(ack);
@@ -713,7 +713,7 @@ impl Supervisor {
         // try_send: blocking await here would back up
         // the entire supervisor (cmd loop, other subs, conn.closed()
         // detection) on the slowest consumer. Phase doc Risk Assessment
-        // mentions "drop-oldest policy" but tokio mpsc lacks that — we
+        // mentions "drop-oldest policy" but tokio mpsc lacks that - we
         // drop the sub on Full and let the caller see the stream end.
         // They can resubscribe to start fresh.
         match slot.user_tx.try_send(WsEvent::Update(update)) {
@@ -741,7 +741,7 @@ impl Supervisor {
     async fn broadcast(&mut self, event: WsEvent, skip: &ReplayMarks) {
         let keys: Vec<SubKey> = self.subs.keys().cloned().collect();
         for key in keys {
-            // Skip subs that just got their first ack this cycle — from
+            // Skip subs that just got their first ack this cycle - from
             // the caller's POV this isn't a reconnect.
             if skip.fresh.contains(&key) {
                 continue;
@@ -795,7 +795,7 @@ impl Supervisor {
     }
 }
 
-/// Outcome of a connect attempt — connect either succeeded or the
+/// Outcome of a connect attempt - connect either succeeded or the
 /// supervisor was asked to stop while waiting.
 enum ConnectOutcome {
     Connected(WsConnection),
@@ -825,12 +825,12 @@ fn is_conn_gone(e: &Error) -> bool {
 /// capped at 30s including jitter. Each [`Backoff`] holds its own xorshift
 /// state seeded from a process-unique entropy source so a fleet of SDK
 /// clients restarting against a recovering server doesn't synchronize on
-/// identical jitter (which `subsec_nanos`-based jitter does — multiple
+/// identical jitter (which `subsec_nanos`-based jitter does - multiple
 /// processes restarting in the same wall-clock millisecond would compute
 /// the same offset).
 struct Backoff {
     n: u32,
-    /// xorshift64* state — must be non-zero (xorshift produces all zeros
+    /// xorshift64* state - must be non-zero (xorshift produces all zeros
     /// from a zero seed).
     rng: u64,
 }
@@ -862,7 +862,7 @@ impl Backoff {
     }
 
     fn next_jitter(&mut self, span: u64) -> u64 {
-        // xorshift64 — passes basic statistical tests, trivial to embed,
+        // xorshift64 - passes basic statistical tests, trivial to embed,
         // good enough for de-synchronizing reconnects. Not crypto.
         self.rng ^= self.rng << 13;
         self.rng ^= self.rng >> 7;
@@ -908,7 +908,7 @@ mod tests {
         let mut b = Backoff::new();
         let d1 = b.next();
         let d2 = b.next();
-        // Allow for jitter — assert the floor.
+        // Allow for jitter - assert the floor.
         assert!(d1.as_millis() as u64 >= Backoff::BASE_MS);
         assert!(d2.as_millis() as u64 >= Backoff::BASE_MS * 2);
         for _ in 0..20 {

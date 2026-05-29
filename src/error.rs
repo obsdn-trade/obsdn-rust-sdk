@@ -2,7 +2,7 @@
 //!
 //! `Error` is the top-level result type. `Api` wraps the JSON envelope the
 //! grpc-gateway emits on non-2xx (`pkg/gateway/response.go::ErrorResponse`):
-//! `{"error":{"code":"...","message":"..."},"request_id":"..."}` — `code`
+//! `{"error":{"code":"...","message":"..."},"request_id":"..."}` - `code`
 //! is the gRPC status string (e.g., `"InvalidArgument"`, `"Unauthenticated"`).
 
 use thiserror::Error;
@@ -59,14 +59,14 @@ pub enum Error {
 
     /// WebSocket-specific failure (handshake, oversize frame, server error
     /// response, lost connection, ...). The thin client surfaces server
-    /// `error` frames via this variant — the message is the server's raw
+    /// `error` frames via this variant - the message is the server's raw
     /// `message` field.
     #[error("websocket error: {0}")]
     Ws(String),
 }
 
 /// JSON shape used by `pkg/gateway/response.go::ErrorResponse`. Internal
-/// helper — surfaced through `Error::Api`.
+/// helper - surfaced through `Error::Api`.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct WireError {
     pub error: WireErrorDetail,

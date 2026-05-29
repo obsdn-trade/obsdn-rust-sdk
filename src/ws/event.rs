@@ -4,7 +4,7 @@
 //! `SubscriptionResponse`, `ErrorResponse`, `ChannelMessage`). The thin
 //! client surfaces `data` as `serde_json::Value` so callers can deserialize
 //! into per-channel typed structs they own (Phase 7 ergonomic wrappers will
-//! provide ready-made views — keeping Phase 5 minimal).
+//! provide ready-made views - keeping Phase 5 minimal).
 
 use serde::Deserialize;
 
@@ -24,7 +24,7 @@ pub(crate) enum WireType {
     Pong,
 }
 
-/// A single server frame, after JSON parse but before routing. Internal — we
+/// A single server frame, after JSON parse but before routing. Internal - we
 /// dispatch into `WsEvent` / per-subscription `WsUpdate` before exposing
 /// anything to callers.
 #[derive(Debug, Deserialize)]
@@ -63,7 +63,7 @@ where
 /// Whether a data frame is the initial state or a subsequent diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WsUpdateKind {
-    /// Initial state — replace any cached state for this filter.
+    /// Initial state - replace any cached state for this filter.
     Snapshot,
     /// Incremental diff against the prior snapshot/update.
     Update,
@@ -80,7 +80,7 @@ pub struct WsUpdate {
     pub kind: WsUpdateKind,
     /// Routing channel (`book`, `oracle`, ...).
     pub channel: ChannelName,
-    /// Server `gsn` — a global event watermark, monotonic but sparse per
+    /// Server `gsn` - a global event watermark, monotonic but sparse per
     /// subscription (channels emit selectively). Not a dense sequence; do
     /// not infer dropped messages from gaps between consecutive frames.
     pub gsn: u64,
@@ -89,7 +89,7 @@ pub struct WsUpdate {
     /// Channel filter (`"BTC-PERP"`, `"BTC"`, ...). `""` for filter-less
     /// channels (`portfolio`, `notification`).
     pub filter: String,
-    /// Raw channel payload — decode via [`crate::ws::views`] helpers
+    /// Raw channel payload - decode via [`crate::ws::views`] helpers
     /// (`as_book`, `as_oracle`, ...) or `serde_json::from_value`.
     pub data: serde_json::Value,
 }
@@ -102,7 +102,7 @@ pub struct WsUpdate {
 ///
 /// Variants:
 /// - [`WsEvent::Update`]: a snapshot or update frame. Inspect
-///   `update.kind` to discriminate — both flow through this variant.
+///   `update.kind` to discriminate - both flow through this variant.
 /// - [`WsEvent::Reconnected`]: the underlying socket dropped and the
 ///   supervisor re-attached. Subscriptions and authentication were
 ///   replayed automatically. Emitted once per reconnect.

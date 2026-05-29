@@ -1,4 +1,4 @@
-//! WebSocket thin connection (crate-internal — Phase 5 implementation).
+//! WebSocket thin connection (crate-internal - Phase 5 implementation).
 //!
 //! One [`WsConnection`] owns one tokio task driving the socket. The task
 //! serves commands sent over an mpsc channel and routes inbound frames:
@@ -44,9 +44,9 @@ const CMD_BUFFER: usize = 64;
 /// (`portfolio`, `notification`).
 type SubKey = (ChannelName, String);
 
-/// Live WebSocket connection. Cheap to clone — internal state is Arc'd so
+/// Live WebSocket connection. Cheap to clone - internal state is Arc'd so
 /// the underlying task survives until every clone is dropped (or `close`
-/// is called explicitly). Crate-internal — used by
+/// is called explicitly). Crate-internal - used by
 /// [`super::managed::WsClient`].
 #[derive(Clone)]
 pub(crate) struct WsConnection {
@@ -60,7 +60,7 @@ struct Inner {
     /// Set to `true` when the driver task exits (socket closed by peer,
     /// read error, send error, or client `close`). Watch channel chosen
     /// over `Notify` because `Notify::notify_waiters` only wakes
-    /// *current* waiters — a notification fired before the supervisor
+    /// *current* waiters - a notification fired before the supervisor
     /// reaches `closed().await` would be lost. `watch::Receiver::changed`
     /// is naturally race-free: the snapshot value reflects the latest
     /// `send` regardless of subscribe-order.
@@ -68,9 +68,9 @@ struct Inner {
 }
 
 /// One snapshot/update stream for a subscribed channel. Drop to free the
-/// internal sender slot — note that this does NOT send `unsub` to the
+/// internal sender slot - note that this does NOT send `unsub` to the
 /// server. Call [`WsConnection::unsubscribe`] explicitly for clean
-/// shutdown of a single channel. Crate-internal — managed-client users
+/// shutdown of a single channel. Crate-internal - managed-client users
 /// receive [`super::event::WsEvent`] via [`super::managed::SubscriptionStream`].
 pub(crate) type Subscription = ReceiverStream<WsUpdate>;
 
@@ -166,7 +166,7 @@ impl WsConnection {
         })
     }
 
-    /// Future that completes when the underlying driver task exits — i.e.
+    /// Future that completes when the underlying driver task exits - i.e.
     /// the socket has dropped, errored, or been explicitly closed. Used by
     /// the supervisor to detect connection loss instantly without waiting
     /// for the next periodic ping. Race-safe: returns immediately if the
@@ -177,13 +177,13 @@ impl WsConnection {
             return;
         }
         // changed() returns Err only if all senders are dropped, which we
-        // treat as equivalent to "closed" — driver task is gone either
+        // treat as equivalent to "closed" - driver task is gone either
         // way.
         let _ = rx.changed().await;
     }
 
     /// Server-assigned ID for this connection. Useful for support tickets
-    /// — the server logs everything keyed off this.
+    /// - the server logs everything keyed off this.
     #[allow(dead_code)]
     pub(crate) fn connection_id(&self) -> &str {
         &self.inner.connection_id
@@ -210,7 +210,7 @@ impl WsConnection {
     }
 
     /// Unsubscribe from `channel`. Awaits the server `unsubscribed` ack.
-    /// Drops the stream slot — the previously returned [`Subscription`]
+    /// Drops the stream slot - the previously returned [`Subscription`]
     /// will yield `None` after any in-flight messages drain.
     pub(crate) async fn unsubscribe(&self, channel: Channel) -> Result<()> {
         let (ack_tx, ack_rx) = oneshot::channel();
@@ -255,8 +255,8 @@ impl WsConnection {
     }
 
     /// Application-level `{"op":"ping"}`. Awaits the matching `pong`. The
-    /// underlying WebSocket library already handles protocol-level pings
-    /// — the supervisor uses this for periodic dead-socket detection
+    /// underlying WebSocket library already handles protocol-level pings -
+    /// the supervisor uses this for periodic dead-socket detection
     /// (`super::managed::Supervisor::drive`).
     pub(crate) async fn ping(&self) -> Result<()> {
         let (ack_tx, ack_rx) = oneshot::channel();
@@ -271,7 +271,7 @@ impl WsConnection {
     }
 
     /// Close the connection. After this returns, the driver task has
-    /// exited — clones of this handle are no longer functional.
+    /// exited - clones of this handle are no longer functional.
     pub(crate) async fn close(self) {
         // Dropping every cmd_tx clone causes recv() in the driver to
         // return None, which the driver treats as shutdown. We can't
@@ -294,7 +294,7 @@ struct Driver<S> {
     subscribers: HashMap<SubKey, mpsc::Sender<WsUpdate>>,
     /// Watch sender shared with [`Inner::closed_rx`]. Set to `true`
     /// exactly once on driver-task exit so any number of
-    /// [`WsConnection::closed`] callers observe the death — even if they
+    /// [`WsConnection::closed`] callers observe the death - even if they
     /// `await` after the exit.
     closed_tx: watch::Sender<bool>,
 }
@@ -474,7 +474,7 @@ where
         match frame.kind {
             WireType::Welcome => {
                 // Spec says welcome arrives once, before anything else.
-                // A second welcome means the server reset state — log
+                // A second welcome means the server reset state - log
                 // and ignore, Phase 6 reconnect path may handle.
                 tracing::warn!("unexpected second welcome frame");
             }
@@ -570,11 +570,11 @@ where
             data: frame.data.unwrap_or(serde_json::Value::Null),
         };
         // try_send: if the consumer is slow, drop with a warn rather than
-        // backpressure into the socket — Phase 6 will revisit.
+        // backpressure into the socket - Phase 6 will revisit.
         match sender.try_send(update) {
             Ok(()) => {}
             Err(mpsc::error::TrySendError::Full(_)) => {
-                tracing::warn!(?key, "dropping ws update — subscriber buffer full");
+                tracing::warn!(?key, "dropping ws update - subscriber buffer full");
             }
             Err(mpsc::error::TrySendError::Closed(_)) => {
                 self.subscribers.remove(&key);

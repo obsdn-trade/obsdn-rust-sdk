@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
             }
             WsEvent::Reconnected => tracing::info!("reconnected"),
             WsEvent::Unauthorized(msg) => {
-                tracing::error!(%msg, "unauthorized — auth replay failed");
+                tracing::error!(%msg, "unauthorized - auth replay failed");
                 break;
             }
         }

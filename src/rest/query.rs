@@ -1,14 +1,14 @@
 //! URL query-string encoding for GET requests.
 //!
 //! Uses `serde_json::to_value` to drive serialization through the
-//! pbjson-emitted `Serialize` impl on each proto request type — pbjson
+//! pbjson-emitted `Serialize` impl on each proto request type - pbjson
 //! already follows proto3 default-skipping semantics, so default-valued
 //! fields drop out automatically and we don't carry them as `?foo=0`.
 //! Repeated fields encode as `?key=v1&key=v2` (grpc-gateway supports both
 //! `?key[]=...` and repeated `?key=...`; we pick the latter for parity
 //! with `pkg/exc/client.go`).
 //!
-//! Field names are the JSON (lowerCamelCase) form pbjson emits — matches
+//! Field names are the JSON (lowerCamelCase) form pbjson emits - matches
 //! what `runtime.DefaultQueryParser` accepts on the gateway side. Proto
 //! field names (snake_case) are also accepted server-side, but we keep
 //! one canonical form to avoid surprises.
@@ -24,7 +24,7 @@ use crate::error::{Error, Result};
 ///
 /// Returns an empty string when the request has no non-default fields.
 /// Path parameters MUST be cleared (set to default) by the caller before
-/// passing — they are otherwise emitted as redundant query params.
+/// passing - they are otherwise emitted as redundant query params.
 pub fn encode_query<T: Serialize>(req: &T) -> Result<String> {
     let value = serde_json::to_value(req)?;
     let object = match value {
@@ -50,7 +50,7 @@ pub fn encode_query<T: Serialize>(req: &T) -> Result<String> {
 fn append_value(ser: &mut Serializer<'_, String>, key: &str, val: Value) {
     match val {
         Value::Null => {}
-        // pbjson emits scalars directly — strings, numbers, bools, enum
+        // pbjson emits scalars directly - strings, numbers, bools, enum
         // names. URL-encoding them is `to_string` minus quotes.
         Value::Bool(b) => {
             ser.append_pair(key, if b { "true" } else { "false" });
@@ -69,7 +69,7 @@ fn append_value(ser: &mut Serializer<'_, String>, key: &str, val: Value) {
         // Nested objects in a query string aren't a thing. Flatten with
         // dot-separated keys is one option, but no current OBSDN endpoint
         // takes a nested message in a GET, so we just stringify as JSON
-        // — server will reject if it ever happens. The `if let Ok(s)`
+        // - server will reject if it ever happens. The `if let Ok(s)`
         // silently drops on serialize failure, which serde_json only
         // produces for impossible-in-practice cases (custom Serialize
         // impls); pbjson messages always round-trip cleanly.
@@ -97,7 +97,7 @@ pub fn percent_encode_segment(s: &str) -> String {
     // application/x-www-form-urlencoded, which is wrong for path segments
     // (it encodes `/` differently). Hand-roll using percent_encoding.
     use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-    // Reserved sub-delims & general-delims — same as Go's url.PathEscape.
+    // Reserved sub-delims & general-delims - same as Go's url.PathEscape.
     const SEG: &AsciiSet = &CONTROLS
         .add(b' ')
         .add(b'"')
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn skips_default_when_all_serialized() {
         // serde_json produces all fields. Only proto's pbjson skips
-        // defaults — a plain serde struct emits zeros. This test pins
+        // defaults - a plain serde struct emits zeros. This test pins
         // the contract: encode_query produces stable output for a
         // representative struct.
         let q = encode_query(&Sample {
@@ -143,7 +143,7 @@ mod tests {
         // Order is HashMap insertion (serde_json preserves keys but
         // ordering across `serde_json::Value` iteration is not stable
         // across `Object`'s underlying map type, which depends on the
-        // `preserve_order` feature). Don't assert order — assert content.
+        // `preserve_order` feature). Don't assert order - assert content.
         assert!(q.contains("mktId=BTC-PERP"));
         assert!(q.contains("lmt=50"));
         assert!(q.contains("oids=a") && q.contains("oids=b"));

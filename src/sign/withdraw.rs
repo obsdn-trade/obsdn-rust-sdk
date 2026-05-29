@@ -1,4 +1,4 @@
-//! `Withdraw` EIP-712 signer — mirrors
+//! `Withdraw` EIP-712 signer - mirrors
 //! `pkg/ethsig/template/withdraw.json.tmpl` + `sign_withdraw.go`.
 
 use alloy_primitives::Address;
@@ -18,11 +18,11 @@ sol! {
     }
 }
 
-/// Withdraw payload (pre-scaled). `amount` is 18-decimal fixed-point —
+/// Withdraw payload (pre-scaled). `amount` is 18-decimal fixed-point -
 /// see [`crate::sign::scale_decimal_str`].
 #[derive(Debug, Clone)]
 pub struct WithdrawPayload {
-    /// Sender wallet — must match the signer's address.
+    /// Sender wallet - must match the signer's address.
     pub sender: Address,
     /// Token contract address.
     pub token: Address,

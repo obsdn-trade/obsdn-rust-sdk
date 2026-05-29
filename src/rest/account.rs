@@ -1,4 +1,4 @@
-//! Account REST surface — `AccountService` in `api/proto/nil/v1/account.proto`.
+//! Account REST surface - `AccountService` in `api/proto/nil/v1/account.proto`.
 
 use std::sync::Arc;
 
@@ -22,7 +22,7 @@ impl AccountApi {
         Self { rest }
     }
 
-    /// `GET /accounts` — get authenticated account info.
+    /// `GET /accounts` - get authenticated account info.
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, req: GetAccountRequest) -> Result<GetAccountResponse> {
         self.rest
@@ -30,14 +30,14 @@ impl AccountApi {
             .await
     }
 
-    /// `POST /faucet` — request testnet funds.
-    /// **INTERNAL** endpoint — only reachable from internal/Twingate hosts.
+    /// `POST /faucet` - request testnet funds.
+    /// **INTERNAL** endpoint - only reachable from internal/Twingate hosts.
     #[doc(hidden)]
     pub async fn faucet(&self, req: FaucetRequest) -> Result<FaucetResponse> {
         self.rest.post("/faucet", &req, Auth::Optional).await
     }
 
-    /// `POST /transfers/withdraw` — withdraw collateral on-chain.
+    /// `POST /transfers/withdraw` - withdraw collateral on-chain.
     /// **Auth:** required. EIP-712 signed request.
     pub async fn withdraw_collateral(
         &self,
@@ -48,7 +48,7 @@ impl AccountApi {
             .await
     }
 
-    /// `GET /transfers/history` — paginated transfer history.
+    /// `GET /transfers/history` - paginated transfer history.
     /// **Auth:** required (read-only allowed).
     pub async fn get_transfer_history(
         &self,
@@ -59,7 +59,7 @@ impl AccountApi {
             .await
     }
 
-    /// `GET /transfers/withdrawal-requests` — pending/finalized withdrawals.
+    /// `GET /transfers/withdrawal-requests` - pending/finalized withdrawals.
     /// **Auth:** required (read-only allowed).
     pub async fn get_withdrawal_requests(
         &self,
@@ -70,7 +70,7 @@ impl AccountApi {
             .await
     }
 
-    /// `POST /transfers/send-funds` — send funds to another account.
+    /// `POST /transfers/send-funds` - send funds to another account.
     /// **Auth:** required.
     pub async fn send_funds(&self, req: SendFundsRequest) -> Result<SendFundsResponse> {
         self.rest

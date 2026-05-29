@@ -11,7 +11,7 @@
 //! ```
 //!
 //! These tests exercise the public `GET /markets` (no auth) and the
-//! authenticated `GET /accounts/me`-equivalent — kept narrow so a
+//! authenticated `GET /accounts/me`-equivalent - kept narrow so a
 //! registered key is enough; we don't place real orders here.
 
 use obsdn_sdk::{Client, Env};
@@ -24,7 +24,7 @@ fn creds() -> Option<(String, String)> {
 
 #[tokio::test]
 async fn get_markets_smoke() {
-    // Public endpoint — no creds needed, but we still skip in CI by
+    // Public endpoint - no creds needed, but we still skip in CI by
     // requiring an explicit opt-in env var so untrusted networks don't
     // hammer production from PR CI.
     if std::env::var("OBSDN_SMOKE").is_err() {

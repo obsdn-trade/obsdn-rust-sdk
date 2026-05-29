@@ -12,17 +12,17 @@ use reqwest::{header::HeaderName, RequestBuilder};
 
 use crate::auth::HmacSigner;
 
-/// `x-api-key` header — identifies the API key.
+/// `x-api-key` header - identifies the API key.
 pub const HEADER_API_KEY: HeaderName = HeaderName::from_static("x-api-key");
-/// `x-api-signature` header — base64 HMAC-SHA256 over the prehash.
+/// `x-api-signature` header - base64 HMAC-SHA256 over the prehash.
 pub const HEADER_API_SIGNATURE: HeaderName = HeaderName::from_static("x-api-signature");
-/// `x-api-timestamp` header — unix-epoch seconds at signing time.
+/// `x-api-timestamp` header - unix-epoch seconds at signing time.
 pub const HEADER_API_TIMESTAMP: HeaderName = HeaderName::from_static("x-api-timestamp");
 
 /// Attach `x-api-key`, `x-api-signature`, `x-api-timestamp` to a request.
 ///
 /// `path` MUST be the URL path only (no host, no query string). `body` is
-/// the exact bytes that will be transmitted — pass `&[]` for empty.
+/// the exact bytes that will be transmitted - pass `&[]` for empty.
 pub fn apply_auth(
     builder: RequestBuilder,
     signer: &HmacSigner,

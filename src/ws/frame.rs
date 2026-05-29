@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 
 use super::channel::Channel;
 
-/// Hard cap from `services/pulse/io/websocket.go` — server drops the
+/// Hard cap from `services/pulse/io/websocket.go` - server drops the
 /// connection on overflow. Verified at build time so a payload that would
 /// disconnect us errors before the send.
 pub(crate) const MAX_CLIENT_FRAME_BYTES: usize = 512;

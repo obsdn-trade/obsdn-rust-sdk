@@ -10,11 +10,11 @@ cargo test --all-targets
 
 Runs all 86 tests including:
 
-- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) — Rust signing output matches Go reference byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
-- **WS chaos tests** (`tests/ws_chaos.rs`) — reconnect, gap detection, frame loss.
-- **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) — wiremock-based.
-- **View roundtrip** — BookView, TickerView, OracleView, OrderView deserialization.
-- **Codegen** (`tests/codegen_smoke.rs`) — generated types compile and have expected fields.
+- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches Go reference byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
+- **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, gap detection, frame loss.
+- **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) - wiremock-based.
+- **View roundtrip** - BookView, TickerView, OracleView, OrderView deserialization.
+- **Codegen** (`tests/codegen_smoke.rs`) - generated types compile and have expected fields.
 
 ### Production Smoke (unauthenticated)
 
@@ -40,20 +40,20 @@ OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 
 Full end-to-end against the live staging matching engine **and** pulse WS. Gated by `OBSDN_STAGING=1`; self-skips when unset. Two tests:
 
-**`e2e_combined_flow`** — one account lifecycle, with the WS as live observer of the REST mutations:
+**`e2e_combined_flow`** - one account lifecycle, with the WS as live observer of the REST mutations:
 
 1. Sender keypair (pk=0x01) + signer keypair (pk=0x02)
-2. **Register signer** — sender signs 4-field `Register` struct (C2 proof), signer signs `DelegatedSigner`, POST `/auth/signers` returns API key
-3. **Faucet** — request 10k USDC on staging
+2. **Register signer** - sender signs 4-field `Register` struct (C2 proof), signer signs `DelegatedSigner`, POST `/auth/signers` returns API key
+3. **Faucet** - request 10k USDC on staging
 4. **WS authenticate** + subscribe `Order { market: None }` (wildcard); drain initial snapshot
-5. **Place order** via REST — sign `Order` with `uint16 marketIndex` (C1 proof) → **assert the order update arrives on the wildcard sub** stamped with the concrete market (`filter="BTC-PERP"`) — live proof of the WS wildcard-routing fix
+5. **Place order** via REST - sign `Order` with `uint16 marketIndex` (C1 proof) → **assert the order update arrives on the wildcard sub** stamped with the concrete market (`filter="BTC-PERP"`) - live proof of the WS wildcard-routing fix
 6. **Cancel order** via REST → assert the follow-up update arrives on the wildcard sub
-7. **Set leverage** — POST `/positions/BTC-PERP/leverage` (H1 proof)
-8. Cleanup — cancel all, WS shutdown
+7. **Set leverage** - POST `/positions/BTC-PERP/leverage` (H1 proof)
+8. Cleanup - cancel all, WS shutdown
 
-**`e2e_ws_public_book`** — public book channel, no auth: asserts the first frame is a `Snapshot` with a populated book, then a follow-up `Update` arrives; validates live `as_book()` deserialization.
+**`e2e_ws_public_book`** - public book channel, no auth: asserts the first frame is a `Snapshot` with a populated book, then a follow-up `Update` arrives; validates live `as_book()` deserialization.
 
-Per-channel GSN is logged, never asserted contiguous — pulse `gsn` is a global event watermark, sparse per subscription by design (observed deltas of tens-to-hundreds between consecutive frames on one channel).
+Per-channel GSN is logged, never asserted contiguous - pulse `gsn` is a global event watermark, sparse per subscription by design (observed deltas of tens-to-hundreds between consecutive frames on one channel).
 
 **What it proves:**
 
@@ -80,7 +80,7 @@ When EIP-712 struct definitions change (field added/removed, type changed):
 
 1. Fix the Rust `sol!` struct in `src/sign/*.rs`
 2. Update `tests/eip712_golden.rs` to match new fields
-3. Run golden tests — the "left" (got) values are the correct ones
+3. Run golden tests - the "left" (got) values are the correct ones
 4. Update `tests/fixtures/eip712/*.json` with the correct struct_hash, digest, signature
 5. Verify: `cargo test --test eip712_golden`
 
@@ -94,4 +94,4 @@ cargo run --manifest-path scripts/codegen-rust/Cargo.toml -- \
   --out-dir src/types/generated
 ```
 
-Requires `buf` CLI. Output must be committed — CI enforces `git diff --exit-code src/types/generated/`.
+Requires `buf` CLI. Output must be committed - CI enforces `git diff --exit-code src/types/generated/`.

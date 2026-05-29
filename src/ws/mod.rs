@@ -8,7 +8,7 @@
 //!
 //! No gap detection: pulse stamps every frame with `gsn`, a single global
 //! event watermark (`pkg/events/sequencer.go`), not a dense per-subscription
-//! sequence — channels emit selectively (throttling/filtering), so per-sub
+//! sequence - channels emit selectively (throttling/filtering), so per-sub
 //! GSNs jump arbitrarily and gap inference is meaningless. The server never
 //! drops individual messages mid-session (it closes the connection on outbox
 //! overflow, which the supervisor handles via reconnect). `update.gsn` is

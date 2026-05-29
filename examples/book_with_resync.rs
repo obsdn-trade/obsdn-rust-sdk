@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
                 tracing::info!(?bid, ?ask, nb, na, gsn = u.gsn, "book");
             }
             WsEvent::Reconnected => {
-                tracing::info!("reconnected — refetching REST snapshot");
+                tracing::info!("reconnected - refetching REST snapshot");
                 let snap = client.markets().get_order_book(&market).await?;
                 tracing::info!(
                     levels_b = snap.book.as_ref().map(|b| b.bids.len()).unwrap_or(0),
@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
                 );
                 // Caller would seed `book` from `snap.book` here. The WS
                 // stream also delivers a fresh `Snapshot` frame on resub,
-                // which `replace_with` applies — either path rebuilds.
+                // which `replace_with` applies - either path rebuilds.
             }
             WsEvent::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
         }

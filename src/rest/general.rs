@@ -1,4 +1,4 @@
-//! General REST surface — `GeneralService` in `api/proto/nil/v1/general.proto`.
+//! General REST surface - `GeneralService` in `api/proto/nil/v1/general.proto`.
 
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ impl GeneralApi {
         Self { rest }
     }
 
-    /// `GET /client` — recommended client config (rate limits, etc).
+    /// `GET /client` - recommended client config (rate limits, etc).
     /// **Auth:** none.
     pub async fn get_client_info(
         &self,
@@ -29,7 +29,7 @@ impl GeneralApi {
         self.rest.get_with_query("/client", &req, Auth::None).await
     }
 
-    /// `GET /error-codes` — enumerate server error codes for client mapping.
+    /// `GET /error-codes` - enumerate server error codes for client mapping.
     /// **Auth:** none.
     pub async fn get_error_codes(
         &self,
@@ -40,7 +40,7 @@ impl GeneralApi {
             .await
     }
 
-    /// `GET /fee-tiers` — all available fee tier definitions.
+    /// `GET /fee-tiers` - all available fee tier definitions.
     /// **Auth:** none.
     pub async fn get_fee_tiers(&self, req: GetFeeTiersRequest) -> Result<GetFeeTiersResponse> {
         self.rest

@@ -22,7 +22,7 @@ use crate::error::{Error, Result};
 /// The server accepts timestamps within a +/- 60 second window of its own
 /// clock. If authentication fails with a "timestamp expired" error, the
 /// most likely cause is clock skew between the client machine and the
-/// server — synchronize via NTP.
+/// server - synchronize via NTP.
 pub(crate) fn build_ws_auth(signer: &HmacSigner, now_secs: u64) -> (String, String) {
     let timestamp = now_secs.to_string();
     let prehash = format!("{},{}", signer.api_key(), timestamp);
@@ -55,7 +55,7 @@ pub(crate) fn now_unix_secs() -> Result<u64> {
 mod tests {
     use super::*;
 
-    /// Golden vector — recompute against the canonical Python reference in
+    /// Golden vector - recompute against the canonical Python reference in
     /// `docs/api/ws-integration.md::Authentication` for the same inputs.
     #[test]
     fn ws_prehash_format() {

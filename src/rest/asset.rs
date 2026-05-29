@@ -1,4 +1,4 @@
-//! Asset REST surface — `AssetService` in `api/proto/nil/v1/asset.proto`.
+//! Asset REST surface - `AssetService` in `api/proto/nil/v1/asset.proto`.
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ impl AssetApi {
         Self { rest }
     }
 
-    /// `GET /assets` — list available assets.
+    /// `GET /assets` - list available assets.
     /// **Auth:** none.
     pub async fn get_assets(&self, req: GetAssetsRequest) -> Result<GetAssetsResponse> {
         self.rest.get_with_query("/assets", &req, Auth::None).await

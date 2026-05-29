@@ -1,4 +1,4 @@
-//! Markets REST surface — `MarketService` in `api/proto/nil/v1/market.proto`.
+//! Markets REST surface - `MarketService` in `api/proto/nil/v1/market.proto`.
 
 use std::sync::Arc;
 
@@ -22,20 +22,20 @@ impl MarketsApi {
         Self { rest }
     }
 
-    /// `GET /markets` — list all available trading markets.
+    /// `GET /markets` - list all available trading markets.
     /// **Auth:** none.
     pub async fn get_markets(&self) -> Result<GetMarketsResponse> {
         self.rest.get("/markets", Auth::None).await
     }
 
-    /// `GET /markets/{mkt_id}/orderbook` — current order book.
+    /// `GET /markets/{mkt_id}/orderbook` - current order book.
     /// **Auth:** none.
     pub async fn get_order_book(&self, mkt_id: &str) -> Result<GetOrderBookResponse> {
         let path = format!("/markets/{}/orderbook", percent_encode_segment(mkt_id));
         self.rest.get(&path, Auth::None).await
     }
 
-    /// `GET /markets/{mkt_id}/trades` — recent trades for a market.
+    /// `GET /markets/{mkt_id}/trades` - recent trades for a market.
     /// **Auth:** none. `req.mkt_id` is consumed for the path; remaining
     /// fields go in the query string.
     pub async fn get_market_trades(
@@ -47,7 +47,7 @@ impl MarketsApi {
         self.rest.get_with_query(&path, &req, Auth::None).await
     }
 
-    /// `GET /markets/{mkt_id}/candles` — historical OHLCV data.
+    /// `GET /markets/{mkt_id}/candles` - historical OHLCV data.
     /// **Auth:** none.
     pub async fn get_market_candles(
         &self,
@@ -58,7 +58,7 @@ impl MarketsApi {
         self.rest.get_with_query(&path, &req, Auth::None).await
     }
 
-    /// `GET /markets/{mkt_id}/funding-rate-history` — funding rate history.
+    /// `GET /markets/{mkt_id}/funding-rate-history` - funding rate history.
     /// **Auth:** none.
     pub async fn get_funding_rate_history(
         &self,
@@ -72,7 +72,7 @@ impl MarketsApi {
         self.rest.get_with_query(&path, &req, Auth::None).await
     }
 
-    /// `GET /trade-history` — authenticated account's trade history.
+    /// `GET /trade-history` - authenticated account's trade history.
     /// **Auth:** required (read-only allowed).
     pub async fn get_account_trade_history(
         &self,

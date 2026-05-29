@@ -1,4 +1,4 @@
-//! Price REST surface — `PriceService` in `api/proto/nil/v1/price.proto`.
+//! Price REST surface - `PriceService` in `api/proto/nil/v1/price.proto`.
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ impl PriceApi {
         Self { rest }
     }
 
-    /// `GET /prices` — current oracle prices.
+    /// `GET /prices` - current oracle prices.
     /// **Auth:** none.
     pub async fn get_prices(&self, req: GetPricesRequest) -> Result<GetPricesResponse> {
         self.rest.get_with_query("/prices", &req, Auth::None).await

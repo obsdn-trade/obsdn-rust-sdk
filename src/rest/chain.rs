@@ -1,4 +1,4 @@
-//! Chain REST surface — `ChainService` in `api/proto/nil/v1/chain.proto`.
+//! Chain REST surface - `ChainService` in `api/proto/nil/v1/chain.proto`.
 
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ impl ChainApi {
         Self { rest }
     }
 
-    /// `GET /chain/config` — read on-chain config (contract addresses, etc).
+    /// `GET /chain/config` - read on-chain config (contract addresses, etc).
     /// **Auth:** none.
     pub async fn get_chain_config(
         &self,
@@ -31,8 +31,8 @@ impl ChainApi {
             .await
     }
 
-    /// `GET /chain/last-onchain-block` — last processed block height.
-    /// **INTERNAL** endpoint — only reachable from internal hosts.
+    /// `GET /chain/last-onchain-block` - last processed block height.
+    /// **INTERNAL** endpoint - only reachable from internal hosts.
     #[doc(hidden)]
     pub async fn get_last_onchain_block(
         &self,
@@ -43,7 +43,7 @@ impl ChainApi {
             .await
     }
 
-    /// `POST /chain/onchain-events` — submit batch of on-chain events.
+    /// `POST /chain/onchain-events` - submit batch of on-chain events.
     /// **INTERNAL** endpoint.
     #[doc(hidden)]
     pub async fn submit_onchain_events(

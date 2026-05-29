@@ -90,7 +90,7 @@ async fn staging_ws_oracle() {
 /// C1 live check: subscribe to the all-markets trade channel (`market:
 /// None`). Pulse stamps each trade frame with a concrete market filter; the
 /// wildcard routing must still deliver them. Trades are organic, so this is
-/// opportunistic — when the market is active it verifies routing end to end.
+/// opportunistic - when the market is active it verifies routing end to end.
 #[tokio::test]
 async fn staging_ws_wildcard_trade_routes() {
     if skip_unless_staging() {

@@ -2,7 +2,7 @@
 //!
 //! Exercises every public read endpoint against live staging
 //! (`nova.staging.obsdn.trade`). These tests never mutate state and never
-//! authenticate — the authenticated read/write order lifecycle lives in
+//! authenticate - the authenticated read/write order lifecycle lives in
 //! `e2e_staging.rs` (which registers a fresh key per run), and additional WS
 //! coverage in `staging_ws.rs`.
 //!
@@ -117,7 +117,7 @@ async fn staging_chain_config_matches_sdk_domain() {
     assert_eq!(
         live.verif_contract.to_lowercase(),
         format!("{}", sdk.verifying_contract.expect("sdk contract")).to_lowercase(),
-        "verifying contract drift — signatures would be rejected"
+        "verifying contract drift - signatures would be rejected"
     );
     eprintln!(
         "OK: SDK domain matches live staging ({} / {} / {} / {})",

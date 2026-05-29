@@ -3,7 +3,20 @@ name = "obsdn-sdk"
 version = "0.1.0"
 edition = "2021"
 description = "Rust SDK for the OBSDN perpetual exchange"
-license = "MIT OR Apache-2.0"
+authors = ["OBSDN Engineering <dev@obsdn.trade>"]
+license = "MIT"
+repository = "https://github.com/obsdn-trade/obsdn-rust-sdk"
+homepage = "https://obsdn.trade"
+documentation = "https://docs.rs/obsdn-sdk"
+readme = "README.md"
+keywords = ["trading", "exchange", "perpetuals", "crypto", "websocket"]
+categories = [
+    "api-bindings",
+    "asynchronous",
+    "cryptography::cryptocurrencies",
+    "finance",
+    "web-programming::http-client",
+]
 publish = false
 # MSRV: pinned to current stable. Several transitive crates (getrandom,
 # time-core, etc.) require Cargo's edition2024 feature, stabilized in 1.85.
@@ -37,7 +50,7 @@ zeroize = { version = "1", features = ["derive"] }
 
 # Phase 4: EIP-712 signing.
 # alloy-sol-types generates the ABI-encoded struct hash from Solidity-style
-# `sol!` declarations — byte-equal to go-ethereum apitypes.HashStruct for the
+# `sol!` declarations - byte-equal to go-ethereum apitypes.HashStruct for the
 # templates we mirror.
 # alloy-signer-local provides the secp256k1 signing path (k256 under the hood).
 # Individual sub-crate pins keep the dep surface narrow vs. the umbrella
@@ -59,7 +72,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 [dev-dependencies]
 # wiremock provides an in-process HTTP mock to assert header/body shape.
 wiremock = "0.6"
-# Phase 7 examples deps — keep minimal so `cargo build --examples` stays fast.
+# Phase 7 examples deps - keep minimal so `cargo build --examples` stays fast.
 anyhow = "1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }

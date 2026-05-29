@@ -1,4 +1,4 @@
-# obsdn-sdk (Rust) — architecture
+# obsdn-sdk (Rust) - architecture
 
 ASCII map of what the SDK does, what it holds in memory, and what it
 deliberately leaves to the caller. Pair with `cargo doc --open` for the
@@ -73,7 +73,7 @@ full API reference; this file is the orientation, not the spec.
   types/v1/             prost+pbjson generated from api/proto/nil/v1/
 
   ws/views.rs           Per-frame parsers: BookView TickerView OracleView
-                        TradeView OrderView. NOT running state — decode +
+                        TradeView OrderView. NOT running state - decode +
                         drop. Caller owns aggregation.
 
   ws/gsn.rs             Tracks last_gsn per (channel,market). Emits Gap
@@ -147,7 +147,6 @@ full API reference; this file is the orientation, not the spec.
   └── src/
       ├── lib.rs          re-exports Client, Env, LocalSigner
       ├── builder.rs      ClientBuilder, Client (Arc handle)
-      ├── env.rs          Local / Staging / Production / Custom
       ├── market_cache.rs lazy TTL cache
       ├── auth.rs         HMAC signer
       ├── error.rs        Error enum + Result alias

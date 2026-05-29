@@ -1,8 +1,8 @@
-//! Vault REST surface — `VaultService` in `api/proto/nil/v1/vault.proto`.
+//! Vault REST surface - `VaultService` in `api/proto/nil/v1/vault.proto`.
 //!
 //! Every method here is marked **INTERNAL** in the proto. They're exposed
 //! to support internal tooling (bots, dashboards) but not part of the
-//! documented public SDK — hidden from `cargo doc` via `#[doc(hidden)]`.
+//! documented public SDK - hidden from `cargo doc` via `#[doc(hidden)]`.
 
 use std::sync::Arc;
 
@@ -32,13 +32,13 @@ impl VaultApi {
         Self { rest }
     }
 
-    /// `POST /vaults` — create a new vault. **Auth:** required. **INTERNAL.**
+    /// `POST /vaults` - create a new vault. **Auth:** required. **INTERNAL.**
     #[doc(hidden)]
     pub async fn create(&self, req: CreateVaultRequest) -> Result<CreateVaultResponse> {
         self.rest.post("/vaults", &req, Auth::Required).await
     }
 
-    /// `GET /vaults/portfolio` — vault portfolio. **INTERNAL.**
+    /// `GET /vaults/portfolio` - vault portfolio. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_portfolio(
         &self,
@@ -49,7 +49,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/trade-history` — vault trade history. **INTERNAL.**
+    /// `GET /vaults/trade-history` - vault trade history. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_trade_history(
         &self,
@@ -60,7 +60,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/orders` — vault open orders. **INTERNAL.**
+    /// `GET /vaults/orders` - vault open orders. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_open_orders(
         &self,
@@ -71,7 +71,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/order-history` — vault historical orders. **INTERNAL.**
+    /// `GET /vaults/order-history` - vault historical orders. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_order_history(
         &self,
@@ -82,7 +82,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/account-value-history` — vault NAV history. **INTERNAL.**
+    /// `GET /vaults/account-value-history` - vault NAV history. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_account_value_history(
         &self,
@@ -93,7 +93,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/pnl-history` — vault PnL history. **INTERNAL.**
+    /// `GET /vaults/pnl-history` - vault PnL history. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_pnl_history(
         &self,
@@ -104,13 +104,13 @@ impl VaultApi {
             .await
     }
 
-    /// `POST /vaults/stake` — stake into a vault. **Auth:** required. **INTERNAL.**
+    /// `POST /vaults/stake` - stake into a vault. **Auth:** required. **INTERNAL.**
     #[doc(hidden)]
     pub async fn stake(&self, req: StakeVaultRequest) -> Result<StakeVaultResponse> {
         self.rest.post("/vaults/stake", &req, Auth::Required).await
     }
 
-    /// `POST /vaults/unstake` — unstake from a vault. **Auth:** required. **INTERNAL.**
+    /// `POST /vaults/unstake` - unstake from a vault. **Auth:** required. **INTERNAL.**
     #[doc(hidden)]
     pub async fn unstake(&self, req: UnstakeVaultRequest) -> Result<UnstakeVaultResponse> {
         self.rest
@@ -118,7 +118,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/transfer-history` — vault stake/unstake history. **INTERNAL.**
+    /// `GET /vaults/transfer-history` - vault stake/unstake history. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_transfer_history(
         &self,
@@ -129,7 +129,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/user-transfer-history` — caller's vault transfers.
+    /// `GET /vaults/user-transfer-history` - caller's vault transfers.
     /// **Auth:** required (read-only allowed). **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_user_transfer_history(
@@ -141,7 +141,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/stats` — aggregated vault stats. **INTERNAL.**
+    /// `GET /vaults/stats` - aggregated vault stats. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_stats(&self, req: GetVaultStatsRequest) -> Result<GetVaultStatsResponse> {
         self.rest
@@ -149,7 +149,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/stakers` — vault staker list. **INTERNAL.**
+    /// `GET /vaults/stakers` - vault staker list. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_stakers(
         &self,
@@ -160,7 +160,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/staker` — caller's stake info.
+    /// `GET /vaults/staker` - caller's stake info.
     /// **Auth:** required (read-only allowed). **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_staker(&self, req: GetVaultStakerRequest) -> Result<GetVaultStakerResponse> {
@@ -169,7 +169,7 @@ impl VaultApi {
             .await
     }
 
-    /// `GET /vaults/position-history` — vault position history. **INTERNAL.**
+    /// `GET /vaults/position-history` - vault position history. **INTERNAL.**
     #[doc(hidden)]
     pub async fn get_position_history(
         &self,
