@@ -1,10 +1,4 @@
 //! Server → client wire types.
-//!
-//! Mirrors `services/pulse/channel/op.go` (`AuthResponse`,
-//! `SubscriptionResponse`, `ErrorResponse`, `ChannelMessage`). The thin
-//! client surfaces `data` as `serde_json::Value` so callers can deserialize
-//! into per-channel typed structs they own (Phase 7 ergonomic wrappers will
-//! provide ready-made views - keeping Phase 5 minimal).
 
 use serde::Deserialize;
 
@@ -25,7 +19,7 @@ pub(crate) enum WireType {
 }
 
 /// A single server frame, after JSON parse but before routing. Internal - we
-/// dispatch into `WsEvent` / per-subscription `WsUpdate` before exposing
+/// dispatch into `Event` / per-subscription `Update` before exposing
 /// anything to callers.
 #[derive(Debug, Deserialize)]
 pub(crate) struct ServerFrame {
@@ -43,8 +37,8 @@ pub(crate) struct ServerFrame {
     pub filter: Option<String>,
     #[serde(default)]
     pub gsn: Option<u64>,
-    /// Server emits `ts` as a JSON-string-encoded i64 nanosecond timestamp
-    /// (`json:"ts,string"` on the Go side). Parse via `from_str`.
+    /// Server emits `ts` as a JSON-string-encoded nanosecond timestamp.
+    /// Parsed via `from_str`.
     #[serde(default, deserialize_with = "deserialize_opt_str_u64")]
     pub ts: Option<u64>,
     #[serde(default)]
@@ -62,7 +56,7 @@ where
 
 /// Whether a data frame is the initial state or a subsequent diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WsUpdateKind {
+pub enum UpdateKind {
     /// Initial state - replace any cached state for this filter.
     Snapshot,
     /// Incremental diff against the prior snapshot/update.
@@ -71,13 +65,12 @@ pub enum WsUpdateKind {
 
 /// Snapshot or update message routed to a channel subscriber.
 ///
-/// Phase 5 keeps `data` as `serde_json::Value`. Callers can `serde_json::
-/// from_value` it into a per-channel typed struct (see
-/// `docs/api/ws-integration.md` for schemas).
+/// `data` is a raw `serde_json::Value`. Use the typed helpers on [`Update`]
+/// (`as_book`, `as_oracle`, ...) or `serde_json::from_value` directly.
 #[derive(Debug, Clone)]
-pub struct WsUpdate {
+pub struct Update {
     /// Snapshot or incremental update.
-    pub kind: WsUpdateKind,
+    pub kind: UpdateKind,
     /// Routing channel (`book`, `oracle`, ...).
     pub channel: ChannelName,
     /// Server `gsn` - a global event watermark, monotonic but sparse per
@@ -94,26 +87,22 @@ pub struct WsUpdate {
     pub data: serde_json::Value,
 }
 
-/// Per-subscription event delivered by the managed [`crate::ws::WsClient`].
+/// Per-subscription event delivered by the managed [`crate::ws::Session`].
 ///
-/// The managed client surfaces both the data plane (snapshot/update frames
-/// from the server) and the lifecycle plane (reconnect, auth failure) in a
-/// single stream so callers don't have to juggle two channels.
+/// Surfaces both the data plane (snapshot/update frames) and the lifecycle
+/// plane (reconnect, auth failure) in a single stream.
 ///
 /// Variants:
-/// - [`WsEvent::Update`]: a snapshot or update frame. Inspect
-///   `update.kind` to discriminate - both flow through this variant.
-/// - [`WsEvent::Reconnected`]: the underlying socket dropped and the
-///   supervisor re-attached. Subscriptions and authentication were
-///   replayed automatically. Emitted once per reconnect.
-/// - [`WsEvent::Unauthorized`]: an auth replay failed (e.g., revoked key).
-///   Private subscriptions on this connection will not deliver further
-///   updates until the caller re-authenticates. Public subscriptions
-///   continue working.
+/// - [`Event::Update`]: snapshot or update frame. Inspect `update.kind` to
+///   discriminate - both flow through this variant.
+/// - [`Event::Reconnected`]: the socket dropped and the supervisor
+///   re-attached with auth + subs replayed. Emitted once per reconnect.
+/// - [`Event::Unauthorized`]: auth replay failed (e.g. revoked key).
+///   Private subscriptions stop delivering; public subs continue.
 #[derive(Debug, Clone)]
-pub enum WsEvent {
+pub enum Event {
     /// Normal data frame (snapshot or update).
-    Update(WsUpdate),
+    Update(Update),
     /// Underlying connection re-attached. Subs replayed.
     Reconnected,
     /// Auth replay rejected by the server. Carries the server's error

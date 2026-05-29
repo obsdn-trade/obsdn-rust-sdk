@@ -1,33 +1,26 @@
 //! Decimal scaling helpers.
 //!
 //! REST exposes `f64` for size/price; EIP-712 hashes them as `uint128`
-//! after a fixed `× 10^18` scale (see
-//! `pkg/models/scalar.go::(Amount).X18()` and `(Price).X18()`). Go uses
-//! shopspring `decimal.Decimal` for arbitrary precision, then
-//! `BigInt()` truncates toward zero. This module mirrors that path with no
-//! third-party decimal dep - a tiny string-based scaler that handles the
-//! shapes a REST caller can produce.
+//! scaled by `10^18` and truncated toward zero.
 //!
-//! Why string-based? `f64 * 1e18` loses precision near u128 boundaries;
-//! shopspring constructs the decimal from `strconv.FormatFloat(v, 'f', -1, 64)`
-//! (the shortest round-trip decimal repr) which Rust's `format!("{}", v)`
-//! also produces. So `scale_f64(v) == scale_decimal_str(format!("{}", v))`
-//! up to the same float-to-decimal rounding Go performs.
+//! Why string-based? `f64 * 1e18` loses precision near `u128` boundaries.
+//! The reference implementation converts via the shortest round-trip decimal
+//! representation, which Rust's `format!("{}", v)` also produces.
+//! So `scale_f64(v) == scale_decimal_str(format!("{}", v))` for all values
+//! a REST caller can supply.
 
 use crate::error::{Error, Result};
 
-/// Scale a decimal *string* by `10^18` and truncate toward zero, returning
-/// the integer as `u128`.
+/// Scale a decimal string by `10^18`, truncating toward zero, and return
+/// the result as `u128`.
 ///
-/// Accepts:
-/// - integer literals: `"1"`, `"1500"`
-/// - decimal fractions: `"1.5"`, `"0.000001"`
-/// - long fractions (excess digits truncated): `"1.123456789012345678999"`
+/// Accepts integer literals (`"1"`, `"1500"`), decimal fractions
+/// (`"1.5"`, `"0.000001"`), and long fractions where excess digits are
+/// truncated (`"1.123456789012345678999"`).
 ///
-/// Rejects: leading sign, exponent notation, embedded whitespace, multiple
-/// dots. The REST layer already rejects NaN/Inf via
-/// `services/nova/order_service_place.go::PlaceOrder`, so we don't see
-/// those.
+/// Rejects leading signs, exponent notation, embedded whitespace, and
+/// multiple dots. NaN/Inf cannot appear here — the REST layer rejects them
+/// before they reach signing.
 pub fn scale_decimal_str(s: &str) -> Result<u128> {
     if s.is_empty() {
         return Err(Error::Sign("empty decimal".into()));
@@ -51,9 +44,8 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
         return Err(Error::Sign(format!("non-digit in decimal: {s}")));
     }
 
-    // Pad/truncate fractional part to exactly 18 digits - equivalent to
-    // shopspring `Shift(18).BigInt()` which scales then truncates toward
-    // zero (see scalar.go).
+    // Pad/truncate fractional part to exactly 18 digits — scale by 10^18,
+    // truncate toward zero.
     let mut padded = String::with_capacity(int_part.len() + 18);
     padded.push_str(if int_part.is_empty() { "0" } else { int_part });
     if frac_part.len() >= 18 {
@@ -69,12 +61,12 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
         .map_err(|e| Error::Sign(format!("scaled value overflows u128: {s} ({e})")))
 }
 
-/// Scale an `f64` by `10^18` via the shopspring path: format with the
-/// shortest round-trip decimal repr, then call [`scale_decimal_str`].
+/// Scale an `f64` by `10^18` via the shortest round-trip decimal
+/// representation, then delegate to [`scale_decimal_str`].
 ///
-/// Returns `Error::Sign` on NaN/Inf - the REST layer already rejects those
-/// upstream, but we re-check here so a misuse from a non-REST caller (e.g.,
-/// signing an offline order) is loud.
+/// Returns `Error::Sign` on NaN/Inf. The REST layer rejects these upstream,
+/// but the check is repeated here so non-REST callers (e.g. offline signing)
+/// get a clear error instead of silent undefined behavior.
 pub fn scale_f64(v: f64) -> Result<u128> {
     if !v.is_finite() {
         return Err(Error::Sign(format!("non-finite float: {v}")));
@@ -82,10 +74,9 @@ pub fn scale_f64(v: f64) -> Result<u128> {
     if v < 0.0 {
         return Err(Error::Sign(format!("negative float: {v}")));
     }
-    // Rust's default `{}` formatter on f64 emits the shortest decimal that
-    // round-trips back to the same f64 (Grisu/Ryu). `strconv.FormatFloat`
-    // with prec=-1 in Go does the same. Outputs match for typical exchange
-    // sizes / prices.
+    // Rust's `{}` formatter emits the shortest decimal that round-trips
+    // back to the same f64 (Grisu/Ryu), matching the reference
+    // implementation's behavior for typical exchange sizes and prices.
     let s = format!("{}", v);
     scale_decimal_str(&s)
 }

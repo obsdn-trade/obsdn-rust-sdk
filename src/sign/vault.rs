@@ -1,17 +1,14 @@
 //! Vault EIP-712 signers - `CreateVault`, `StakeVault`, `UnstakeVault`.
 //!
-//! Mirrors templates `create_vault.json.tmpl`, `stake_vault.json.tmpl`,
-//! `unstake_vault.json.tmpl` + their `sign_*.go` counterparts.
-//!
 //! Note the type asymmetry vs Order/Transfer/Withdraw: vault `amount` is
-//! `uint256` in the templates (not `uint128`) - accept `U256` directly so
-//! callers can hash values that overflow `u128`.
+//! `uint256` (not `uint128`). `U256` is used directly so callers can hash
+//! values that overflow `u128`.
 
 use alloy_primitives::{Address, U256};
 use alloy_sol_types::{sol, Eip712Domain, SolStruct};
 
 use crate::error::Result;
-use crate::sign::EipSigner;
+use crate::sign::Eip712Signer;
 
 sol! {
     /// Create a profit-sharing vault.
@@ -65,7 +62,7 @@ impl CreateVaultPayload {
 
 /// Sign a [`CreateVaultPayload`].
 pub fn sign_create_vault(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: CreateVaultPayload,
 ) -> Result<[u8; 65]> {
@@ -102,7 +99,7 @@ impl StakeVaultPayload {
 
 /// Sign a [`StakeVaultPayload`].
 pub fn sign_stake_vault(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: StakeVaultPayload,
 ) -> Result<[u8; 65]> {
@@ -139,7 +136,7 @@ impl UnstakeVaultPayload {
 
 /// Sign an [`UnstakeVaultPayload`].
 pub fn sign_unstake_vault(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: UnstakeVaultPayload,
 ) -> Result<[u8; 65]> {

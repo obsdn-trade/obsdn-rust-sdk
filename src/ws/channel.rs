@@ -1,8 +1,8 @@
 //! Subscription channels.
 //!
-//! Mirrors `services/pulse/channel/channel.go`. The lower-case wire names are
-//! the canonical identifiers - typed via [`ChannelName`] for routing and
-//! [`Channel`] for the user-facing API which carries the per-channel filter.
+//! The lower-case wire names are the canonical identifiers - typed via
+//! [`ChannelName`] for routing and [`Channel`] for the user-facing API
+//! which carries the per-channel filter.
 
 use serde::{Deserialize, Serialize};
 
@@ -59,9 +59,8 @@ impl ChannelName {
     }
 }
 
-/// User-facing subscription request. Carries the channel name and its filter -
-/// the SDK validates the filter shape against the channel before sending,
-/// matching `ClientRequest::ValidateSubscription` server-side.
+/// User-facing subscription request. Carries the channel name and its filter.
+/// The SDK validates the filter shape before sending.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Channel {
     /// `oracle` - `asset` (e.g. `"BTC"`) is required.
@@ -106,6 +105,55 @@ pub enum Channel {
 }
 
 impl Channel {
+    /// Subscribe to the order book for `market` (e.g. `"BTC-PERP"`).
+    pub fn book(market: impl Into<String>) -> Self {
+        Channel::Book {
+            market: market.into(),
+        }
+    }
+
+    /// Subscribe to best bid/ask for `market`.
+    pub fn ticker(market: impl Into<String>) -> Self {
+        Channel::Ticker {
+            market: market.into(),
+        }
+    }
+
+    /// Subscribe to the oracle price feed for `asset` (e.g. `"BTC"`).
+    pub fn oracle(asset: impl Into<String>) -> Self {
+        Channel::Oracle {
+            asset: asset.into(),
+        }
+    }
+
+    /// Subscribe to public trades. `None` streams every market.
+    pub fn trade(market: Option<&str>) -> Self {
+        Channel::Trade {
+            market: market.map(str::to_string),
+        }
+    }
+
+    /// Subscribe to your order updates (private). `None` streams every market.
+    pub fn order(market: Option<&str>) -> Self {
+        Channel::Order {
+            market: market.map(str::to_string),
+        }
+    }
+
+    /// Subscribe to your position updates (private). `None` streams every market.
+    pub fn position(market: Option<&str>) -> Self {
+        Channel::Position {
+            market: market.map(str::to_string),
+        }
+    }
+
+    /// Subscribe to the debug event stream. `None` streams every event type.
+    pub fn event(event: Option<&str>) -> Self {
+        Channel::Event {
+            event: event.map(str::to_string),
+        }
+    }
+
     /// Routing-side name.
     pub fn name(&self) -> ChannelName {
         match self {

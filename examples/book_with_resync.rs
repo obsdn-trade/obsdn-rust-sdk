@@ -7,24 +7,24 @@
 //! Pulse does NOT replay missed updates across a dropped connection. After
 //! the supervisor reconnects it auto-resubscribes and pulse sends a fresh
 //! `Snapshot` frame, so the local book rebuilds itself. This example also
-//! shows fetching a REST snapshot via `markets().get_order_book(...)` on
+//! shows fetching a REST snapshot via `markets().order_book(...)` on
 //! `Reconnected` as a belt-and-suspenders rebuild.
 
 use std::collections::BTreeMap;
 
 use anyhow::Result;
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{BookView, Channel, WsEvent};
+use obsdn_sdk::ws::{Book, Channel, Event};
 use obsdn_sdk::{Client, Env};
 
 #[derive(Default)]
-struct Book {
+struct LocalBook {
     bids: BTreeMap<String, String>,
     asks: BTreeMap<String, String>,
 }
 
-impl Book {
-    fn replace_with(&mut self, view: &BookView) {
+impl LocalBook {
+    fn replace_with(&mut self, view: &Book) {
         self.bids.clear();
         self.asks.clear();
         for [px, sz] in &view.bids {
@@ -34,7 +34,7 @@ impl Book {
             self.asks.insert(px.clone(), sz.clone());
         }
     }
-    fn apply_diff(&mut self, view: &BookView) {
+    fn apply_diff(&mut self, view: &Book) {
         for [px, sz] in &view.bids {
             apply_level(&mut self.bids, px, sz);
         }
@@ -67,27 +67,23 @@ async fn main() -> Result<()> {
     let market = std::env::args().nth(1).unwrap_or_else(|| "BTC-PERP".into());
     let client = Client::builder().env(Env::Production).build()?;
     let ws = client.ws();
-    let mut stream = ws
-        .subscribe(Channel::Book {
-            market: market.clone(),
-        })
-        .await?;
-    let mut book = Book::default();
+    let mut stream = ws.subscribe(Channel::book(market.clone())).await?;
+    let mut book = LocalBook::default();
 
     while let Some(evt) = stream.next().await {
         match evt {
-            WsEvent::Update(u) => {
+            Event::Update(u) => {
                 let view = u.as_book()?;
                 match u.kind {
-                    obsdn_sdk::ws::WsUpdateKind::Snapshot => book.replace_with(&view),
-                    obsdn_sdk::ws::WsUpdateKind::Update => book.apply_diff(&view),
+                    obsdn_sdk::ws::UpdateKind::Snapshot => book.replace_with(&view),
+                    obsdn_sdk::ws::UpdateKind::Update => book.apply_diff(&view),
                 }
                 let (bid, ask, nb, na) = book.summary();
                 tracing::info!(?bid, ?ask, nb, na, gsn = u.gsn, "book");
             }
-            WsEvent::Reconnected => {
+            Event::Reconnected => {
                 tracing::info!("reconnected - refetching REST snapshot");
-                let snap = client.markets().get_order_book(&market).await?;
+                let snap = client.markets().order_book(&market).await?;
                 tracing::info!(
                     levels_b = snap.book.as_ref().map(|b| b.bids.len()).unwrap_or(0),
                     levels_a = snap.book.as_ref().map(|b| b.asks.len()).unwrap_or(0),
@@ -97,7 +93,7 @@ async fn main() -> Result<()> {
                 // stream also delivers a fresh `Snapshot` frame on resub,
                 // which `replace_with` applies - either path rebuilds.
             }
-            WsEvent::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
+            Event::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
         }
     }
     Ok(())

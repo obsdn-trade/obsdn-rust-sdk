@@ -1,4 +1,4 @@
-//! Phase 2 REST smoke tests against an in-process wiremock server.
+//! REST smoke tests against an in-process wiremock server.
 //!
 //! Goals:
 //!   1. Confirm the gateway envelope (`{"data":...}`) is unwrapped.
@@ -51,7 +51,7 @@ async fn get_markets_unwraps_envelope_and_skips_auth_headers() {
         .await;
 
     let client = build_client(&server);
-    let resp = client.markets().get_markets().await.expect("get_markets");
+    let resp = client.markets().list().await.expect("list");
     assert_eq!(resp.mkts.len(), 1);
     assert_eq!(resp.mkts[0].mkt_id, "BTC-PERP");
 
@@ -173,7 +173,7 @@ async fn server_error_envelope_decodes_to_api_error() {
     let client = build_client(&server);
     let err = client
         .markets()
-        .get_markets()
+        .list()
         .await
         .expect_err("must surface server error");
     match err {

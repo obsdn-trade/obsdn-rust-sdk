@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 use crate::error::{Error, Result};
-use crate::rest::markets::MarketsApi;
+use crate::rest::markets::Markets;
 use crate::types::v1::Market;
 
 /// Default lifetime of a cached snapshot before lazy refresh.
@@ -40,7 +40,7 @@ struct Snapshot {
 /// Constructed internally by [`crate::Client`]; not part of the public
 /// surface. The user-facing entry point is `Client::resolve_market(...)`.
 pub(crate) struct MarketCache {
-    rest: MarketsApi,
+    rest: Markets,
     ttl: Duration,
     // Single mutex protects both the snapshot cell and the
     // refresh-in-progress flag - under TTL expiry we want exactly one
@@ -50,7 +50,7 @@ pub(crate) struct MarketCache {
 }
 
 impl MarketCache {
-    pub(crate) fn new(rest: MarketsApi) -> Self {
+    pub(crate) fn new(rest: Markets) -> Self {
         Self {
             rest,
             ttl: DEFAULT_TTL,
@@ -83,7 +83,7 @@ impl MarketCache {
         // Fetch under the lock - single-flight by construction. Other
         // callers block on the mutex; once we publish the snapshot they
         // see it and skip the REST call.
-        let resp = self.rest.get_markets().await?;
+        let resp = self.rest.list().await?;
         let mut by_symbol = HashMap::with_capacity(resp.mkts.len());
         for mkt in resp.mkts {
             by_symbol.insert(mkt.mkt_id.clone(), mkt);

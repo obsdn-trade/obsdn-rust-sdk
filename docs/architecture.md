@@ -14,7 +14,7 @@ full API reference; this file is the orientation, not the spec.
                        Client::builder()
                          .env(Env::Production)
                          .api_key(k, s)        ← HMAC for REST/WS auth
-                         .eip_signer(local)    ← EIP-712 for orders/transfers
+                         .eip712_signer(local)    ← EIP-712 for orders/transfers
                          .build()?
                                   │
                                   ▼
@@ -30,7 +30,7 @@ full API reference; this file is the orientation, not the spec.
   │                 REST layer (rest/)               │  │   WS managed       │
   │                                                  │  │   (ws/managed.rs)  │
   │  ┌──────────────────────────────────────────┐    │  │                    │
-  │  │ MarketsApi  OrdersApi  PortfolioApi  …   │    │  │  WsClient          │
+  │  │ Markets  Orders  Portfolio  …   │    │  │  WsClient          │
   │  └──────────────────────────────────────────┘    │  │   ├─ supervisor    │
   │                       │                          │  │   │  (reconnect+   │
   │                       ▼                          │  │   │   exp backoff) │
@@ -38,11 +38,11 @@ full API reference; this file is the orientation, not the spec.
   │  │   RestClient  (reqwest::Client, Arc)     │    │  │   ├─ GSN tracker   │
   │  │   ├─ HMAC sign (ts+method+path+body)     │    │  │   │  (gsn.rs)      │
   │  │   ├─ retry on 5xx / network              │    │  │   └─ replay subs   │
-  │  │   ├─ JSON-named proto via pbjson         │    │  │      after reconn  │
+  │  │   ├─ JSON-named wire types               │    │  │      after reconn  │
   │  │   └─ Error enum (Http/Api/Sign/Config)   │    │  │                    │
   │  └──────────────────────────────────────────┘    │  │  Channel::Book{…}  │
   │                                                  │  │  Channel::Order    │
-  │  place_easy() flow:                              │  │  Channel::Trade    │
+  │  place_limit() flow:                              │  │  Channel::Trade    │
   │   1. resolve_market(mkt_id) → MarketCache        │  │  Channel::Fill     │
   │   2. scale_f64 size/px → 18-dec fixed            │  │  Channel::Position │
   │   3. sign EIP-712 Order (sign/order.rs)          │  │  Channel::Oracle   │
@@ -70,7 +70,7 @@ full API reference; this file is the orientation, not the spec.
 
   auth.rs               HMAC-SHA256 signer for REST + WS handshake
 
-  types/v1/             prost+pbjson generated from api/proto/nil/v1/
+  types/v1/             generated wire types committed under src/types/generated/
 
   ws/views.rs           Per-frame parsers: BookView TickerView OracleView
                         TradeView OrderView. NOT running state - decode +
@@ -85,24 +85,24 @@ full API reference; this file is the orientation, not the spec.
 ```
    pulse  ──frame──▶  Connection  ──▶  GsnTracker  ──▶  SubscriptionStream
                        │                    │
-                       │                    └─ contiguous? → WsEvent::Update
-                       │                    └─ skipped?    → WsEvent::Gap{from,to}
+                       │                    └─ contiguous? → Event::Update
+                       │                    └─ skipped?    → Event::Gap{from,to}
                        │
                        ├─ disconnect      → supervisor backoff + reconnect
                        │                  → re-subscribe all subs
-                       │                  → emit WsEvent::Reconnected
+                       │                  → emit Event::Reconnected
                        │                    (next frame is fresh Snapshot)
                        │
-                       └─ 401/403         → WsEvent::Unauthorized(msg)
+                       └─ 401/403         → Event::Unauthorized(msg)
 ```
 
 ## Order placement happy path
 
 ```
-  bot.place_easy(PlaceEasy::limit("BTC-PERP", Buy, 50_000.0, 0.001))
+  bot.place_limit(LimitOrder::new("BTC-PERP", Buy, 50_000.0, 0.001))
        │
        ▼
-  OrdersApi::place_easy
+  Orders::place_limit
        │  reject if order_type ≠ Limit          (no true MARKET on server)
        │  reject if side ≠ Buy/Sell
        ▼
@@ -143,7 +143,7 @@ full API reference; this file is the orientation, not the spec.
   ├── examples/           place_order, cancel_order, ws_book,
   │                       ws_private_orders, transfer, withdraw,
   │                       book_with_resync
-  ├── scripts/            codegen-rust (proto → prost+pbjson)
+  ├── scripts/            codegen-rust (regenerates committed wire types)
   └── src/
       ├── lib.rs          re-exports Client, Env, LocalSigner
       ├── builder.rs      ClientBuilder, Client (Arc handle)
@@ -153,7 +153,7 @@ full API reference; this file is the orientation, not the spec.
       ├── rest/           orders / portfolio / markets / price /
       │                   transfers + RestClient + query helpers
       ├── sign/           EIP-712 order/transfer/withdraw + LocalSigner
-      ├── types/          generated wire types (nil.v1)
+      ├── types/          generated wire types (committed under generated/)
       └── ws/             managed.rs (top-level), connection.rs (raw),
                           channel.rs, event.rs, frame.rs, views.rs, gsn.rs
 ```

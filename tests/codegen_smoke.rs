@@ -1,16 +1,16 @@
-//! Phase 1 smoke tests: confirm the codegen output deserializes representative
-//! REST payloads via pbjson and re-serializes back to a structurally equal JSON.
+//! Codegen smoke tests: confirm the generated types deserialize representative
+//! REST payloads and re-serialize back to structurally equal JSON.
 //!
-//! The asymmetry to defend against: pbjson's `Serialize` impls intentionally
-//! omit fields holding default values (proto3 semantics). A weak round-trip
-//! test (`parse → serialize → parse → assert eq`) cannot detect a silent
-//! field drop on parse - the dropped field becomes the type default on
-//! parse-1, gets omitted on serialize, and re-parses to the same default
-//! value on parse-2. Equality holds spuriously.
+//! The asymmetry to defend against: the JSON serializer intentionally omits
+//! fields holding default values (proto3 semantics). A weak round-trip test
+//! (`parse → serialize → parse → assert eq`) cannot detect a silent field
+//! drop on parse — the dropped field becomes the type default on parse-1,
+//! gets omitted on serialize, and re-parses to the same default on parse-2.
+//! Equality holds spuriously.
 //!
 //! Defense:
 //!   1. Fixtures populate every field with a NON-DEFAULT value, so any
-//!      field still missing from the re-serialized JSON indicates a drop.
+//!      field missing from the re-serialized JSON indicates a drop.
 //!   2. We compare the raw fixture against `serialize(parse(raw))` as
 //!      canonical JSON (recursively sorted keys). All input keys must
 //!      survive the round trip.
@@ -33,8 +33,8 @@ fn load_fixture(name: &str) -> String {
 
 /// Recursively sort all object keys so two structurally-equal JSON values
 /// compare as identical regardless of key ordering. Necessary because
-/// `serde_json` preserves insertion order, but pbjson and a hand-written
-/// fixture won't agree on field declaration order.
+/// `serde_json` preserves insertion order but the serializer and a
+/// hand-written fixture won't agree on field declaration order.
 fn canonicalize(v: Value) -> Value {
     match v {
         Value::Object(map) => {
@@ -90,8 +90,8 @@ fn order_round_trips() {
     assert_round_trip::<Order>("order.json");
 }
 
-/// Confirms enum-as-string jsonpb behavior - pbjson must accept both the
-/// SCREAMING_SNAKE form ("ORDER_SIDE_BUY") and the integer form (1).
+/// Confirms enum-as-string JSON behavior: the deserializer must accept both
+/// the SCREAMING_SNAKE form ("ORDER_SIDE_BUY") and the integer form (1).
 #[test]
 fn enum_accepts_both_string_and_int() {
     let as_string = r#"{"mktId":"BTC-PERP","sd":"ORDER_SIDE_BUY","ot":"ORDER_TYPE_MARKET","sz":1.0,"px":0,"tif":"TIME_IN_FORCE_GTC","po":false,"ro":false,"stp":"SELF_TRADE_PREVENTION_CANCEL_TAKER","clOid":"x","nonce":"1","sig":""}"#;

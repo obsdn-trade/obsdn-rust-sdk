@@ -1,19 +1,17 @@
-//! API-key registration EIP-712 signers - `Register` (signed by sender)
-//! and `DelegatedSigner` (signed by signer key, proves ownership).
+//! API-key registration EIP-712 signers.
 //!
-//! These two signatures together flow through `RegisterSigner` -
-//! see `services/nova/auth_service.go` and Go SDK
-//! `pkg/exc/client.go::RegisterSigner`.
+//! `Register` is signed by the sender (main wallet); `DelegatedSigner` is
+//! signed by the new signer key to prove ownership. Both signatures are
+//! required by the `RegisterSigner` endpoint.
 
 use alloy_primitives::Address;
 use alloy_sol_types::{sol, Eip712Domain, SolStruct};
 
 use crate::error::Result;
-use crate::sign::EipSigner;
+use crate::sign::Eip712Signer;
 
 sol! {
-    /// Sender authorizes a new signer key.
-    /// Template: `register_signed_by_sender.json.tmpl` (primaryType `Register`).
+    /// Sender authorizes a new signer key. primaryType: `Register`.
     #[derive(Debug)]
     struct Register {
         address sender;
@@ -23,8 +21,7 @@ sol! {
     }
 
     /// Signer proves ownership by signing the main account address.
-    /// Template: `register_signed_by_signer.json.tmpl` (primaryType
-    /// `DelegatedSigner`).
+    /// primaryType: `DelegatedSigner`.
     #[derive(Debug)]
     struct DelegatedSigner {
         address account;
@@ -58,7 +55,7 @@ impl RegisterPayload {
 
 /// Sign a [`RegisterPayload`] (sender side).
 pub fn sign_register(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: RegisterPayload,
 ) -> Result<[u8; 65]> {
@@ -84,7 +81,7 @@ impl DelegatedSignerPayload {
 
 /// Sign a [`DelegatedSignerPayload`] (signer-key side).
 pub fn sign_delegated_signer(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: DelegatedSignerPayload,
 ) -> Result<[u8; 65]> {

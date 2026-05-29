@@ -1,4 +1,4 @@
-//! Phase 6 chaos / state-machine integration tests.
+//! WebSocket chaos / state-machine integration tests.
 //!
 //! Runs in-process against a small `MockPulse` that speaks just enough of
 //! the wire protocol to exercise reconnect, sub-replay, wildcard fan-out,
@@ -19,7 +19,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use alloy_primitives::Address;
 use alloy_sol_types::eip712_domain;
-use obsdn_sdk::ws::{Channel, ChannelName, WsEvent};
+use obsdn_sdk::ws::{Channel, ChannelName, Event};
 use obsdn_sdk::{Client, Env};
 
 /// Server-side commands the mock pulse accepts from the test driver.
@@ -198,7 +198,7 @@ where
                     // stale push doesn't deliver to an unsubscribed channel.
                     // Mirror real pulse fan-out: a concrete-filter frame is
                     // delivered to an exact (ch,fi) subscriber OR a wildcard
-                    // (ch,"") subscriber (subscription_manager.go).
+                    // (ch,"") subscriber (server-side wildcard routing).
                     if let Ok(v) = serde_json::from_str::<Value>(s) {
                         let kind = v["type"].as_str().unwrap_or("");
                         if matches!(kind, "snapshot" | "update") {
@@ -318,7 +318,7 @@ async fn subscribe_and_receive_update() {
         .await
         .expect("first event in 2s")
         .expect("stream open");
-    let WsEvent::Update(u) = evt else {
+    let Event::Update(u) = evt else {
         panic!("expected Update, got {evt:?}");
     };
     assert_eq!(u.channel, ChannelName::Book);
@@ -360,7 +360,7 @@ async fn noncontiguous_gsn_does_not_emit_gap() {
         .expect("second event")
         .expect("stream open");
     match (a, b) {
-        (WsEvent::Update(a), WsEvent::Update(b)) => {
+        (Event::Update(a), Event::Update(b)) => {
             assert_eq!(a.gsn, 1);
             assert_eq!(b.gsn, 5, "second update delivered as-is, no gap injected");
         }
@@ -410,7 +410,7 @@ async fn wildcard_sub_routes_concrete_filter_updates() {
         .expect("update routed to wildcard sub")
         .expect("stream open");
     match (snap, upd) {
-        (WsEvent::Update(s), WsEvent::Update(u)) => {
+        (Event::Update(s), Event::Update(u)) => {
             assert_eq!(s.filter, "");
             assert_eq!(
                 u.filter, "BTC-PERP",
@@ -447,7 +447,7 @@ async fn reconnect_emits_reconnected_and_resubscribes() {
         .await
         .expect("first")
         .expect("open");
-    assert!(matches!(first, WsEvent::Update(_)));
+    assert!(matches!(first, Event::Update(_)));
 
     // Server kills the conn; supervisor should reconnect within backoff
     // (~100ms-500ms) and resubscribe automatically.
@@ -486,12 +486,12 @@ async fn reconnect_emits_reconnected_and_resubscribes() {
             Err(_) => panic!("missing events: reconnected={saw_reconnected}, update={saw_update}"),
         };
         match evt {
-            WsEvent::Reconnected => saw_reconnected = true,
-            WsEvent::Update(u) => {
+            Event::Reconnected => saw_reconnected = true,
+            Event::Update(u) => {
                 assert_eq!(u.gsn, 100, "post-reconnect update gsn");
                 saw_update = true;
             }
-            WsEvent::Unauthorized(m) => panic!("unexpected unauthorized: {m}"),
+            Event::Unauthorized(m) => panic!("unexpected unauthorized: {m}"),
         }
     }
     ws.shutdown().await.expect("shutdown");
@@ -538,7 +538,7 @@ async fn auth_replay_failure_emits_unauthorized_after_reconnect() {
             Ok(None) => panic!("stream closed before Unauthorized"),
             Err(_) => panic!("did not see Unauthorized within 5s"),
         };
-        if let WsEvent::Unauthorized(msg) = evt {
+        if let Event::Unauthorized(msg) = evt {
             assert!(
                 msg.contains("revoked"),
                 "msg should mention server reason: {msg}"
@@ -619,7 +619,7 @@ async fn dropped_subscribe_future_does_not_pin_channel() {
         .await
         .expect("event")
         .expect("open");
-    assert!(matches!(evt, WsEvent::Update(_)));
+    assert!(matches!(evt, Event::Update(_)));
     ws.shutdown().await.expect("shutdown");
 }
 
@@ -661,7 +661,7 @@ async fn closed_signal_race_immediate_kill_after_welcome() {
         let Ok(Some(evt)) = timeout(remaining, stream.next()).await else {
             break;
         };
-        if matches!(evt, WsEvent::Reconnected) {
+        if matches!(evt, Event::Reconnected) {
             saw_reconnected = true;
         }
     }
@@ -707,7 +707,7 @@ async fn disconnected_authenticate_blocks_until_replay() {
     // supervisor can't deadlock the test.
     let _ = timeout(Duration::from_secs(2), async {
         while let Some(e) = stream.next().await {
-            if matches!(e, WsEvent::Reconnected) {
+            if matches!(e, Event::Reconnected) {
                 break;
             }
         }
@@ -768,7 +768,7 @@ async fn slow_consumer_does_not_deadlock_supervisor() {
         .await
         .expect("ticker event")
         .expect("open");
-    assert!(matches!(evt, WsEvent::Update(_)));
+    assert!(matches!(evt, Event::Update(_)));
     ws.shutdown().await.expect("shutdown");
 }
 
@@ -823,7 +823,7 @@ async fn drop_subscription_then_resubscribe_works() {
         .await
         .expect("data")
         .expect("open");
-    assert!(matches!(evt, WsEvent::Update(_)));
+    assert!(matches!(evt, Event::Update(_)));
     ws.shutdown().await.expect("shutdown");
 }
 
@@ -854,7 +854,7 @@ async fn first_subscribe_after_reconnect_does_not_see_reconnected() {
     // Drain Reconnected from existing.
     let _ = timeout(Duration::from_secs(2), async {
         while let Some(e) = existing.next().await {
-            if matches!(e, WsEvent::Reconnected) {
+            if matches!(e, Event::Reconnected) {
                 break;
             }
         }
@@ -882,7 +882,7 @@ async fn first_subscribe_after_reconnect_does_not_see_reconnected() {
     // Caller's first event MUST be data, not Reconnected - we never
     // experienced a disconnect from this sub's POV.
     assert!(
-        matches!(first, WsEvent::Update(_)),
+        matches!(first, Event::Update(_)),
         "expected data first, got {first:?}"
     );
     ws.shutdown().await.expect("shutdown");
@@ -958,7 +958,7 @@ async fn mid_replay_conn_death_preserves_subs() {
     })
     .await;
     // Drain each stream until we see Update - Reconnected may interleave.
-    async fn await_update<S: futures_util::Stream<Item = WsEvent> + Unpin>(s: &mut S) {
+    async fn await_update<S: futures_util::Stream<Item = Event> + Unpin>(s: &mut S) {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         loop {
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
@@ -967,7 +967,7 @@ async fn mid_replay_conn_death_preserves_subs() {
                 Ok(None) => panic!("stream ended unexpectedly - sub got dropped from registry"),
                 Err(_) => panic!("no Update within deadline - sub silently lost"),
             };
-            if matches!(evt, WsEvent::Update(_)) {
+            if matches!(evt, Event::Update(_)) {
                 return;
             }
         }

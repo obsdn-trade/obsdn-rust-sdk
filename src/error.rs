@@ -1,7 +1,7 @@
 //! SDK error types.
 //!
 //! `Error` is the top-level result type. `Api` wraps the JSON envelope the
-//! grpc-gateway emits on non-2xx (`pkg/gateway/response.go::ErrorResponse`):
+//! grpc-gateway emits on non-2xx:
 //! `{"error":{"code":"...","message":"..."},"request_id":"..."}` - `code`
 //! is the gRPC status string (e.g., `"InvalidArgument"`, `"Unauthenticated"`).
 
@@ -34,7 +34,7 @@ pub enum Error {
     /// Surface the raw body so callers can debug new shapes without us
     /// guessing.
     #[error("api error {status}: unparseable body: {body}")]
-    UnparseableError {
+    UnparsedBody {
         /// HTTP status code.
         status: u16,
         /// Raw response body, truncated by the caller if huge.
@@ -45,7 +45,7 @@ pub enum Error {
     #[error("auth error: {0}")]
     Auth(String),
 
-    /// EIP-712 signing failure (Phase 4+).
+    /// EIP-712 signing failure.
     #[error("sign error: {0}")]
     Sign(String),
 
@@ -58,15 +58,14 @@ pub enum Error {
     Config(String),
 
     /// WebSocket-specific failure (handshake, oversize frame, server error
-    /// response, lost connection, ...). The thin client surfaces server
-    /// `error` frames via this variant - the message is the server's raw
-    /// `message` field.
+    /// response, lost connection, ...). Server `error` frames surface via
+    /// this variant; the message is the server's raw `message` field.
     #[error("websocket error: {0}")]
     Ws(String),
 }
 
-/// JSON shape used by `pkg/gateway/response.go::ErrorResponse`. Internal
-/// helper - surfaced through `Error::Api`.
+/// JSON shape of the grpc-gateway error envelope. Internal helper - surfaced
+/// through `Error::Api`.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct WireError {
     pub error: WireErrorDetail,

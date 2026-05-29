@@ -1,11 +1,10 @@
-//! Portfolio REST surface - `PortfolioService` in
-//! `api/proto/nil/v1/portfolio.proto`.
+//! Portfolio REST surface (`/portfolio/...`, `/positions/...`, `/funding/...`).
 
 use std::sync::Arc;
 
 use crate::error::Result;
 use crate::rest::query::percent_encode_segment;
-use crate::rest::{Auth, RestClient};
+use crate::rest::{AuthMode, RestClient};
 use crate::types::v1::{
     GetFundingPaymentsRequest, GetFundingPaymentsResponse, GetPnLHistoryRequest,
     GetPnLHistoryResponse, GetPortfolioHistoryRequest, GetPortfolioHistoryResponse,
@@ -17,11 +16,11 @@ use crate::types::v1::{
 
 /// Cheap handle to portfolio endpoints.
 #[derive(Debug, Clone)]
-pub struct PortfolioApi {
+pub struct Portfolio {
     rest: Arc<RestClient>,
 }
 
-impl PortfolioApi {
+impl Portfolio {
     pub(crate) fn new(rest: Arc<RestClient>) -> Self {
         Self { rest }
     }
@@ -30,51 +29,48 @@ impl PortfolioApi {
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, req: GetPortfolioRequest) -> Result<GetPortfolioResponse> {
         self.rest
-            .get_with_query("/portfolio", &req, Auth::Required)
+            .get_with_query("/portfolio", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /positions/history` - historical position changes.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_position_history(
+    pub async fn position_history(
         &self,
         req: GetPositionHistoryRequest,
     ) -> Result<GetPositionHistoryResponse> {
         self.rest
-            .get_with_query("/positions/history", &req, Auth::Required)
+            .get_with_query("/positions/history", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /funding/payments` - funding payments paid/received.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_funding_payments(
+    pub async fn funding_payments(
         &self,
         req: GetFundingPaymentsRequest,
     ) -> Result<GetFundingPaymentsResponse> {
         self.rest
-            .get_with_query("/funding/payments", &req, Auth::Required)
+            .get_with_query("/funding/payments", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /portfolio/history` - historical portfolio snapshots.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_history(
+    pub async fn history(
         &self,
         req: GetPortfolioHistoryRequest,
     ) -> Result<GetPortfolioHistoryResponse> {
         self.rest
-            .get_with_query("/portfolio/history", &req, Auth::Required)
+            .get_with_query("/portfolio/history", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /portfolio/pnl-history` - historical PnL.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_pnl_history(
-        &self,
-        req: GetPnLHistoryRequest,
-    ) -> Result<GetPnLHistoryResponse> {
+    pub async fn pnl_history(&self, req: GetPnLHistoryRequest) -> Result<GetPnLHistoryResponse> {
         self.rest
-            .get_with_query("/portfolio/pnl-history", &req, Auth::Required)
+            .get_with_query("/portfolio/pnl-history", &req, AuthMode::Required)
             .await
     }
 
@@ -83,18 +79,18 @@ impl PortfolioApi {
     #[doc(hidden)]
     pub async fn preview_order(&self, req: PlaceOrderRequest) -> Result<GetPortfolioResponse> {
         self.rest
-            .post("/portfolio/preview", &req, Auth::Required)
+            .post("/portfolio/preview", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /portfolio/trading-calendar` - market trading hours.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_trading_calendar(
+    pub async fn trading_calendar(
         &self,
         req: GetTradingCalendarRequest,
     ) -> Result<GetTradingCalendarResponse> {
         self.rest
-            .get_with_query("/portfolio/trading-calendar", &req, Auth::Required)
+            .get_with_query("/portfolio/trading-calendar", &req, AuthMode::Required)
             .await
     }
 
@@ -105,7 +101,7 @@ impl PortfolioApi {
             "/positions/{}/leverage",
             percent_encode_segment(&req.mkt_id)
         );
-        self.rest.post(&path, &req, Auth::Required).await
+        self.rest.post(&path, &req, AuthMode::Required).await
     }
 
     /// `POST /positions/{mkt_id}/margin-mode` - switch cross/isolated margin.
@@ -118,7 +114,7 @@ impl PortfolioApi {
             "/positions/{}/margin-mode",
             percent_encode_segment(&req.mkt_id)
         );
-        self.rest.post(&path, &req, Auth::Required).await
+        self.rest.post(&path, &req, AuthMode::Required).await
     }
 
     /// `POST /positions/{mkt_id}/margin` - add/remove margin on an isolated position.
@@ -128,6 +124,6 @@ impl PortfolioApi {
         req: TransferMarginRequest,
     ) -> Result<TransferMarginResponse> {
         let path = format!("/positions/{}/margin", percent_encode_segment(&req.mkt_id));
-        self.rest.post(&path, &req, Auth::Required).await
+        self.rest.post(&path, &req, AuthMode::Required).await
     }
 }

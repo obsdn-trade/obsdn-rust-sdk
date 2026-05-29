@@ -1,16 +1,15 @@
-//! `Transfer` EIP-712 signer - mirrors
-//! `pkg/ethsig/template/transfer.json.tmpl` + `sign_transfer.go`.
+//! `Transfer` EIP-712 signer.
 
 use alloy_primitives::Address;
 use alloy_sol_types::{sol, Eip712Domain, SolStruct};
 
 use crate::error::Result;
-use crate::sign::EipSigner;
+use crate::sign::Eip712Signer;
 
 sol! {
-    /// Spot/sub-account transfer between two addresses on the same chain.
-    /// `amount` is `uint128` (matches Go template), with the same 18-decimal
-    /// scaling convention as Order.size - see [`crate::sign::scale_decimal_str`].
+    /// Spot/sub-account transfer between two addresses.
+    /// `amount` is `uint128` with the same 18-decimal scaling as `Order.size`;
+    /// see [`crate::sign::scale_decimal_str`].
     #[derive(Debug)]
     struct Transfer {
         address from;
@@ -51,7 +50,7 @@ impl TransferPayload {
 /// Sign a [`TransferPayload`] under the given domain. Returns the 65-byte
 /// `r || s || v` signature with `v ∈ {27, 28}`.
 pub fn sign_transfer(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: TransferPayload,
 ) -> Result<[u8; 65]> {

@@ -16,7 +16,7 @@
 //!     .api_key("my-api-key", "my-api-secret")
 //!     .build()?;
 //!
-//! let markets = client.markets().get_markets().await?;
+//! let markets = client.markets().list().await?;
 //! println!("{} markets", markets.mkts.len());
 //! # Ok(()) }
 //! ```
@@ -26,7 +26,7 @@
 //! ```no_run
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! use std::sync::Arc;
-//! use obsdn_sdk::rest::orders::PlaceEasy;
+//! use obsdn_sdk::rest::orders::LimitOrder;
 //! use obsdn_sdk::types::v1::OrderSide;
 //! use obsdn_sdk::{Client, Env, LocalSigner};
 //!
@@ -34,12 +34,12 @@
 //! let client = Client::builder()
 //!     .env(Env::Production)
 //!     .api_key("key", "secret")
-//!     .eip_signer(signer)
+//!     .eip712_signer(signer)
 //!     .build()?;
 //!
 //! let resp = client
 //!     .orders()
-//!     .place_easy(PlaceEasy::limit("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
+//!     .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
 //!     .await?;
 //! # Ok(()) }
 //! ```
@@ -49,7 +49,7 @@
 //! ```no_run
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! use futures_util::StreamExt;
-//! use obsdn_sdk::ws::{Channel, WsEvent};
+//! use obsdn_sdk::ws::{Channel, Event};
 //! use obsdn_sdk::{Client, Env};
 //!
 //! let client = Client::builder().env(Env::Production).build()?;
@@ -58,7 +58,7 @@
 //!     .subscribe(Channel::Book { market: "BTC-PERP".into() })
 //!     .await?;
 //! while let Some(evt) = stream.next().await {
-//!     if let WsEvent::Update(u) = evt {
+//!     if let Event::Update(u) = evt {
 //!         let book = u.as_book()?;
 //!         println!("{} bids / {} asks", book.bids.len(), book.asks.len());
 //!     }
@@ -73,7 +73,7 @@
 #![warn(rust_2018_idioms)]
 #![warn(missing_docs)]
 
-pub mod auth;
+pub(crate) mod auth;
 pub mod builder;
 pub mod env;
 pub mod error;
@@ -86,4 +86,9 @@ pub mod ws;
 pub use builder::{Client, ClientBuilder};
 pub use env::Env;
 pub use error::{Error, Result};
-pub use sign::{EipSigner, LocalSigner};
+pub use sign::{Eip712Signer, LocalSigner};
+/// Order side. The full [`OrderSide`] name and the short `Side` alias are
+/// both re-exported; use whichever reads best at the call site (`Side::Buy` /
+/// `Side::Sell`).
+pub use types::v1::OrderSide;
+pub use types::v1::OrderSide as Side;

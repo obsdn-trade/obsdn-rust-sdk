@@ -38,9 +38,8 @@ pub fn apply_auth(
         .header(HEADER_API_TIMESTAMP, timestamp)
 }
 
-/// Unix-epoch seconds as a decimal string. Matches Go's
-/// `strconv.FormatInt(time.Now().Unix(), 10)` semantics. Pre-epoch clocks
-/// (which can't reach our servers anyway) emit `"0"` rather than panic.
+/// Unix-epoch seconds as a decimal string. Pre-epoch clocks emit `"0"`
+/// rather than panic.
 fn current_unix_seconds() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

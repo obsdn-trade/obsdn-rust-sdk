@@ -1,10 +1,10 @@
 //! REST client core. One [`RestClient`] is shared (Arc) across all
-//! per-service handles (`OrdersApi`, `MarketsApi`, ...).
+//! per-service handles (`Orders`, `Markets`, ...).
 
 pub mod account;
 pub mod asset;
-pub mod auth_api;
-pub mod auth_layer;
+pub mod auth;
+pub(crate) mod auth_layer;
 pub mod chain;
 pub mod general;
 pub mod markets;
@@ -30,15 +30,15 @@ use crate::error::{Error, Result, WireError};
 
 /// Default User-Agent. Including the crate version makes server-side
 /// debugging easier when SDK consumers report problems.
-const DEFAULT_USER_AGENT: &str = concat!("obsdn-sdk-rust/", env!("CARGO_PKG_VERSION"));
+const DEFAULT_USER_AGENT: &str = concat!("obsdn-sdk/", env!("CARGO_PKG_VERSION"));
 
-/// Auth requirement marker for the internal request path. `Required` adds
+/// AuthMode requirement marker for the internal request path. `Required` adds
 /// the HMAC headers and errors with [`crate::Error::Auth`] when no signer
 /// is configured. `Optional` adds them when a signer is configured. `None`
 /// never adds them, even with a signer (used for public endpoints like
 /// `GetMarkets`).
 #[derive(Debug, Clone, Copy)]
-pub enum Auth {
+pub(crate) enum AuthMode {
     /// Authenticated endpoint - fail with `Error::Auth` if no signer.
     Required,
     /// Add headers if a signer is present, otherwise pass through.
@@ -47,10 +47,7 @@ pub enum Auth {
     None,
 }
 
-/// Successful gateway responses are wrapped in
-/// `{"data": ..., "request_id": "..."}` per
-/// `pkg/gateway/response.go::forwardResponseWrapper`. We unwrap to `T`
-/// before returning.
+/// Successful responses are wrapped in `{"data": ..., "request_id": ...}`; we unwrap to `T`.
 #[derive(serde::Deserialize)]
 struct DataEnvelope<T> {
     data: T,
@@ -100,7 +97,7 @@ impl RestClient {
         method: Method,
         path: &str,
         body: Option<&TReq>,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<TResp>
     where
         TReq: Serialize + ?Sized,
@@ -118,7 +115,7 @@ impl RestClient {
     }
 
     /// GET helper. Body is always empty.
-    pub(crate) async fn get<TResp>(self: &Arc<Self>, path: &str, auth: Auth) -> Result<TResp>
+    pub(crate) async fn get<TResp>(self: &Arc<Self>, path: &str, auth: AuthMode) -> Result<TResp>
     where
         TResp: DeserializeOwned,
     {
@@ -133,7 +130,7 @@ impl RestClient {
         self: &Arc<Self>,
         path: &str,
         req: &TReq,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<TResp>
     where
         TReq: Serialize,
@@ -149,7 +146,7 @@ impl RestClient {
         self: &Arc<Self>,
         path: &str,
         req: &TReq,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<TResp>
     where
         TReq: Serialize + ?Sized,
@@ -163,7 +160,7 @@ impl RestClient {
         self: &Arc<Self>,
         path: &str,
         req: &TReq,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<TResp>
     where
         TReq: Serialize + ?Sized,
@@ -173,7 +170,7 @@ impl RestClient {
     }
 
     /// DELETE without body.
-    pub(crate) async fn delete<TResp>(self: &Arc<Self>, path: &str, auth: Auth) -> Result<TResp>
+    pub(crate) async fn delete<TResp>(self: &Arc<Self>, path: &str, auth: AuthMode) -> Result<TResp>
     where
         TResp: DeserializeOwned,
     {
@@ -181,13 +178,13 @@ impl RestClient {
             .await
     }
 
-    /// DELETE with the request struct serialized as a query string. Used
-    /// by `CancelAllOrders` (no `body: "*"` annotation).
+    /// DELETE with the request struct serialized as a query string (filters
+    /// passed as query params rather than a body).
     pub(crate) async fn delete_with_query<TReq, TResp>(
         self: &Arc<Self>,
         path: &str,
         req: &TReq,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<TResp>
     where
         TReq: Serialize,
@@ -206,19 +203,16 @@ impl RestClient {
         path: &str,
         body: Bytes,
         has_body: bool,
-        auth: Auth,
+        auth: AuthMode,
     ) -> Result<Bytes> {
-        // Direct concatenation mirrors `pkg/exc/client.go` (`baseURL + path`)
-        // - `Url::join` resolves relative refs (it would drop the last
-        // segment when joining `"orders"` onto a base without a trailing
-        // slash), which is the wrong semantics for our flat REST surface.
+        // Direct base-URL + path concatenation (`Url::join` would drop the last
+        // path segment when joining onto a base without a trailing slash).
         // Caller passes a full path with leading slash (e.g., `"/orders"`).
         let raw_url = format!("{}{}", self.base.as_str().trim_end_matches('/'), path);
         let url = Url::parse(&raw_url)
             .map_err(|e| Error::Config(format!("invalid url {raw_url}: {e}")))?;
 
-        // Path used for HMAC signing must be the URL path component ONLY,
-        // matching the gateway's `r.URL.Path` (no query, no host).
+        // HMAC signing covers the URL path only (no query, no host).
         // `Url::path` returns the percent-encoded path the server will see.
         let sign_path = url.path().to_string();
 
@@ -230,7 +224,7 @@ impl RestClient {
         }
 
         builder = match auth {
-            Auth::Required => match self.signer.as_ref() {
+            AuthMode::Required => match self.signer.as_ref() {
                 Some(s) => {
                     auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())
                 }
@@ -240,13 +234,13 @@ impl RestClient {
                     ))
                 }
             },
-            Auth::Optional => match self.signer.as_ref() {
+            AuthMode::Optional => match self.signer.as_ref() {
                 Some(s) => {
                     auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())
                 }
                 None => builder,
             },
-            Auth::None => builder,
+            AuthMode::None => builder,
         };
 
         let resp = builder.send().await?;
@@ -259,9 +253,8 @@ impl RestClient {
     }
 }
 
-/// Decode a non-2xx body. Server returns `ErrorResponse`
-/// (`pkg/gateway/response.go`); fall back to raw text if parsing fails so
-/// we don't swallow new shapes.
+/// Decode a non-2xx body into [`Error`]. Falls back to raw text if the
+/// structured error shape can't be parsed.
 fn decode_error(status: StatusCode, body: Bytes) -> Error {
     if let Ok(parsed) = serde_json::from_slice::<WireError>(&body) {
         return Error::Api {
@@ -271,8 +264,20 @@ fn decode_error(status: StatusCode, body: Bytes) -> Error {
             request_id: parsed.request_id,
         };
     }
-    Error::UnparseableError {
+    Error::UnparsedBody {
         status: status.as_u16(),
         body: String::from_utf8_lossy(&body).into_owned(),
     }
+}
+
+/// Wall-clock nanoseconds since the Unix epoch. Default EIP-712 nonce used by
+/// the one-call signing helpers (`Orders::place_limit`, `Account::transfer` /
+/// `withdraw`).
+pub(crate) fn now_unix_nanos() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        // Pre-1970 clocks are a bigger problem than nonce uniqueness.
+        .unwrap_or(0)
 }

@@ -6,10 +6,8 @@
 //! prehash = "{api_key},{timestamp}"
 //! ```
 //!
-//! (`services/pulse/channel/auth_handler.go::Handle` ~ `params.Key + "," +
-//! params.Timestamp`). Compare with REST's
-//! `timestamp || METHOD || path || body`. We share the underlying HMAC-SHA256
-//! routine but build the payload here.
+//! Compare with REST's `timestamp || METHOD || path || body`. We share the
+//! underlying HMAC-SHA256 routine but build the payload here.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -65,7 +63,7 @@ mod tests {
         let signer = HmacSigner::new("K", "SECRET");
         let (ts, sig) = build_ws_auth(&signer, 1_700_000_000);
         assert_eq!(ts, "1700000000");
-        // Recomputed from the Go-doc example, byte-equal across HMAC libs.
+        // Byte-equal across HMAC implementations.
         let expected = sign_ws_prehash(b"SECRET", "K,1700000000");
         assert_eq!(sig, expected);
     }
