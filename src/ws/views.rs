@@ -369,16 +369,19 @@ impl WsUpdate {
                 self.channel
             ))));
         }
+        // Borrow-deserialize from `&Value` (which implements `Deserializer`)
+        // instead of `from_value(self.data.clone())` — avoids cloning the
+        // whole JSON tree, which matters for large position snapshots.
         match &self.data {
             // Snapshot: array of positions.
             serde_json::Value::Array(_) => {
-                serde_json::from_value(self.data.clone()).map_err(Error::from)
+                Vec::<PositionView>::deserialize(&self.data).map_err(Error::from)
             }
             // Defensive: empty/absent payload → no positions.
             serde_json::Value::Null => Ok(Vec::new()),
             // Update: a single position object.
             _ => {
-                let one: PositionView = serde_json::from_value(self.data.clone())?;
+                let one = PositionView::deserialize(&self.data).map_err(Error::from)?;
                 Ok(vec![one])
             }
         }
