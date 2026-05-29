@@ -1,22 +1,20 @@
-//! Comprehensive staging read-path integration tests.
+//! Public (no-auth) staging read-path smoke tests.
 //!
-//! Exercises every public (no-auth) read endpoint plus the authenticated
-//! read endpoints against live staging (`nova.staging.obsdn.trade`). These
-//! tests never mutate state — the order lifecycle / write + WS flow lives in
-//! `e2e_staging.rs`, and additional WS coverage in `staging_ws.rs`.
+//! Exercises every public read endpoint against live staging
+//! (`nova.staging.obsdn.trade`). These tests never mutate state and never
+//! authenticate — the authenticated read/write order lifecycle lives in
+//! `e2e_staging.rs` (which registers a fresh key per run), and additional WS
+//! coverage in `staging_ws.rs`.
 //!
 //! Run: `OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture`
 //!
-//! Authenticated tests use `OBSDN_API_KEY` / `OBSDN_API_SECRET` when set,
-//! otherwise fall back to a shared staging read key. All tests are skipped
-//! unless `OBSDN_STAGING=1` so the suite compiles (and no-ops) in CI.
+//! All tests are skipped unless `OBSDN_STAGING=1` so the suite compiles (and
+//! no-ops) in CI without network access.
 
 use obsdn_sdk::types::v1::{
-    GetAccountRequest, GetAssetsRequest, GetChainConfigRequest, GetClientInfoRequest,
-    GetErrorCodesRequest, GetFeeTiersRequest, GetFundingRateHistoryRequest,
-    GetMarketCandlesRequest, GetMarketTradesRequest, GetPortfolioRequest, GetPricesRequest,
-    GetTransferHistoryRequest, GetWithdrawalRequestsRequest, ListOpenOrdersRequest,
-    ListOrderHistoryRequest,
+    GetAssetsRequest, GetChainConfigRequest, GetClientInfoRequest, GetErrorCodesRequest,
+    GetFeeTiersRequest, GetFundingRateHistoryRequest, GetMarketCandlesRequest,
+    GetMarketTradesRequest, GetPricesRequest,
 };
 use obsdn_sdk::{sign, Client, Env};
 
@@ -33,23 +31,8 @@ fn skip_unless_staging() -> bool {
 fn unauthed() -> Client {
     Client::builder()
         .env(Env::Staging)
-        .danger_accept_invalid_certs(true)
         .build()
         .expect("build staging client")
-}
-
-fn authed() -> Client {
-    let key = std::env::var("OBSDN_API_KEY")
-        .unwrap_or_else(|_| "0ede9a77f5651c4c6c2acd76b20078bc".to_string());
-    let secret = std::env::var("OBSDN_API_SECRET").unwrap_or_else(|_| {
-        "4b29e2587ee4b4cd89e78904f72d06ed644bca2f5c437643326c911912a3a958".to_string()
-    });
-    Client::builder()
-        .env(Env::Staging)
-        .api_key(key, secret)
-        .danger_accept_invalid_certs(true)
-        .build()
-        .expect("build staging authed client")
 }
 
 // ---------------------------------------------------------------------------
@@ -274,99 +257,4 @@ async fn staging_get_funding_rate_history() {
         .await
         .expect("get_funding_rate_history");
     eprintln!("OK: {} funding-rate items", resp.items.len());
-}
-
-// ---------------------------------------------------------------------------
-// Authenticated read endpoints
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-async fn staging_get_account() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .account()
-        .get(GetAccountRequest::default())
-        .await
-        .expect("get_account");
-    assert!(!resp.addr.is_empty(), "account addr present");
-    eprintln!(
-        "OK: account {} vaults={} subs={}",
-        resp.addr,
-        resp.vlts.len(),
-        resp.subs.len()
-    );
-}
-
-#[tokio::test]
-async fn staging_get_portfolio() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .portfolio()
-        .get(GetPortfolioRequest::default())
-        .await
-        .expect("get_portfolio");
-    if let Some(ft) = &resp.fee_tier {
-        eprintln!(
-            "OK: portfolio fee_tier={} vol30d={}",
-            ft.tier_nm, ft.vol_30d
-        );
-    } else {
-        eprintln!("OK: portfolio received");
-    }
-}
-
-#[tokio::test]
-async fn staging_list_open_orders() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .orders()
-        .list_open(ListOpenOrdersRequest::default())
-        .await
-        .expect("list_open_orders");
-    eprintln!("OK: {} open orders", resp.ords.len());
-}
-
-#[tokio::test]
-async fn staging_list_order_history() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .orders()
-        .list_history(ListOrderHistoryRequest::default())
-        .await
-        .expect("list_order_history");
-    eprintln!("OK: {} historical orders", resp.ords.len());
-}
-
-#[tokio::test]
-async fn staging_get_transfer_history() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .account()
-        .get_transfer_history(GetTransferHistoryRequest::default())
-        .await
-        .expect("get_transfer_history");
-    eprintln!("OK: transfer history received ({} items)", resp.items.len());
-}
-
-#[tokio::test]
-async fn staging_get_withdrawal_requests() {
-    if skip_unless_staging() {
-        return;
-    }
-    let resp = authed()
-        .account()
-        .get_withdrawal_requests(GetWithdrawalRequestsRequest::default())
-        .await
-        .expect("get_withdrawal_requests");
-    eprintln!("OK: {} withdrawal requests", resp.items.len());
 }

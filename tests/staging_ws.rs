@@ -1,10 +1,10 @@
 //! Additional staging WebSocket coverage against the live `pulse` service.
 //!
 //! Complements `e2e_staging.rs` (which covers the public book channel and the
-//! authenticated wildcard order flow) with: the ticker and oracle channels,
-//! a public all-markets (wildcard) trade check, and a position-channel
-//! snapshot decode. The single-object position *update* shape is covered
-//! deterministically by `views::tests::position_update_single_object_decodes`.
+//! authenticated wildcard order flow) with the ticker and oracle channels and
+//! a public all-markets (wildcard) trade check. Position decode (both the
+//! snapshot array and single-object update shapes) is covered deterministically
+//! by `views::tests::position_update_single_object_decodes`.
 //!
 //! Run: `OBSDN_STAGING=1 cargo test --test staging_ws -- --nocapture --test-threads=1`
 //!
@@ -29,23 +29,8 @@ fn skip_unless_staging() -> bool {
 fn unauthed() -> Client {
     Client::builder()
         .env(Env::Staging)
-        .danger_accept_invalid_certs(true)
         .build()
         .expect("build staging client")
-}
-
-fn authed() -> Client {
-    let key = std::env::var("OBSDN_API_KEY")
-        .unwrap_or_else(|_| "0ede9a77f5651c4c6c2acd76b20078bc".to_string());
-    let secret = std::env::var("OBSDN_API_SECRET").unwrap_or_else(|_| {
-        "4b29e2587ee4b4cd89e78904f72d06ed644bca2f5c437643326c911912a3a958".to_string()
-    });
-    Client::builder()
-        .env(Env::Staging)
-        .api_key(key, secret)
-        .danger_accept_invalid_certs(true)
-        .build()
-        .expect("build staging authed client")
 }
 
 /// Read events until the first data frame (snapshot or update) arrives or we
@@ -126,32 +111,6 @@ async fn staging_ws_wildcard_trade_routes() {
             eprintln!("OK: wildcard trade routed live: {} px={}", u.filter, t.px);
         }
         None => eprintln!("NOTE: no trade activity in 20s window; wildcard routing not exercised"),
-    }
-    ws.shutdown().await.expect("shutdown");
-}
-
-/// Position-channel snapshot must decode via `as_positions()` (array shape).
-#[tokio::test]
-async fn staging_ws_position_snapshot_decodes() {
-    if skip_unless_staging() {
-        return;
-    }
-    let client = authed();
-    let ws = client.ws();
-    ws.authenticate().await.expect("ws authenticate");
-    let mut s = ws
-        .subscribe(Channel::Position { market: None })
-        .await
-        .expect("subscribe all-markets position");
-    match first_data(&mut s, 15).await {
-        Some(u) => {
-            let positions = u.as_positions().expect("position snapshot decodes");
-            eprintln!(
-                "OK: position snapshot decoded ({} positions)",
-                positions.len()
-            );
-        }
-        None => eprintln!("NOTE: no position snapshot in 15s window (account may have none)"),
     }
     ws.shutdown().await.expect("shutdown");
 }
