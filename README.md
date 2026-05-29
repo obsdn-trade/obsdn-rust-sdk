@@ -6,8 +6,6 @@
 
 Async Rust client for the [OBSDN](https://obsdn.trade) perpetual exchange - REST, EIP-712 order signing, and a managed WebSocket feed in one crate.
 
-The client is built on `tokio`, `reqwest`, and `tokio-tungstenite` with `rustls` (no OpenSSL). Wire types are committed to the repository, so `cargo build` needs no external code-generation tooling.
-
 ## Contents
 
 - [Features](#features)
@@ -188,7 +186,7 @@ cargo doc --no-deps
 
 The Makefile mirrors CI: `make style`, `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
 
-`cargo build` requires no external code-generation tooling — wire types are committed under `src/types/generated/`.
+`cargo build` requires no external code-generation tooling. Wire types are committed under `src/types/generated/`.
 
 The offline `cargo test` suite covers unit tests, EIP-712 golden fixtures, the WebSocket chaos suite (in-process mock for reconnect, sub-replay, wildcard routing, and sparse GSN), and wiremock REST smoke. The live integration tests below are gated on environment variables and skip when those are unset, so the offline suite stays green in credential-less CI.
 

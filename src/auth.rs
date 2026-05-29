@@ -6,7 +6,7 @@
 //! ```
 //!
 //! `timestamp` is Unix seconds as a decimal string. `path` is the URL path
-//! only — query string excluded. `body` is the raw request body, or empty
+//! only (query string excluded). `body` is the raw request body, or empty
 //! for GET/DELETE requests without a body.
 
 use base64::Engine;

@@ -1,7 +1,7 @@
 //! Compile-time contract for the public API names.
 //!
 //! If any public rename regresses, this file fails to compile. Most of it is
-//! never executed — compiling is the assertion.
+//! never executed; compiling is the assertion.
 #![allow(dead_code, unused_imports)]
 
 use std::sync::Arc;

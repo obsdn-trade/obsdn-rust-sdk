@@ -4,7 +4,7 @@
 //! The asymmetry to defend against: the JSON serializer intentionally omits
 //! fields holding default values (proto3 semantics). A weak round-trip test
 //! (`parse → serialize → parse → assert eq`) cannot detect a silent field
-//! drop on parse — the dropped field becomes the type default on parse-1,
+//! drop on parse: the dropped field becomes the type default on parse-1,
 //! gets omitted on serialize, and re-parses to the same default on parse-2.
 //! Equality holds spuriously.
 //!

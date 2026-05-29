@@ -1,7 +1,7 @@
 //! `Order` EIP-712 signer.
 //!
 //! Matches the exchange's reference `Order` signer byte-for-byte.
-//! Field order is canonical — any change silently breaks matching-engine
+//! Field order is canonical; any change silently breaks matching-engine
 //! verification. Golden test `tests/eip712_golden.rs::order_hash_matches_go`
 //! is the gate.
 

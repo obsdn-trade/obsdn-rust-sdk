@@ -19,7 +19,7 @@ use crate::error::{Error, Result};
 /// truncated (`"1.123456789012345678999"`).
 ///
 /// Rejects leading signs, exponent notation, embedded whitespace, and
-/// multiple dots. NaN/Inf cannot appear here — the REST layer rejects them
+/// multiple dots. NaN/Inf cannot appear here; the REST layer rejects them
 /// before they reach signing.
 pub fn scale_decimal_str(s: &str) -> Result<u128> {
     if s.is_empty() {
@@ -44,7 +44,7 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
         return Err(Error::Sign(format!("non-digit in decimal: {s}")));
     }
 
-    // Pad/truncate fractional part to exactly 18 digits — scale by 10^18,
+    // Pad/truncate fractional part to exactly 18 digits: scale by 10^18,
     // truncate toward zero.
     let mut padded = String::with_capacity(int_part.len() + 18);
     padded.push_str(if int_part.is_empty() { "0" } else { int_part });

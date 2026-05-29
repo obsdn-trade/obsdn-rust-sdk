@@ -1,4 +1,4 @@
-//! Golden hash tests — Rust-side EIP-712 signing must produce byte-equal
+//! Golden hash tests: Rust-side EIP-712 signing must produce byte-equal
 //! struct hashes, digests, and signatures against the exchange's reference signer.
 //!
 //! Fixtures under `tests/fixtures/eip712/*.json` are captured from the

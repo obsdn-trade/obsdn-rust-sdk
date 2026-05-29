@@ -48,7 +48,7 @@ async-trait = "0.1"
 zeroize = { version = "1", features = ["derive"] }
 
 # EIP-712 signing. alloy-sol-types generates the ABI-encoded struct hash from
-# Solidity-style `sol!` declarations — produces the struct hash the gateway
+# Solidity-style `sol!` declarations, producing the struct hash the gateway
 # verifies. alloy-signer-local provides the secp256k1 signing path (k256 under
 # the hood). Individual sub-crate pins keep the dep surface narrow vs. the
 # umbrella `alloy` crate.
@@ -68,7 +68,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 [dev-dependencies]
 # wiremock provides an in-process HTTP mock to assert header/body shape.
 wiremock = "0.6"
-# Example deps — kept minimal so `cargo build --examples` stays fast.
+# Example deps: kept minimal so `cargo build --examples` stays fast.
 anyhow = "1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }

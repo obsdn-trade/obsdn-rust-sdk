@@ -1,4 +1,4 @@
-//! Extended REST smoke tests — additional request patterns not covered by
+//! Extended REST smoke tests: additional request patterns not covered by
 //! the basic REST suite.
 //!
 //! Covers:

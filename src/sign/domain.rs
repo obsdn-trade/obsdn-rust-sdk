@@ -14,7 +14,7 @@ use crate::env::Env;
 /// Returns the EIP-712 domain for the given environment.
 ///
 /// All signer families (orders, transfers, withdrawals, vaults, registers)
-/// share a single domain. Panics if called with [`Env::Custom`] — use
+/// share a single domain. Panics if called with [`Env::Custom`]; use
 /// [`custom_domain`] or `ClientBuilder::eip712_domain()` instead.
 pub fn default_eip712_domain(env: &Env) -> Eip712Domain {
     match env {

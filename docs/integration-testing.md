@@ -10,7 +10,7 @@ cargo test --all-targets
 
 Runs all 86 tests including:
 
-- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) — Rust signing output matches the exchange's reference signer byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
+- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches the exchange's reference signer byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
 - **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, gap detection, frame loss.
 - **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) - wiremock-based.
 - **View roundtrip** - BookView, TickerView, OracleView, OrderView deserialization.
@@ -94,4 +94,4 @@ cargo run --manifest-path scripts/codegen-rust/Cargo.toml -- \
   --out-dir src/types/generated
 ```
 
-Output must be committed — CI enforces `git diff --exit-code src/types/generated/`.
+Output must be committed; CI enforces `git diff --exit-code src/types/generated/`.

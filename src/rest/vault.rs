@@ -1,6 +1,6 @@
 //! Vault REST surface (`/vaults/...`).
 //!
-//! All methods are **INTERNAL** — exposed for internal tooling (bots,
+//! All methods are **INTERNAL**: exposed for internal tooling (bots,
 //! dashboards) but not part of the public SDK; hidden from `cargo doc`
 //! via `#[doc(hidden)]`.
 
