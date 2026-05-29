@@ -7,7 +7,7 @@
 //!
 //! Cancels do NOT require an EIP-712 signer - server treats the HMAC'd
 //! REST request as authorization. The order id is the UUID returned from
-//! `OrdersApi::place`.
+//! `Orders::place`.
 
 use anyhow::{anyhow, Context, Result};
 use obsdn_sdk::{Client, Env};

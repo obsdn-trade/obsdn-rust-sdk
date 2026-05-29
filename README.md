@@ -6,8 +6,6 @@
 
 Async Rust client for the [OBSDN](https://obsdn.trade) perpetual exchange - REST, EIP-712 order signing, and a managed WebSocket feed in one crate.
 
-The client is built on `tokio`, `reqwest`, and `tokio-tungstenite` with `rustls` (no OpenSSL). Wire types are generated from the exchange's protobuf definitions and committed to the repository, so `cargo build` needs no `protoc` or `buf`.
-
 ## Contents
 
 - [Features](#features)
@@ -29,8 +27,8 @@ The client is built on `tokio`, `reqwest`, and `tokio-tungstenite` with `rustls`
 
 ## Features
 
-- **REST** - the public service surface (~50 RPCs) across 11 typed handles: `orders`, `markets`, `account`, `asset`, `auth_api`, `chain`, `general`, `portfolio`, `price`, `subaccount`, and `vault`. Covers leverage, margin mode, margin transfer, and fee-tier endpoints. Authenticated requests are signed with HMAC.
-- **EIP-712 signing** - a local secp256k1 signer (`LocalSigner`) whose output is byte-equal to the Go reference implementation, verified against golden fixtures. Templates: Order, Transfer, Withdraw, Vault (Create / Stake / Unstake), Subaccount, Register, and DelegatedSigner.
+- **REST** - the public service surface (~50 RPCs) across 11 typed handles: `orders`, `markets`, `account`, `asset`, `auth`, `chain`, `general`, `portfolio`, `price`, `subaccount`, and `vault`. Covers leverage, margin mode, margin transfer, and fee-tier endpoints. Authenticated requests are signed with HMAC.
+- **EIP-712 signing** - a local secp256k1 signer (`LocalSigner`) whose output is byte-equal to the exchange's reference signer, verified against golden fixtures. Templates: Order, Transfer, Withdraw, Vault (Create / Stake / Unstake), Subaccount, Register, and DelegatedSigner.
 - **WebSocket** - a managed client with automatic reconnect, exponential backoff, HMAC auth replay, and GSN (global sequence number) gap detection. Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, and `order`.
 
 ## Status
@@ -85,17 +83,17 @@ async fn main() -> anyhow::Result<()> {
         .build()?;
 
     // Call a REST handle: `markets()` exposes the markets endpoints.
-    let markets = client.markets().get_markets().await?;
+    let markets = client.markets().list().await?;
     println!("{} markets available", markets.mkts.len());
     Ok(())
 }
 ```
 
-Place an order - `place_easy` resolves the market index, signs the EIP-712 payload, and posts it:
+Place an order - `place_limit` resolves the market index, signs the EIP-712 payload, and posts it:
 
 ```rust
 use std::sync::Arc;
-use obsdn_sdk::rest::orders::PlaceEasy;
+use obsdn_sdk::rest::orders::LimitOrder;
 use obsdn_sdk::types::v1::OrderSide;
 use obsdn_sdk::{Client, LocalSigner};
 
@@ -104,14 +102,14 @@ let signer = Arc::new(LocalSigner::from_hex(&std::env::var("OBSDN_PRIVATE_KEY")?
 
 let client = Client::builder()
     .api_key(std::env::var("OBSDN_API_KEY")?, std::env::var("OBSDN_API_SECRET")?)
-    .eip_signer(signer) // attach the signer so orders can be signed
+    .eip712_signer(signer) // attach the signer so orders can be signed
     .build()?;
 
-// A limit buy: 0.001 BTC-PERP at 50,000. `place_easy` handles index lookup,
+// A limit buy: 0.001 BTC-PERP at 50,000. `place_limit` handles index lookup,
 // signing, and the POST.
 client
     .orders()
-    .place_easy(PlaceEasy::limit("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
+    .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
     .await?;
 ```
 
@@ -119,7 +117,7 @@ Stream the order book over the managed WebSocket:
 
 ```rust
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{Channel, WsEvent};
+use obsdn_sdk::ws::{Channel, Event};
 use obsdn_sdk::Client;
 
 let client = Client::builder().build()?;
@@ -133,7 +131,7 @@ let mut stream = client
 
 while let Some(evt) = stream.next().await {
     // `as_book` gives a typed view over the raw update frame.
-    if let WsEvent::Update(u) = evt {
+    if let Event::Update(u) = evt {
         let book = u.as_book()?;
         println!("{} bids / {} asks", book.bids.len(), book.asks.len());
     }
@@ -146,7 +144,7 @@ The `examples/` directory holds runnable end-to-end flows. Run one with `cargo r
 
 | Example             | What it shows                                                            |
 |---------------------|--------------------------------------------------------------------------|
-| `place_order`       | REST + EIP-712 signing via `place_easy`. Quotes 5% under mark.           |
+| `place_order`       | REST + EIP-712 signing via `place_limit`. Quotes 5% under mark.           |
 | `cancel_order`      | Cancel by order id (HMAC only, no EIP-712 needed).                       |
 | `ws_book`           | Public managed WebSocket, typed `BookView`, prints 10 frames.            |
 | `ws_private_orders` | HMAC auth on WebSocket + `Channel::Order`, streams order lifecycle events. |
@@ -188,7 +186,7 @@ cargo doc --no-deps
 
 The Makefile mirrors CI: `make style`, `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
 
-`cargo build` does not require `buf` or `protoc` - wire types are committed under `src/types/generated/`.
+`cargo build` requires no external code-generation tooling. Wire types are committed under `src/types/generated/`.
 
 The offline `cargo test` suite covers unit tests, EIP-712 golden fixtures, the WebSocket chaos suite (in-process mock for reconnect, sub-replay, wildcard routing, and sparse GSN), and wiremock REST smoke. The live integration tests below are gated on environment variables and skip when those are unset, so the offline suite stays green in credential-less CI.
 
@@ -214,11 +212,11 @@ See [`docs/integration-testing.md`](docs/integration-testing.md) for environment
 
 ## Code generation
 
-Wire types are regenerated with the codegen binary at `scripts/codegen-rust/`. Point it at a checkout of the OBSDN proto definitions (`buf` must be on `PATH`):
+Wire types in `src/types/generated/` are committed, so building the SDK needs no extra toolchain. To regenerate them, run the codegen tool in `scripts/codegen-rust/` against the schema definitions:
 
 ```bash
 cargo run --release --manifest-path scripts/codegen-rust/Cargo.toml -- \
-  --proto-dir <path-to-api/proto> \
+  --proto-dir <path-to-proto-dir> \
   --out-dir   src/types/generated
 ```
 
@@ -226,7 +224,7 @@ Commit the regenerated files; CI fails if `git diff --exit-code src/types/genera
 
 ## Documentation
 
-- API reference: `cargo doc --open`. Internal-only proto fields are tagged `#[doc(hidden)]`, so they stay reachable without rendering.
+- API reference: `cargo doc --open`. Internal-only fields are tagged `#[doc(hidden)]`, so they stay reachable without rendering.
 - Architecture overview (with diagrams): [`docs/architecture.md`](docs/architecture.md).
 - Integration testing guide: [`docs/integration-testing.md`](docs/integration-testing.md).
 - WebSocket protocol: see the [OBSDN documentation site](https://docs.obsdn.trade/).

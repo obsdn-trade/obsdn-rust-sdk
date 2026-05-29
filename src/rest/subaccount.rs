@@ -1,10 +1,9 @@
-//! Subaccount REST surface - `SubaccountService` in
-//! `api/proto/nil/v1/subaccount.proto`.
+//! Subaccount REST surface (`/subaccounts/...`).
 
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::rest::{Auth, RestClient};
+use crate::rest::{AuthMode, RestClient};
 use crate::types::v1::{
     CreateSubaccountRequest, CreateSubaccountResponse, DeleteSubaccountRequest,
     DeleteSubaccountResponse, GetSubaccountCollateralRequest, GetSubaccountCollateralResponse,
@@ -15,11 +14,11 @@ use crate::types::v1::{
 
 /// Cheap handle to subaccount endpoints.
 #[derive(Debug, Clone)]
-pub struct SubaccountApi {
+pub struct Subaccount {
     rest: Arc<RestClient>,
 }
 
-impl SubaccountApi {
+impl Subaccount {
     pub(crate) fn new(rest: Arc<RestClient>) -> Self {
         Self { rest }
     }
@@ -27,7 +26,9 @@ impl SubaccountApi {
     /// `POST /subaccounts` - create a new subaccount.
     /// **Auth:** required.
     pub async fn create(&self, req: CreateSubaccountRequest) -> Result<CreateSubaccountResponse> {
-        self.rest.post("/subaccounts", &req, Auth::Required).await
+        self.rest
+            .post("/subaccounts", &req, AuthMode::Required)
+            .await
     }
 
     /// `POST /subaccounts/frozen` - freeze/unfreeze a subaccount.
@@ -37,40 +38,40 @@ impl SubaccountApi {
         req: SetSubaccountFrozenRequest,
     ) -> Result<SetSubaccountFrozenResponse> {
         self.rest
-            .post("/subaccounts/frozen", &req, Auth::Required)
+            .post("/subaccounts/frozen", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /subaccounts/portfolio` - portfolio for a subaccount.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_portfolio(
+    pub async fn portfolio(
         &self,
         req: GetSubaccountPortfolioRequest,
     ) -> Result<GetSubaccountPortfolioResponse> {
         self.rest
-            .get_with_query("/subaccounts/portfolio", &req, Auth::Required)
+            .get_with_query("/subaccounts/portfolio", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /subaccounts/collateral` - collateral assets for a subaccount.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_collateral(
+    pub async fn collateral(
         &self,
         req: GetSubaccountCollateralRequest,
     ) -> Result<GetSubaccountCollateralResponse> {
         self.rest
-            .get_with_query("/subaccounts/collateral", &req, Auth::Required)
+            .get_with_query("/subaccounts/collateral", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /subaccounts/portfolio/history` - historical portfolio snapshots.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_portfolio_history(
+    pub async fn portfolio_history(
         &self,
         req: GetSubaccountPortfolioHistoryRequest,
     ) -> Result<GetSubaccountPortfolioHistoryResponse> {
         self.rest
-            .get_with_query("/subaccounts/portfolio/history", &req, Auth::Required)
+            .get_with_query("/subaccounts/portfolio/history", &req, AuthMode::Required)
             .await
     }
 
@@ -78,7 +79,7 @@ impl SubaccountApi {
     /// **Auth:** required.
     pub async fn delete(&self, req: DeleteSubaccountRequest) -> Result<DeleteSubaccountResponse> {
         self.rest
-            .delete_with_body("/subaccounts", &req, Auth::Required)
+            .delete_with_body("/subaccounts", &req, AuthMode::Required)
             .await
     }
 }

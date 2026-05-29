@@ -44,11 +44,7 @@ async fn staging_get_markets() {
     if skip_unless_staging() {
         return;
     }
-    let resp = unauthed()
-        .markets()
-        .get_markets()
-        .await
-        .expect("get_markets");
+    let resp = unauthed().markets().list().await.expect("list");
     assert!(!resp.mkts.is_empty(), "staging should have markets");
     // Every market index must fit in the EIP-712 `uint16 marketIndex`.
     for m in &resp.mkts {
@@ -68,9 +64,9 @@ async fn staging_get_assets() {
     }
     let resp = unauthed()
         .asset()
-        .get_assets(GetAssetsRequest {})
+        .list(GetAssetsRequest {})
         .await
-        .expect("get_assets");
+        .expect("list");
     let usdc = resp
         .assets
         .iter()
@@ -81,7 +77,7 @@ async fn staging_get_assets() {
 }
 
 /// The single most important read test: the EIP-712 domain the SDK signs
-/// with (`sign::sdk_domain(Env::Staging)`) MUST match the domain the live
+/// with (`sign::default_eip712_domain(Env::Staging)`) MUST match the domain the live
 /// backend verifies against (`GET /chain/config`). A mismatch in chain_id
 /// or verifying_contract silently rejects every order/withdraw/transfer.
 #[tokio::test]
@@ -91,14 +87,14 @@ async fn staging_chain_config_matches_sdk_domain() {
     }
     let resp = unauthed()
         .chain()
-        .get_chain_config(GetChainConfigRequest {})
+        .config(GetChainConfigRequest {})
         .await
-        .expect("get_chain_config");
+        .expect("config");
     let live = resp
         .domain
         .expect("chain config should carry an EIP-712 domain");
 
-    let sdk = sign::sdk_domain(&Env::Staging);
+    let sdk = sign::default_eip712_domain(&Env::Staging);
     assert_eq!(
         live.nm,
         sdk.name.as_deref().unwrap_or_default(),
@@ -132,11 +128,11 @@ async fn staging_get_prices() {
     }
     let resp = unauthed()
         .price()
-        .get_prices(GetPricesRequest {
+        .list(GetPricesRequest {
             assets: vec!["BTC".into(), "ETH".into()],
         })
         .await
-        .expect("get_prices");
+        .expect("list");
     assert!(!resp.prices.is_empty(), "should return at least one price");
     for p in &resp.prices {
         assert!(!p.mark_px.is_empty(), "{} mark_px present", p.asset);
@@ -151,9 +147,9 @@ async fn staging_get_fee_tiers() {
     }
     let resp = unauthed()
         .general()
-        .get_fee_tiers(GetFeeTiersRequest {})
+        .fee_tiers(GetFeeTiersRequest {})
         .await
-        .expect("get_fee_tiers");
+        .expect("fee_tiers");
     assert!(!resp.tiers.is_empty(), "staging should have fee tiers");
     eprintln!("OK: {} fee tiers", resp.tiers.len());
 }
@@ -165,9 +161,9 @@ async fn staging_get_error_codes() {
     }
     let resp = unauthed()
         .general()
-        .get_error_codes(GetErrorCodesRequest::default())
+        .error_codes(GetErrorCodesRequest::default())
         .await
-        .expect("get_error_codes");
+        .expect("error_codes");
     assert!(!resp.errs.is_empty(), "should enumerate error codes");
     eprintln!("OK: {} error codes", resp.errs.len());
 }
@@ -179,9 +175,9 @@ async fn staging_get_client_info_unauthed() {
     }
     let resp = unauthed()
         .general()
-        .get_client_info(GetClientInfoRequest {})
+        .client_info(GetClientInfoRequest {})
         .await
-        .expect("get_client_info");
+        .expect("client_info");
     assert!(
         !resp.is_auth,
         "unauthenticated client must report is_auth=false"
@@ -196,9 +192,9 @@ async fn staging_get_order_book() {
     }
     let resp = unauthed()
         .markets()
-        .get_order_book("BTC-PERP")
+        .order_book("BTC-PERP")
         .await
-        .expect("get_order_book");
+        .expect("order_book");
     let book = resp.book.expect("orderbook payload present");
     eprintln!(
         "OK: BTC-PERP book bids={} asks={} gsn={}",
@@ -215,13 +211,15 @@ async fn staging_get_market_trades() {
     }
     let resp = unauthed()
         .markets()
-        .get_market_trades(GetMarketTradesRequest {
-            mkt_id: "BTC-PERP".into(),
-            lmt: 10,
-            ..Default::default()
-        })
+        .trades(
+            "BTC-PERP",
+            GetMarketTradesRequest {
+                lmt: 10,
+                ..Default::default()
+            },
+        )
         .await
-        .expect("get_market_trades");
+        .expect("trades");
     eprintln!("OK: {} recent trades", resp.trades.len());
 }
 
@@ -232,13 +230,15 @@ async fn staging_get_market_candles() {
     }
     let resp = unauthed()
         .markets()
-        .get_market_candles(GetMarketCandlesRequest {
-            mkt_id: "BTC-PERP".into(),
-            intv: ONE_MINUTE_NS,
-            ..Default::default()
-        })
+        .candles(
+            "BTC-PERP",
+            GetMarketCandlesRequest {
+                intv: ONE_MINUTE_NS,
+                ..Default::default()
+            },
+        )
         .await
-        .expect("get_market_candles");
+        .expect("candles");
     eprintln!("OK: {} candles", resp.data.len());
 }
 
@@ -249,12 +249,14 @@ async fn staging_get_funding_rate_history() {
     }
     let resp = unauthed()
         .markets()
-        .get_funding_rate_history(GetFundingRateHistoryRequest {
-            mkt_id: "BTC-PERP".into(),
-            lmt: 10,
-            ..Default::default()
-        })
+        .funding_rate_history(
+            "BTC-PERP",
+            GetFundingRateHistoryRequest {
+                lmt: 10,
+                ..Default::default()
+            },
+        )
         .await
-        .expect("get_funding_rate_history");
+        .expect("funding_rate_history");
     eprintln!("OK: {} funding-rate items", resp.items.len());
 }

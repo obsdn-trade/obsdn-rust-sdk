@@ -2,21 +2,15 @@
 //!
 //! ```bash
 //! OBSDN_API_KEY=... OBSDN_API_SECRET=... OBSDN_PRIVATE_KEY=0x... \
-//!     OBSDN_TO=0x... OBSDN_TOKEN=0x... \
+//!     OBSDN_TO=0x... OBSDN_TOKEN=0x... OBSDN_AMOUNT=1.0 \
 //!     cargo run --example transfer
 //! ```
-//!
-//! Signs the EIP-712 `Transfer` payload with the local key, then POSTs
-//! `/transfers/send-funds`.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use alloy_primitives::Address;
 use anyhow::{Context, Result};
-use obsdn_sdk::sign::{scale_decimal_str, sign_transfer, transfer::TransferPayload};
-use obsdn_sdk::types::v1::SendFundsRequest;
-use obsdn_sdk::{Client, EipSigner, Env, LocalSigner};
+use obsdn_sdk::{Client, Env, LocalSigner};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,34 +23,19 @@ async fn main() -> Result<()> {
     let token: Address = std::env::var("OBSDN_TOKEN")
         .context("OBSDN_TOKEN")?
         .parse()?;
-    let amount = std::env::var("OBSDN_AMOUNT").unwrap_or_else(|_| "1.0".into());
+    let amount: f64 = std::env::var("OBSDN_AMOUNT")
+        .unwrap_or_else(|_| "1.0".into())
+        .parse()?;
 
     let signer = Arc::new(LocalSigner::from_hex(&private_key)?);
     let client = Client::builder()
         .env(Env::Production)
         .api_key(api_key, api_secret)
-        .eip_signer(signer.clone())
+        .eip712_signer(signer)
         .build()?;
 
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() as u64;
-    let payload = TransferPayload {
-        from: signer.address(),
-        to,
-        token,
-        amount: scale_decimal_str(&amount)?,
-        nonce,
-    };
-    let sig = sign_transfer(signer.as_ref(), client.eip712_domain(), payload)?;
-
-    let req = SendFundsRequest {
-        from: format!("{:#x}", signer.address()),
-        to: format!("{to:#x}"),
-        tkn: format!("{token:#x}"),
-        amt: amount.clone(),
-        nonce,
-        sig: obsdn_sdk::sign::signature_hex(&sig),
-    };
-    let resp = client.account().send_funds(req).await?;
-    tracing::info!(?resp, "send_funds result");
+    // One call scales the amount, signs the EIP-712 Transfer, and posts it.
+    let resp = client.account().transfer(to, token, amount).await?;
+    tracing::info!(?resp, "transfer result");
     Ok(())
 }

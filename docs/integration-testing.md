@@ -10,7 +10,7 @@ cargo test --all-targets
 
 Runs all 86 tests including:
 
-- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches Go reference byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
+- **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches the exchange's reference signer byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
 - **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, gap detection, frame loss.
 - **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) - wiremock-based.
 - **View roundtrip** - BookView, TickerView, OracleView, OrderView deserialization.
@@ -86,12 +86,12 @@ When EIP-712 struct definitions change (field added/removed, type changed):
 
 The fixture `domain_separator` only changes if the EIP-712 domain changes.
 
-## Regenerating Proto Types
+## Regenerating Wire Types
 
 ```bash
 cargo run --manifest-path scripts/codegen-rust/Cargo.toml -- \
-  --proto-dir /path/to/backend/api/proto \
+  --proto-dir /path/to/schema \
   --out-dir src/types/generated
 ```
 
-Requires `buf` CLI. Output must be committed - CI enforces `git diff --exit-code src/types/generated/`.
+Output must be committed; CI enforces `git diff --exit-code src/types/generated/`.

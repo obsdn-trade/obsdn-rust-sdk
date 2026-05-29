@@ -1,12 +1,12 @@
-//! Auth REST surface - `AuthService` in `api/proto/nil/v1/auth.proto`.
+//! Auth REST surface (`/auth/...`).
 //!
-//! Named `auth_api` (not `auth`) to avoid clashing with the SDK's HMAC
-//! signing module at `crate::auth`.
+//! Reached via [`crate::Client::auth`]. Distinct from the crate-internal
+//! HMAC signing module (`crate::auth`, `pub(crate)`).
 
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::rest::{Auth, RestClient};
+use crate::rest::{AuthMode, RestClient};
 use crate::types::v1::{
     CreateApiKeyRequest, CreateApiKeyResponse, DeleteApiKeysRequest, DeleteApiKeysResponse,
     GetApiKeysRequest, GetApiKeysResponse, GetChildAccountApiKeysRequest,
@@ -16,11 +16,11 @@ use crate::types::v1::{
 
 /// Cheap handle to auth endpoints.
 #[derive(Debug, Clone)]
-pub struct AuthApi {
+pub struct Auth {
     rest: Arc<RestClient>,
 }
 
-impl AuthApi {
+impl Auth {
     pub(crate) fn new(rest: Arc<RestClient>) -> Self {
         Self { rest }
     }
@@ -31,21 +31,23 @@ impl AuthApi {
         &self,
         req: RegisterSignerRequest,
     ) -> Result<RegisterSignerResponse> {
-        self.rest.post("/auth/signers", &req, Auth::None).await
+        self.rest.post("/auth/signers", &req, AuthMode::None).await
     }
 
     /// `POST /auth/api-keys` - issue an additional API key for the
     /// authenticated wallet.
     /// **Auth:** required.
     pub async fn create_api_key(&self, req: CreateApiKeyRequest) -> Result<CreateApiKeyResponse> {
-        self.rest.post("/auth/api-keys", &req, Auth::Required).await
+        self.rest
+            .post("/auth/api-keys", &req, AuthMode::Required)
+            .await
     }
 
     /// `GET /auth/api-keys` - list API keys for the authenticated wallet.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_api_keys(&self, req: GetApiKeysRequest) -> Result<GetApiKeysResponse> {
+    pub async fn api_keys(&self, req: GetApiKeysRequest) -> Result<GetApiKeysResponse> {
         self.rest
-            .get_with_query("/auth/api-keys", &req, Auth::Required)
+            .get_with_query("/auth/api-keys", &req, AuthMode::Required)
             .await
     }
 
@@ -56,7 +58,7 @@ impl AuthApi {
         req: DeleteApiKeysRequest,
     ) -> Result<DeleteApiKeysResponse> {
         self.rest
-            .delete_with_body("/auth/api-keys", &req, Auth::Required)
+            .delete_with_body("/auth/api-keys", &req, AuthMode::Required)
             .await
     }
 
@@ -68,18 +70,18 @@ impl AuthApi {
         req: RegisterChildAccountSignerRequest,
     ) -> Result<RegisterChildAccountSignerResponse> {
         self.rest
-            .post("/auth/child-accounts/signers", &req, Auth::Required)
+            .post("/auth/child-accounts/signers", &req, AuthMode::Required)
             .await
     }
 
     /// `GET /auth/child-accounts/api-keys` - list API keys for child accounts.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_child_account_api_keys(
+    pub async fn child_account_api_keys(
         &self,
         req: GetChildAccountApiKeysRequest,
     ) -> Result<GetChildAccountApiKeysResponse> {
         self.rest
-            .get_with_query("/auth/child-accounts/api-keys", &req, Auth::Required)
+            .get_with_query("/auth/child-accounts/api-keys", &req, AuthMode::Required)
             .await
     }
 }

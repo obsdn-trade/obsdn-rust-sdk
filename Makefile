@@ -13,8 +13,11 @@ lint:
 	cargo clippy --all-targets -- -D warnings
 
 # Offline test suite (mirrors CI). Live e2e self-skip without OBSDN_STAGING.
+# --all-targets covers unit/integration/examples; --doc covers doctests
+# (cargo excludes the doctest target from --all-targets).
 test:
 	cargo test --all-targets
+	cargo test --doc
 
 # Doc build with broken-link/warning denial (mirrors CI).
 doc:

@@ -12,7 +12,7 @@
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{Channel, ChannelName, WsEvent, WsUpdateKind};
+use obsdn_sdk::ws::{Channel, ChannelName, Event, UpdateKind};
 use obsdn_sdk::{Client, Env};
 
 fn opt_in() -> bool {
@@ -50,13 +50,13 @@ async fn ws_book_subscribe_smoke() {
         .await
         .expect("snapshot/update within 5s")
         .expect("stream not closed early");
-    let WsEvent::Update(u) = first else {
+    let Event::Update(u) = first else {
         panic!("expected Update first, got {first:?}");
     };
     assert_eq!(u.channel, ChannelName::Book);
     assert_eq!(u.filter, "BTC-PERP");
     assert!(u.gsn > 0, "snapshot should carry a real gsn");
-    assert_eq!(u.kind, WsUpdateKind::Snapshot);
+    assert_eq!(u.kind, UpdateKind::Snapshot);
     eprintln!("first frame: gsn={} kind={:?}", u.gsn, u.kind);
 
     ws.unsubscribe(Channel::Book {

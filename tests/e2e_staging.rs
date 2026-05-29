@@ -28,7 +28,7 @@ use obsdn_sdk::types::v1::{
     CancelAllOrdersRequest, FaucetRequest, PlaceOrderRequest, RegisterSignerRequest,
     SetLeverageRequest,
 };
-use obsdn_sdk::ws::{Channel, WsEvent, WsUpdate, WsUpdateKind};
+use obsdn_sdk::ws::{Channel, Event, Update, UpdateKind};
 use obsdn_sdk::{Client, Env, LocalSigner};
 
 fn skip() -> bool {
@@ -63,14 +63,14 @@ async fn setup_test_account() -> TestAccount {
     let sender =
         LocalSigner::from_hex("0x0000000000000000000000000000000000000000000000000000000000000001")
             .unwrap();
-    let sender_addr = obsdn_sdk::EipSigner::address(&sender);
+    let sender_addr = obsdn_sdk::Eip712Signer::address(&sender);
 
     let signer =
         LocalSigner::from_hex("0x0000000000000000000000000000000000000000000000000000000000000002")
             .unwrap();
-    let signer_addr = obsdn_sdk::EipSigner::address(&signer);
+    let signer_addr = obsdn_sdk::Eip712Signer::address(&signer);
 
-    let domain = sign::sdk_domain(&Env::Staging);
+    let domain = sign::default_eip712_domain(&Env::Staging);
     let n = nonce();
     let message = "rust-sdk-e2e-test".to_string();
 
@@ -114,7 +114,7 @@ async fn setup_test_account() -> TestAccount {
     eprintln!("  nonce:       {}", req.nonce);
 
     let reg_resp = unauthed
-        .auth_api()
+        .auth()
         .register_signer(req)
         .await
         .expect("C2: register_signer should accept 4-field Register struct");
@@ -130,7 +130,7 @@ async fn setup_test_account() -> TestAccount {
     let client = Client::builder()
         .env(Env::Staging)
         .api_key(&api_key.api_key, &api_key.api_secret)
-        .eip_signer(signer.clone())
+        .eip712_signer(signer.clone())
         .build()
         .unwrap();
 
@@ -145,7 +145,7 @@ async fn setup_test_account() -> TestAccount {
 /// matching - returns its oid. Far price keeps the position flat, so the flow
 /// exercises the order channel only. Proves C1 (uint16 marketIndex signature).
 async fn place_resting_order(acct: &TestAccount, market: &str) -> String {
-    let sender_addr = obsdn_sdk::EipSigner::address(acct.sender.as_ref());
+    let sender_addr = obsdn_sdk::Eip712Signer::address(acct.sender.as_ref());
     let domain = acct.client.eip712_domain().clone();
     let market_info = acct
         .client
@@ -189,20 +189,20 @@ async fn place_resting_order(acct: &TestAccount, market: &str) -> String {
         .clone()
 }
 
-/// Pull the next [`WsEvent::Update`] off a subscription within [`EVENT_TIMEOUT`],
+/// Pull the next [`Event::Update`] off a subscription within [`EVENT_TIMEOUT`],
 /// skipping lifecycle markers. Returns `None` on timeout or stream end.
-async fn next_update<S>(stream: &mut S) -> Option<WsUpdate>
+async fn next_update<S>(stream: &mut S) -> Option<Update>
 where
-    S: futures_util::Stream<Item = WsEvent> + Unpin,
+    S: futures_util::Stream<Item = Event> + Unpin,
 {
     loop {
         match tokio::time::timeout(EVENT_TIMEOUT, stream.next()).await {
-            Ok(Some(WsEvent::Update(u))) => return Some(u),
-            Ok(Some(WsEvent::Reconnected)) => {
+            Ok(Some(Event::Update(u))) => return Some(u),
+            Ok(Some(Event::Reconnected)) => {
                 eprintln!("  (reconnected - continuing)");
                 continue;
             }
-            Ok(Some(WsEvent::Unauthorized(msg))) => panic!("unexpected Unauthorized: {msg}"),
+            Ok(Some(Event::Unauthorized(msg))) => panic!("unexpected Unauthorized: {msg}"),
             Ok(None) => return None, // stream ended
             Err(_) => return None,   // timeout
         }
@@ -210,14 +210,14 @@ where
 }
 
 /// Scan up to `max_frames` order frames for one carrying `oid` (other order
-/// churn may interleave). Returns the matching [`OrderView`] state on hit.
+/// churn may interleave). Returns the matching [`Order`] state on hit.
 async fn await_order_update<S>(
     stream: &mut S,
     oid: &str,
     max_frames: usize,
-) -> Option<obsdn_sdk::ws::OrderView>
+) -> Option<obsdn_sdk::ws::Order>
 where
-    S: futures_util::Stream<Item = WsEvent> + Unpin,
+    S: futures_util::Stream<Item = Event> + Unpin,
 {
     for _ in 0..max_frames {
         let u = next_update(stream).await?;
@@ -251,9 +251,9 @@ async fn e2e_combined_flow() {
     // --- C2: Register signer (4-field struct) ---
     let acct = setup_test_account().await;
     let client = &acct.client;
-    let sender_addr = obsdn_sdk::EipSigner::address(acct.sender.as_ref());
+    let sender_addr = obsdn_sdk::Eip712Signer::address(acct.sender.as_ref());
 
-    // --- Faucet staging USDC (best-effort - may need Twingate) ---
+    // --- Faucet staging USDC (best-effort - may need internal network access) ---
     let faucet_resp = client
         .account()
         .faucet(FaucetRequest {
@@ -265,7 +265,7 @@ async fn e2e_combined_flow() {
         .await;
     match &faucet_resp {
         Ok(_) => eprintln!("OK: faucet 10000 USDC"),
-        Err(e) => eprintln!("WARN: faucet failed (may need Twingate): {e}"),
+        Err(e) => eprintln!("WARN: faucet failed (may need internal network access): {e}"),
     }
 
     // --- WS: authenticate + subscribe private order (wildcard) ---
@@ -299,7 +299,7 @@ async fn e2e_combined_flow() {
     assert_eq!(placed.oid, oid);
     eprintln!(
         "OK HIGH-1: wildcard sub received placed order, st={}",
-        placed.st
+        placed.status
     );
 
     // --- Cancel via REST → observe the cancel over WS ---
@@ -311,7 +311,7 @@ async fn e2e_combined_flow() {
         .expect("wildcard sub must receive the cancel update");
     eprintln!(
         "OK: wildcard sub received cancel update, st={} cancel_req={} done_rsn={}",
-        cancelled.st, cancelled.cancel_req, cancelled.done_rsn
+        cancelled.status, cancelled.cancel_requested, cancelled.done_reason
     );
 
     // --- H1: SetLeverage ---
@@ -366,7 +366,7 @@ async fn e2e_ws_public_book() {
     eprintln!("first book frame: gsn={} kind={:?}", first.gsn, first.kind);
     assert_eq!(
         first.kind,
-        WsUpdateKind::Snapshot,
+        UpdateKind::Snapshot,
         "first book frame must be a snapshot"
     );
     let book = first.as_book().expect("decode book snapshot");

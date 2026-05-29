@@ -25,6 +25,9 @@ jobs:
       - name: cargo test
         run: cargo test --all-targets
 
+      - name: cargo test --doc
+        run: cargo test --doc
+
       - name: cargo doc
         run: cargo doc --no-deps
         env:

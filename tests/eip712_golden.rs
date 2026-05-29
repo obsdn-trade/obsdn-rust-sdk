@@ -1,11 +1,11 @@
-//! Golden hash tests - Rust-side EIP-712 signing must produce byte-equal
-//! struct hashes / digests / signatures vs. the Go signer.
+//! Golden hash tests: Rust-side EIP-712 signing must produce byte-equal
+//! struct hashes, digests, and signatures against the exchange's reference signer.
 //!
-//! Fixtures under `tests/fixtures/eip712/*.json` are captured by
-//! `scripts/capture_eip712_fixtures.go`. Re-run that script when:
-//!   - any template `.json.tmpl` changes
+//! Fixtures under `tests/fixtures/eip712/*.json` are captured from the
+//! exchange's reference signer. Regenerate them when:
+//!   - any template changes
 //!   - the domain changes (chain id / contract)
-//!   - a new sign function is added (also add a fixture there)
+//!   - a new sign function is added (also add a fixture)
 //!
 //! What we assert per fixture:
 //! 1. `Eip712Domain::hash_struct() == fixture.domain_separator`
@@ -13,7 +13,7 @@
 //! 3. `<sol struct>::eip712_signing_hash(domain) == fixture.digest`
 //! 4. The digest signed with the deterministic key `0x0101..0101` reproduces
 //!    `fixture.signature` byte-for-byte (proves the v ∈ {27,28} normalization
-//!    matches go-ethereum).
+//!    matches the gateway's ecrecover expectation).
 //!
 //! All four together prove that a Rust-signed REST request will be accepted
 //! by the matching engine without a silent hash-mismatch.
@@ -128,7 +128,7 @@ fn assert_signature_matches(f: &Fixture, digest: B256) {
         "{}: signer address mismatch",
         f.template
     );
-    let sig: [u8; 65] = obsdn_sdk::EipSigner::sign_hash_sync(&signer, digest).expect("sign");
+    let sig: [u8; 65] = obsdn_sdk::Eip712Signer::sign_hash_sync(&signer, digest).expect("sign");
     let expected = parse_sig(&f.signature);
     assert_eq!(sig, expected, "{}: signature mismatch", f.template);
 }

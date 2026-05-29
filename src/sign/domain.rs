@@ -1,39 +1,30 @@
 //! Per-environment EIP-712 domain values.
 //!
-//! Mirrors the chain configs each environment's backend loads:
-//! - **Staging** → monad-testnet (`configs/shared/chain/monad_testnet.yaml`)
-//! - **Production** → monad-mainnet (`configs/shared/chain/monad_mainnet.yaml`)
+//! - **Staging** → Monad testnet (chain 10143)
+//! - **Production** → Monad mainnet (chain 143)
 //!
-//! Other targets (a forked staging stack, an internal host, a local backend)
-//! go through [`custom_domain`] paired with [`crate::Env::Custom`].
+//! For any other target (forked stack, custom chain) use [`custom_domain`]
+//! with [`crate::Env::Custom`].
 
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{eip712_domain, Eip712Domain};
 
 use crate::env::Env;
 
-/// Standard SDK domain - every template family in this crate uses this same
-/// value. Go uses one `config.Domain` for all signers (orders, transfers,
-/// withdrawals, vaults, registers); we keep that 1:1.
+/// Returns the EIP-712 domain for the given environment.
 ///
-/// **Staging** → monad-testnet. **Production** → monad-mainnet. Each must
-/// match the chain config the corresponding backend loads, or every
-/// signature is rejected.
-pub fn sdk_domain(env: &Env) -> Eip712Domain {
+/// All signer families (orders, transfers, withdrawals, vaults, registers)
+/// share a single domain. Panics if called with [`Env::Custom`]; use
+/// [`custom_domain`] or `ClientBuilder::eip712_domain()` instead.
+pub fn default_eip712_domain(env: &Env) -> Eip712Domain {
     match env {
         Env::Staging => staging_domain(),
         Env::Production => production_domain(),
         Env::Custom { .. } => panic!(
-            "sdk_domain() cannot determine the correct domain for Env::Custom - \
+            "default_eip712_domain() cannot determine the correct domain for Env::Custom - \
              use custom_domain() or ClientBuilder::eip712_domain() instead"
         ),
     }
-}
-
-/// Backwards-compatible alias for callers that thought of the domain as
-/// "the order domain" - every template currently shares the same domain.
-pub fn order_domain(env: &Env) -> Eip712Domain {
-    sdk_domain(env)
 }
 
 /// Build a fully-custom domain. Useful when targeting a non-public chain or
@@ -58,8 +49,7 @@ fn staging_domain() -> Eip712Domain {
 }
 
 /// Production domain - Monad mainnet (chain 143).
-/// Values at time of writing; canonical source: `GET /chain/config`.
-/// These rarely change - any change will be announced publicly.
+/// Canonical source: `GET /chain/config`. Changes are announced publicly.
 fn production_domain() -> Eip712Domain {
     eip712_domain! {
         name: "Obsidian",

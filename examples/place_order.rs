@@ -1,21 +1,18 @@
 //! Place a single LIMIT order on production.
 //!
-//! Run:
 //! ```bash
-//! OBSDN_API_KEY=... OBSDN_API_SECRET=... OBSDN_PRIVATE_KEY=0x...
+//! OBSDN_API_KEY=... OBSDN_API_SECRET=... OBSDN_PRIVATE_KEY=0x... \
 //!     cargo run --example place_order
 //! ```
 //!
-//! Resolves the market index via the lazy cache, signs the EIP-712 `Order`
-//! payload with the local key, and posts `/orders`. Bias the price low
-//! (`buy` 1k below mark) so the order rests on the book without filling.
+//! Resolves the market, signs the order, and posts it. The price is biased
+//! 5% below mark so the order rests on the book without filling.
 
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use obsdn_sdk::rest::orders::PlaceEasy;
-use obsdn_sdk::types::v1::OrderSide;
-use obsdn_sdk::{Client, Env, LocalSigner};
+use obsdn_sdk::rest::orders::LimitOrder;
+use obsdn_sdk::{Client, Env, LocalSigner, Side};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,18 +31,18 @@ async fn main() -> Result<()> {
     let client = Client::builder()
         .env(Env::Production)
         .api_key(api_key, api_secret)
-        .eip_signer(signer)
+        .eip712_signer(signer)
         .build()?;
 
-    // Pull a fresh mark price so we can quote a non-filling buy.
+    // Quote a non-filling buy 5% below the current mark price.
     let market = client.resolve_market("BTC-PERP").await?;
-    let mark: f64 = market.mark_px.parse().unwrap_or(50_000.0);
-    let bid_px = (mark * 0.95_f64).round();
-    tracing::info!(mark, bid_px, "quoting limit buy 5% under mark");
+    let mark = market.mark_price().unwrap_or(50_000.0);
+    let bid = (mark * 0.95).round();
+    tracing::info!(mark, bid, "quoting limit buy 5% under mark");
 
     let resp = client
         .orders()
-        .place_easy(PlaceEasy::limit("BTC-PERP", OrderSide::Buy, bid_px, 0.001))
+        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, bid, 0.001).post_only(true))
         .await?;
     tracing::info!(?resp, "order placed");
     Ok(())

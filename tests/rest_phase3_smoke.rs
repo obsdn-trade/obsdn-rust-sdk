@@ -1,6 +1,7 @@
-//! Phase 3 smoke tests - extended REST surface.
+//! Extended REST smoke tests: additional request patterns not covered by
+//! the basic REST suite.
 //!
-//! Covers patterns Phase 2 didn't:
+//! Covers:
 //!   1. Path parameter substitution + URL encoding (cancel by oid).
 //!   2. Query-string serialization for GET (list open orders).
 //!   3. DELETE without body (cancel by oid).
@@ -75,8 +76,8 @@ async fn list_open_orders_serializes_query_string() {
     Mock::given(method("GET"))
         .and(path("/orders"))
         .and(query_param("mktId", "BTC-PERP"))
-        // pbjson serializes proto enums as SCREAMING_SNAKE strings; the
-        // query encoder forwards the JSON form unchanged.
+        // Enums are serialized as SCREAMING_SNAKE strings; the query
+        // encoder forwards the JSON form unchanged.
         .and(query_param("ot", "ORDER_TYPE_LIMIT"))
         .respond_with(ResponseTemplate::new(200).set_body_json(&body))
         .mount(&server)
@@ -153,7 +154,7 @@ async fn all_api_accessors_resolve() {
     let _ = c.markets();
     let _ = c.account();
     let _ = c.asset();
-    let _ = c.auth_api();
+    let _ = c.auth();
     let _ = c.chain();
     let _ = c.general();
     let _ = c.portfolio();
@@ -162,5 +163,5 @@ async fn all_api_accessors_resolve() {
     let _ = c.vault();
     // One real call to confirm the markets handle still works through
     // the new wiring.
-    let _ = c.markets().get_markets().await.unwrap();
+    let _ = c.markets().list().await.unwrap();
 }

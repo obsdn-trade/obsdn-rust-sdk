@@ -1,4 +1,4 @@
-//! WebSocket thin connection (crate-internal - Phase 5 implementation).
+//! WebSocket raw connection (crate-internal).
 //!
 //! One [`WsConnection`] owns one tokio task driving the socket. The task
 //! serves commands sent over an mpsc channel and routes inbound frames:
@@ -13,8 +13,8 @@
 //! At ~tens of subs per connection in practice, the throughput cost is
 //! negligible and the simplicity is worth it.
 //!
-//! Public callers go through [`super::managed::WsClient`] (the managed
-//! Phase 6 supervisor) which uses this raw connection as its transport.
+//! Public callers go through [`super::managed::Session`] (the managed
+//! supervisor) which uses this raw connection as its transport.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,12 +30,12 @@ use crate::error::{Error, Result};
 
 use super::auth as ws_auth;
 use super::channel::{Channel, ChannelName};
-use super::event::{ServerFrame, WireType, WsUpdate, WsUpdateKind};
+use super::event::{ServerFrame, Update, UpdateKind, WireType};
 use super::frame;
 
 /// Default per-subscription buffer. 1024 messages is plenty for active
 /// channels (book updates peak ~100/s); slow consumers fail loud rather
-/// than silently dropping. Phase 6 may tune this.
+/// than silently dropping.
 const SUB_BUFFER: usize = 1024;
 /// Outbound command queue depth.
 const CMD_BUFFER: usize = 64;
@@ -46,8 +46,7 @@ type SubKey = (ChannelName, String);
 
 /// Live WebSocket connection. Cheap to clone - internal state is Arc'd so
 /// the underlying task survives until every clone is dropped (or `close`
-/// is called explicitly). Crate-internal - used by
-/// [`super::managed::WsClient`].
+/// is called explicitly). Crate-internal - used by the managed supervisor.
 #[derive(Clone)]
 pub(crate) struct WsConnection {
     inner: Arc<Inner>,
@@ -70,14 +69,14 @@ struct Inner {
 /// One snapshot/update stream for a subscribed channel. Drop to free the
 /// internal sender slot - note that this does NOT send `unsub` to the
 /// server. Call [`WsConnection::unsubscribe`] explicitly for clean
-/// shutdown of a single channel. Crate-internal - managed-client users
-/// receive [`super::event::WsEvent`] via [`super::managed::SubscriptionStream`].
-pub(crate) type Subscription = ReceiverStream<WsUpdate>;
+/// shutdown of a single channel. Crate-internal - public callers receive
+/// [`super::event::Event`] via [`super::managed::SubscriptionStream`].
+pub(crate) type Subscription = ReceiverStream<Update>;
 
 enum Command {
     Subscribe {
         channel: Channel,
-        sender: mpsc::Sender<WsUpdate>,
+        sender: mpsc::Sender<Update>,
         ack: oneshot::Sender<Result<()>>,
     },
     Unsubscribe {
@@ -114,9 +113,7 @@ enum Pending {
 }
 
 impl WsConnection {
-    /// Crate-internal entry point used by the managed supervisor
-    /// (`super::managed`). Public callers go through
-    /// [`WsClient::connect`] instead.
+    /// Crate-internal entry point used by the managed supervisor.
     pub(crate) async fn connect_raw(url: &str, hmac: Option<HmacSigner>) -> Result<Self> {
         Self::connect(url, hmac).await
     }
@@ -291,7 +288,7 @@ struct Driver<S> {
     /// `(channel, filter)` → fan-out sender. Filter for filter-less
     /// channels is `""` to match the server, which omits the filter
     /// field on `portfolio` / `notification` updates.
-    subscribers: HashMap<SubKey, mpsc::Sender<WsUpdate>>,
+    subscribers: HashMap<SubKey, mpsc::Sender<Update>>,
     /// Watch sender shared with [`Inner::closed_rx`]. Set to `true`
     /// exactly once on driver-task exit so any number of
     /// [`WsConnection::closed`] callers observe the death - even if they
@@ -474,8 +471,8 @@ where
         match frame.kind {
             WireType::Welcome => {
                 // Spec says welcome arrives once, before anything else.
-                // A second welcome means the server reset state - log
-                // and ignore, Phase 6 reconnect path may handle.
+                // A second welcome means the server reset state - log and
+                // ignore; the supervisor's reconnect path will handle it.
                 tracing::warn!("unexpected second welcome frame");
             }
             WireType::Authenticated => {
@@ -541,8 +538,8 @@ where
         // market in `filter` even when we subscribed with `market: None`
         // (wildcard, registered under the empty filter); the snapshot for
         // that sub carries `filter:""`. Mirror the server's hierarchical
-        // match (subscription_manager.go IsUserSubscribed): exact
-        // (channel,filter) first, else the (channel,"") wildcard subscriber.
+        // match: exact (channel,filter) first, else the (channel,"")
+        // wildcard subscriber.
         let exact: SubKey = (channel, filter.clone());
         let key: SubKey = if self.subscribers.contains_key(&exact) {
             exact
@@ -558,10 +555,10 @@ where
             .get(&key)
             .expect("key just confirmed present");
         let kind = match frame.kind {
-            WireType::Snapshot => WsUpdateKind::Snapshot,
-            _ => WsUpdateKind::Update,
+            WireType::Snapshot => UpdateKind::Snapshot,
+            _ => UpdateKind::Update,
         };
-        let update = WsUpdate {
+        let update = Update {
             kind,
             channel,
             gsn: frame.gsn.unwrap_or(0),
@@ -570,7 +567,7 @@ where
             data: frame.data.unwrap_or(serde_json::Value::Null),
         };
         // try_send: if the consumer is slow, drop with a warn rather than
-        // backpressure into the socket - Phase 6 will revisit.
+        // backpressure into the socket.
         match sender.try_send(update) {
             Ok(()) => {}
             Err(mpsc::error::TrySendError::Full(_)) => {

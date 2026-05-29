@@ -1,11 +1,10 @@
-//! `Withdraw` EIP-712 signer - mirrors
-//! `pkg/ethsig/template/withdraw.json.tmpl` + `sign_withdraw.go`.
+//! `Withdraw` EIP-712 signer.
 
 use alloy_primitives::Address;
 use alloy_sol_types::{sol, Eip712Domain, SolStruct};
 
 use crate::error::Result;
-use crate::sign::EipSigner;
+use crate::sign::Eip712Signer;
 
 sol! {
     /// On-chain withdrawal request.
@@ -46,7 +45,7 @@ impl WithdrawPayload {
 /// Sign a [`WithdrawPayload`]. Returns the 65-byte `r || s || v`
 /// signature.
 pub fn sign_withdraw(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: WithdrawPayload,
 ) -> Result<[u8; 65]> {

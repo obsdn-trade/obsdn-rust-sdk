@@ -1,17 +1,13 @@
 //! HMAC-SHA256 request signing.
 //!
-//! Mirrors `pkg/auth/hmac.go::ComputeHMACSignature` + `BuildPrehash`:
-//!
 //! ```text
 //! prehash   = timestamp || UPPER(method) || path || body
 //! signature = base64_std(HMAC_SHA256(secret, prehash))
 //! ```
 //!
 //! `timestamp` is Unix seconds as a decimal string. `path` is the URL path
-//! ONLY - query string is excluded (verified against
-//! `pkg/gateway/options.go::prehashMetadata` which reads `r.URL.Path`).
-//! `body` is the raw bytes of the request body, or empty string for GET /
-//! DELETE without a body.
+//! only (query string excluded). `body` is the raw request body, or empty
+//! for GET/DELETE requests without a body.
 
 use base64::Engine;
 use hmac::{Hmac, Mac};
@@ -23,7 +19,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 /// `secret` is wiped from memory on drop. Clones share the secret bytes; the
 /// last drop wipes.
 #[derive(Clone)]
-pub struct HmacSigner {
+pub(crate) struct HmacSigner {
     pub(crate) key: String,
     pub(crate) secret: SecretBytes,
 }
@@ -79,16 +75,20 @@ pub(crate) struct SecretBytes(Vec<u8>);
 /// Pure HMAC-SHA256 over the canonical prehash. Exposed as a free function
 /// so test fixtures can validate against a known secret without constructing
 /// an [`HmacSigner`].
-pub fn sign_hmac(secret: &[u8], timestamp: &str, method: &str, path: &str, body: &[u8]) -> String {
+pub(crate) fn sign_hmac(
+    secret: &[u8],
+    timestamp: &str,
+    method: &str,
+    path: &str,
+    body: &[u8],
+) -> String {
     type HmacSha256 = Hmac<Sha256>;
     // `new_from_slice` only fails for keys that exceed the underlying block
     // size for non-keyed hashes; HMAC accepts any key length. Treat it as
     // unreachable.
     let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key length");
     mac.update(timestamp.as_bytes());
-    // Method is uppercased to match `strings.ToUpper(r.Method)` on the
-    // gateway side; callers should already pass uppercase but normalize
-    // defensively.
+    // Gateway requires uppercase method; normalize defensively.
     let method_upper = ascii_upper(method);
     mac.update(method_upper.as_bytes());
     mac.update(path.as_bytes());
@@ -108,26 +108,19 @@ fn ascii_upper(s: &str) -> std::borrow::Cow<'_, str> {
 mod tests {
     use super::*;
 
-    /// Golden vector - must match
-    /// `pkg/auth/hmac_test.go::TestComputeHMACSignature` semantics. We
-    /// recompute the expected value here from the same inputs the Go test
-    /// uses, then assert byte-for-byte equality. If Go's encoding ever
-    /// drifts (e.g., URL-safe base64), this test will fail.
+    /// Golden vector verified against the reference implementation.
+    /// prehash = `timestamp || method || path || body` with standard-base64
+    /// output. If the encoding ever drifts (e.g. URL-safe base64), this
+    /// test will fail visibly.
     #[test]
     fn matches_go_hmac_format() {
-        // Inputs lifted from `pkg/auth/hmac_test.go`.
         let timestamp = "1234567890";
         let method = "POST";
         let path = "/v1/orders";
         let body = b"{\"symbol\":\"BTC-USD\",\"side\":\"buy\"}";
         let secret = b"my-secret-key";
 
-        // Pre-computed expected value: HMAC-SHA256(secret, prehash) where
-        // prehash = "1234567890POST/v1/orders{\"symbol\":\"BTC-USD\",\"side\":\"buy\"}"
-        // Verified against Go on 2026-04-27 by running
-        // `auth.ComputeHMACSignature` over the same inputs. Hardcoding so
-        // future changes either pass or trigger a visible regression - the
-        // silent-mismatch risk flagged in the phase doc.
+        // HMAC-SHA256(secret, "1234567890POST/v1/orders{...}")
         let expected = "VNdJ7rUFSZvZN2gTGoo/Vz7MQ1S/FEf2GMbgp3fQ+ow=";
 
         let got = sign_hmac(secret, timestamp, method, path, body);

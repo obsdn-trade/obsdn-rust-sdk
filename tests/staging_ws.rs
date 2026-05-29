@@ -14,7 +14,7 @@
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{Channel, SubscriptionStream, WsEvent, WsUpdate};
+use obsdn_sdk::ws::{Channel, Event, SubscriptionStream, Update};
 use obsdn_sdk::{Client, Env};
 use tokio::time::timeout;
 
@@ -35,12 +35,12 @@ fn unauthed() -> Client {
 
 /// Read events until the first data frame (snapshot or update) arrives or we
 /// time out. Panics on an auth failure.
-async fn first_data(stream: &mut SubscriptionStream, secs: u64) -> Option<WsUpdate> {
+async fn first_data(stream: &mut SubscriptionStream, secs: u64) -> Option<Update> {
     loop {
         match timeout(Duration::from_secs(secs), stream.next()).await {
-            Ok(Some(WsEvent::Update(u))) => return Some(u),
-            Ok(Some(WsEvent::Unauthorized(m))) => panic!("ws auth rejected: {m}"),
-            Ok(Some(WsEvent::Reconnected)) => continue,
+            Ok(Some(Event::Update(u))) => return Some(u),
+            Ok(Some(Event::Unauthorized(m))) => panic!("ws auth rejected: {m}"),
+            Ok(Some(Event::Reconnected)) => continue,
             Ok(None) | Err(_) => return None,
         }
     }
@@ -62,7 +62,7 @@ async fn staging_ws_ticker() {
         .await
         .expect("ticker frame within 15s");
     let t = u.as_ticker().expect("ticker decodes");
-    eprintln!("OK: ticker bid={} ask={}", t.bid.px, t.ask.px);
+    eprintln!("OK: ticker bid={} ask={}", t.bid.price, t.ask.price);
     ws.shutdown().await.expect("shutdown");
 }
 
@@ -83,7 +83,7 @@ async fn staging_ws_oracle() {
         .expect("oracle frame within 15s");
     let o = u.as_oracle().expect("oracle decodes");
     assert_eq!(o.asset, "BTC");
-    eprintln!("OK: oracle BTC mark_px={}", o.mark_px);
+    eprintln!("OK: oracle BTC mark_px={}", o.mark_price);
     ws.shutdown().await.expect("shutdown");
 }
 
@@ -108,7 +108,10 @@ async fn staging_ws_wildcard_trade_routes() {
                 !u.filter.is_empty(),
                 "trade frame must carry a concrete market filter"
             );
-            eprintln!("OK: wildcard trade routed live: {} px={}", u.filter, t.px);
+            eprintln!(
+                "OK: wildcard trade routed live: {} px={}",
+                u.filter, t.price
+            );
         }
         None => eprintln!("NOTE: no trade activity in 20s window; wildcard routing not exercised"),
     }

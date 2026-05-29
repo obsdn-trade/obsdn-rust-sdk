@@ -1,4 +1,4 @@
-//! Orders REST surface - `OrderService` in `api/proto/nil/v1/order.proto`.
+//! Orders REST surface (`/orders`).
 
 use std::sync::Arc;
 
@@ -6,11 +6,8 @@ use crate::builder::Client;
 use crate::error::{Error, Result};
 use crate::market_cache::MarketCache;
 use crate::rest::query::percent_encode_segment;
-use crate::rest::{Auth, RestClient};
-use crate::sign::{
-    order::{OrderPayload, OrderSide as SignOrderSide},
-    scale_f64, sign_order, signature_hex,
-};
+use crate::rest::{AuthMode, RestClient};
+use crate::sign::{order::OrderPayload, scale_f64, sign_order, signature_hex};
 use crate::types::v1::{
     CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderByClientIdRequest,
     CancelOrderByClientIdResponse, CancelOrderRequest, CancelOrderResponse, CancelOrdersRequest,
@@ -25,24 +22,24 @@ use crate::types::v1::{
 /// [`RestClient`] - clone freely.
 ///
 /// Constructed via [`crate::Client::orders`]. `client` is the back-reference
-/// used by [`Self::place_easy`] for resolve→sign→post in one call.
+/// used by [`Self::place_limit`] for resolve→sign→post in one call.
 #[derive(Debug, Clone)]
-pub struct OrdersApi {
+pub struct Orders {
     rest: Arc<RestClient>,
     client: Client,
 }
 
-impl OrdersApi {
+impl Orders {
     pub(crate) fn with_client(rest: Arc<RestClient>, client: Client) -> Self {
         Self { rest, client }
     }
 
     /// `POST /orders` - place a single order.
     ///
-    /// **Auth:** required. EIP-712 `sig` must be populated by the caller
-    /// (Phase 4 will provide a typed signer).
+    /// **Auth:** required. EIP-712 `sig` must be pre-populated; use
+    /// [`Self::place_limit`] for the sign-then-place helper.
     pub async fn place(&self, req: PlaceOrderRequest) -> Result<PlaceOrderResponse> {
-        self.rest.post("/orders", &req, Auth::Required).await
+        self.rest.post("/orders", &req, AuthMode::Required).await
     }
 
     /// `POST /orders/group` - place a group of related orders (BRACKET).
@@ -51,13 +48,17 @@ impl OrdersApi {
         &self,
         req: PlaceOrderGroupRequest,
     ) -> Result<PlaceOrderGroupResponse> {
-        self.rest.post("/orders/group", &req, Auth::Required).await
+        self.rest
+            .post("/orders/group", &req, AuthMode::Required)
+            .await
     }
 
     /// `POST /orders/twap` - place TWAP sub-orders.
     /// **Auth:** required.
     pub async fn place_twap(&self, req: PlaceTwapOrdersRequest) -> Result<PlaceTwapOrdersResponse> {
-        self.rest.post("/orders/twap", &req, Auth::Required).await
+        self.rest
+            .post("/orders/twap", &req, AuthMode::Required)
+            .await
     }
 
     /// `DELETE /orders/{oid}` - cancel by order ID.
@@ -66,7 +67,7 @@ impl OrdersApi {
         let path = format!("/orders/{}", percent_encode_segment(oid));
         // CancelOrderRequest has only the `oid` field, already in the path.
         let _ = CancelOrderRequest::default();
-        self.rest.delete(&path, Auth::Required).await
+        self.rest.delete(&path, AuthMode::Required).await
     }
 
     /// `DELETE /orders/by-client-id/{cl_oid}` - cancel by client-assigned ID.
@@ -74,24 +75,23 @@ impl OrdersApi {
     pub async fn cancel_by_client_id(&self, cl_oid: &str) -> Result<CancelOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
         let _ = CancelOrderByClientIdRequest::default();
-        self.rest.delete(&path, Auth::Required).await
+        self.rest.delete(&path, AuthMode::Required).await
     }
 
     /// `DELETE /orders` - cancel multiple orders by criteria.
     /// **Auth:** required.
     pub async fn cancel_many(&self, req: CancelOrdersRequest) -> Result<CancelOrdersResponse> {
         self.rest
-            .delete_with_body("/orders", &req, Auth::Required)
+            .delete_with_body("/orders", &req, AuthMode::Required)
             .await
     }
 
     /// `DELETE /orders/all` - cancel all open orders, optionally filtered.
     /// **Auth:** required.
     pub async fn cancel_all(&self, req: CancelAllOrdersRequest) -> Result<CancelAllOrdersResponse> {
-        // No `body: "*"` in the http annotation - server reads filters
-        // from query params.
+        // Filters are query params, not a body.
         self.rest
-            .delete_with_query("/orders/all", &req, Auth::Required)
+            .delete_with_query("/orders/all", &req, AuthMode::Required)
             .await
     }
 
@@ -100,22 +100,22 @@ impl OrdersApi {
     pub async fn get(&self, oid: &str) -> Result<GetOrderResponse> {
         let path = format!("/orders/{}", percent_encode_segment(oid));
         let _ = GetOrderRequest::default();
-        self.rest.get(&path, Auth::Required).await
+        self.rest.get(&path, AuthMode::Required).await
     }
 
     /// `GET /orders/by-client-id/{cl_oid}` - fetch by client-assigned ID.
     /// **Auth:** required (read-only allowed).
-    pub async fn get_by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
+    pub async fn by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
         let _ = GetOrderByClientIdRequest::default();
-        self.rest.get(&path, Auth::Required).await
+        self.rest.get(&path, AuthMode::Required).await
     }
 
     /// `GET /orders` - list open orders.
     /// **Auth:** required (read-only allowed).
     pub async fn list_open(&self, req: ListOpenOrdersRequest) -> Result<ListOpenOrdersResponse> {
         self.rest
-            .get_with_query("/orders", &req, Auth::Required)
+            .get_with_query("/orders", &req, AuthMode::Required)
             .await
     }
 
@@ -126,7 +126,7 @@ impl OrdersApi {
         req: ListOrderHistoryRequest,
     ) -> Result<ListOrderHistoryResponse> {
         self.rest
-            .get_with_query("/orders/history", &req, Auth::Required)
+            .get_with_query("/orders/history", &req, AuthMode::Required)
             .await
     }
 
@@ -153,32 +153,17 @@ impl OrdersApi {
     /// STOP / TWAP / order-group flows require fields (`stop_t`,
     /// `stop_px`, `exp_ts`, `sched_ts`, ...) that this helper
     /// deliberately doesn't expose; build a raw [`PlaceOrderRequest`] +
-    /// [`crate::Client::sign_place_order`] for those. Calling
-    /// `place_easy` with any non-`Limit` order type returns `Error::Sign`.
+    /// [`crate::Client::sign_place_order`] for those.
     ///
     /// Errors:
     /// - `Error::Config` - `mkt_id` is unknown.
-    /// - `Error::Sign` - no `eip_signer` configured, scaling failed, or
-    ///   `order_type` is not `Limit`.
-    pub async fn place_easy(&self, req: PlaceEasy<'_>) -> Result<PlaceOrderResponse> {
+    /// - `Error::Sign` - no `eip712_signer` configured, scaling failed, or
+    ///   `side` is `Unspecified`.
+    pub async fn place_limit(&self, req: LimitOrder<'_>) -> Result<PlaceOrderResponse> {
         let client = &self.client;
-        let signer = client.eip_signer().cloned().ok_or_else(|| {
-            Error::Sign("no eip_signer configured; call ClientBuilder::eip_signer".into())
+        let signer = client.eip712_signer().cloned().ok_or_else(|| {
+            Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
         })?;
-        // Reject unsupported order types BEFORE signing. Exchange does
-        // not implement a true MARKET order - accepting MARKET here would
-        // sign + post with surprising semantics. STOP / TWAP need extra
-        // fields this helper doesn't expose.
-        match req.order_type {
-            OrderType::Limit => {}
-            other => {
-                return Err(Error::Sign(format!(
-                    "place_easy supports Limit only; got {other:?}. \
-                     For MARKET-like behavior use Limit + TimeInForce::Ioc + a crossing price. \
-                     Build a raw PlaceOrderRequest + Client::sign_place_order for STOP/TWAP/etc.",
-                )));
-            }
-        }
         if !req.size.is_finite() || req.size <= 0.0 {
             return Err(Error::Sign(
                 "order size must be a positive finite number".into(),
@@ -194,7 +179,7 @@ impl OrdersApi {
         let size_x18 = scale_f64(req.size)?;
         let price_x18 = scale_f64(req.price)?;
         let nonce = if req.nonce == 0 {
-            now_unix_nanos()
+            super::now_unix_nanos()
         } else {
             req.nonce
         };
@@ -202,16 +187,8 @@ impl OrdersApi {
         let payload = OrderPayload {
             sender: client.sender_address(),
             market_index,
-            side: match req.side {
-                OrderSide::Buy => SignOrderSide::Buy,
-                OrderSide::Sell => SignOrderSide::Sell,
-                _ => {
-                    return Err(Error::Sign(format!(
-                        "side must be Buy or Sell, got {:?}",
-                        req.side
-                    )))
-                }
-            },
+            // `OrderSide::Unspecified` is rejected by `try_into()`.
+            side: req.side.try_into()?,
             size: size_x18,
             price: price_x18,
             nonce,
@@ -222,7 +199,7 @@ impl OrdersApi {
         let placed = PlaceOrderRequest {
             mkt_id: market.mkt_id.clone(),
             sd: req.side as i32,
-            ot: req.order_type as i32,
+            ot: OrderType::Limit as i32,
             sz: req.size,
             px: req.price,
             tif: req.tif as i32,
@@ -239,21 +216,17 @@ impl OrdersApi {
     }
 }
 
-/// Inputs for [`OrdersApi::place_easy`]. Mirrors
+/// Inputs for [`Orders::place_limit`]. Mirrors
 /// [`PlaceOrderRequest`] minus the fields the helper fills in (`nonce`,
 /// `sig`). Optional fields default to "off"/"unspecified" - the same
 /// proto defaults a hand-built request would produce.
 #[derive(Debug, Clone)]
-pub struct PlaceEasy<'a> {
+pub struct LimitOrder<'a> {
     /// Market symbol (e.g. `"BTC-PERP"`).
     pub mkt_id: &'a str,
-    /// Buy or sell - anything else returns `Error::Sign`.
+    /// Buy or sell (`Side::Buy` / `Side::Sell`). `Unspecified` returns
+    /// `Error::Sign`.
     pub side: OrderSide,
-    /// `Limit` only. The exchange has no true MARKET order - use a
-    /// crossing limit with `tif = TimeInForce::Ioc` for that behavior.
-    /// MARKET / STOP / TWAP / GTT / scheduled types are rejected here;
-    /// see [`OrdersApi::place_easy`] doc for the rationale.
-    pub order_type: OrderType,
     /// Quote-asset price (limit price).
     pub price: f64,
     /// Base-asset size.
@@ -277,14 +250,14 @@ pub struct PlaceEasy<'a> {
     pub await_match: bool,
 }
 
-impl<'a> PlaceEasy<'a> {
-    /// Common shape: a LIMIT order with sane defaults (no STP, no
-    /// post-only, GTC, server-assigned cl_oid).
-    pub fn limit(mkt_id: &'a str, side: OrderSide, price: f64, size: f64) -> Self {
+impl<'a> LimitOrder<'a> {
+    /// A LIMIT order with sane defaults (GTC, no post-only/reduce-only, no
+    /// STP, server-assigned client id, auto nonce). Refine via the builder
+    /// methods.
+    pub fn new(mkt_id: &'a str, side: OrderSide, price: f64, size: f64) -> Self {
         Self {
             mkt_id,
             side,
-            order_type: OrderType::Limit,
             price,
             size,
             tif: TimeInForce::Unspecified,
@@ -296,17 +269,47 @@ impl<'a> PlaceEasy<'a> {
             await_match: false,
         }
     }
-}
 
-/// Wall-clock nanos since the Unix epoch - matches the Go `time.Now().UnixNano()`
-/// pattern used as the default order nonce upstream
-/// (`pkg/exc/client.go::Place`).
-fn now_unix_nanos() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        // Never panics for any realistic clock - a pre-1970 wall clock
-        // would be a bigger problem than nonce uniqueness.
-        .unwrap_or(0)
+    /// Set the post-only flag (reject if the order would take liquidity).
+    pub fn post_only(mut self, yes: bool) -> Self {
+        self.post_only = yes;
+        self
+    }
+
+    /// Set the reduce-only flag (never increase position size).
+    pub fn reduce_only(mut self, yes: bool) -> Self {
+        self.reduce_only = yes;
+        self
+    }
+
+    /// Set the time-in-force (default: server applies GTC).
+    pub fn time_in_force(mut self, tif: TimeInForce) -> Self {
+        self.tif = tif;
+        self
+    }
+
+    /// Set the self-trade-prevention policy.
+    pub fn self_trade_prevention(mut self, stp: SelfTradePrevention) -> Self {
+        self.stp = stp;
+        self
+    }
+
+    /// Attach a caller-assigned client order id (max 32 chars).
+    pub fn client_order_id(mut self, id: &'a str) -> Self {
+        self.client_order_id = Some(id);
+        self
+    }
+
+    /// Pin the EIP-712 nonce (default `0` → wall-clock nanos). Use a fixed
+    /// value for deterministic fixtures or idempotent retry.
+    pub fn nonce(mut self, nonce: u64) -> Self {
+        self.nonce = nonce;
+        self
+    }
+
+    /// Wait for matching-engine confirmation before the call returns.
+    pub fn await_match(mut self, yes: bool) -> Self {
+        self.await_match = yes;
+        self
+    }
 }

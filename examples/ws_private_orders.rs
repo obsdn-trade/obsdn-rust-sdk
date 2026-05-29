@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{Channel, WsEvent};
+use obsdn_sdk::ws::{Channel, Event};
 use obsdn_sdk::{Client, Env};
 
 #[tokio::main]
@@ -27,23 +27,23 @@ async fn main() -> Result<()> {
     let address = ws.authenticate().await?;
     tracing::info!(%address, "ws authenticated");
 
-    let mut stream = ws.subscribe(Channel::Order { market: None }).await?;
+    let mut stream = ws.subscribe(Channel::order(None)).await?;
     while let Some(evt) = stream.next().await {
         match evt {
-            WsEvent::Update(u) => {
+            Event::Update(u) => {
                 let orders = u.as_orders()?;
                 for o in orders {
                     tracing::info!(
                         oid = %o.oid,
-                        mkt = %o.mkt_id,
-                        st = %o.st,
-                        filled = %o.filled_sz,
+                        market = %o.market_id,
+                        status = %o.status,
+                        filled = %o.filled_size,
                         "order update"
                     );
                 }
             }
-            WsEvent::Reconnected => tracing::info!("reconnected"),
-            WsEvent::Unauthorized(msg) => {
+            Event::Reconnected => tracing::info!("reconnected"),
+            Event::Unauthorized(msg) => {
                 tracing::error!(%msg, "unauthorized - auth replay failed");
                 break;
             }

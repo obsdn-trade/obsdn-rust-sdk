@@ -35,7 +35,7 @@ async fn get_markets_smoke() {
         .env(Env::Production)
         .build()
         .expect("build client");
-    let resp = client.markets().get_markets().await.expect("get_markets");
+    let resp = client.markets().list().await.expect("list");
     assert!(
         !resp.mkts.is_empty(),
         "production should expose at least one market"
@@ -54,10 +54,6 @@ async fn authenticated_smoke() {
         .api_key(key, secret)
         .build()
         .expect("build authed client");
-    let resp = client
-        .markets()
-        .get_markets()
-        .await
-        .expect("authed get_markets");
+    let resp = client.markets().list().await.expect("authed list");
     assert!(!resp.mkts.is_empty());
 }

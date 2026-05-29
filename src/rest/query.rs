@@ -1,17 +1,11 @@
 //! URL query-string encoding for GET requests.
 //!
-//! Uses `serde_json::to_value` to drive serialization through the
-//! pbjson-emitted `Serialize` impl on each proto request type - pbjson
-//! already follows proto3 default-skipping semantics, so default-valued
-//! fields drop out automatically and we don't carry them as `?foo=0`.
-//! Repeated fields encode as `?key=v1&key=v2` (grpc-gateway supports both
-//! `?key[]=...` and repeated `?key=...`; we pick the latter for parity
-//! with `pkg/exc/client.go`).
+//! Uses `serde_json::to_value` to drive serialization. The generated request
+//! types follow proto3 default-skipping semantics, so default-valued fields
+//! drop out automatically (`?foo=0` is never emitted). Repeated fields encode
+//! as `?key=v1&key=v2`.
 //!
-//! Field names are the JSON (lowerCamelCase) form pbjson emits - matches
-//! what `runtime.DefaultQueryParser` accepts on the gateway side. Proto
-//! field names (snake_case) are also accepted server-side, but we keep
-//! one canonical form to avoid surprises.
+//! Field names are lowerCamelCase (the JSON form the server accepts).
 
 use serde::Serialize;
 use serde_json::Value;
@@ -30,9 +24,7 @@ pub fn encode_query<T: Serialize>(req: &T) -> Result<String> {
     let object = match value {
         Value::Object(map) => map,
         Value::Null => return Ok(String::new()),
-        // The proto-generated request types are always messages, hence
-        // objects. Anything else is a bug in the generated code or the
-        // caller passing a wrong type.
+        // Request types are always objects. Anything else is a caller bug.
         other => {
             return Err(Error::Config(format!(
                 "encode_query expects a struct/object, got {other:?}"
@@ -50,8 +42,8 @@ pub fn encode_query<T: Serialize>(req: &T) -> Result<String> {
 fn append_value(ser: &mut Serializer<'_, String>, key: &str, val: Value) {
     match val {
         Value::Null => {}
-        // pbjson emits scalars directly - strings, numbers, bools, enum
-        // names. URL-encoding them is `to_string` minus quotes.
+        // Scalars are strings, numbers, bools, or enum names.
+        // URL form is `to_string` minus JSON quotes.
         Value::Bool(b) => {
             ser.append_pair(key, if b { "true" } else { "false" });
         }
@@ -66,13 +58,11 @@ fn append_value(ser: &mut Serializer<'_, String>, key: &str, val: Value) {
                 append_value(ser, key, item);
             }
         }
-        // Nested objects in a query string aren't a thing. Flatten with
-        // dot-separated keys is one option, but no current OBSDN endpoint
-        // takes a nested message in a GET, so we just stringify as JSON
-        // - server will reject if it ever happens. The `if let Ok(s)`
-        // silently drops on serialize failure, which serde_json only
-        // produces for impossible-in-practice cases (custom Serialize
-        // impls); pbjson messages always round-trip cleanly.
+        // Nested objects in a query string aren't a thing. No current
+        // endpoint takes a nested message in a GET, so we stringify as JSON;
+        // the server will reject it if that ever changes. `if let Ok(s)`
+        // silently drops serialize failures, which serde_json only produces
+        // for pathological custom `Serialize` impls.
         Value::Object(_) => {
             if let Ok(s) = serde_json::to_string(&val) {
                 ser.append_pair(key, &s);
@@ -97,7 +87,7 @@ pub fn percent_encode_segment(s: &str) -> String {
     // application/x-www-form-urlencoded, which is wrong for path segments
     // (it encodes `/` differently). Hand-roll using percent_encoding.
     use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
-    // Reserved sub-delims & general-delims - same as Go's url.PathEscape.
+    // RFC 3986 reserved sub-delims and general-delims.
     const SEG: &AsciiSet = &CONTROLS
         .add(b' ')
         .add(b'"')
@@ -129,9 +119,8 @@ mod tests {
 
     #[test]
     fn skips_default_when_all_serialized() {
-        // serde_json produces all fields. Only proto's pbjson skips
-        // defaults - a plain serde struct emits zeros. This test pins
-        // the contract: encode_query produces stable output for a
+        // serde_json emits all fields including zero-valued ones. This test
+        // pins the contract: encode_query produces stable output for a
         // representative struct.
         let q = encode_query(&Sample {
             mkt_id: "BTC-PERP".into(),

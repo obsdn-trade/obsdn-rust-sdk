@@ -1,21 +1,17 @@
-//! EIP-712 signers - byte-equal to `pkg/ethsig/sign_*.go`.
+//! EIP-712 signers - byte-equal to the exchange's reference implementation.
 //!
-//! Each submodule mirrors one Go template:
-//!
-//! | Module        | Template family                                |
-//! |---------------|-----------------------------------------------|
-//! | [`order`]     | `Order`                                       |
-//! | [`transfer`]  | `Transfer`                                    |
-//! | [`withdraw`]  | `Withdraw`                                    |
-//! | [`vault`]     | `CreateVault`, `StakeVault`, `UnstakeVault`   |
+//! | Module        | Template family                                  |
+//! |---------------|--------------------------------------------------|
+//! | [`order`]     | `Order`                                          |
+//! | [`transfer`]  | `Transfer`                                       |
+//! | [`withdraw`]  | `Withdraw`                                       |
+//! | [`vault`]     | `CreateVault`, `StakeVault`, `UnstakeVault`      |
 //! | [`subaccount`]| `CreateSubaccount`, `RegisterChildAccountSigner` |
-//! | [`register`]  | `Register`, `DelegatedSigner`                 |
+//! | [`register`]  | `Register`, `DelegatedSigner`                    |
 //!
-//! Correctness gate: `tests/eip712_golden.rs` loads JSON fixtures captured
-//! from the Go signer (`scripts/capture_eip712_fixtures.go`) and
-//! asserts the Rust hash matches byte-for-byte. Without these, a subtle
-//! type-encoding bug would silently reject orders at the matching engine -
-//! see `pkg/ethsig/verify_order.go::computeOrderStructHash`.
+//! Correctness gate: `tests/eip712_golden.rs` loads JSON fixtures and asserts
+//! the Rust hash matches byte-for-byte. A subtle type-encoding bug would
+//! silently reject orders at the matching engine.
 
 pub mod domain;
 pub mod order;
@@ -26,8 +22,8 @@ pub mod transfer;
 pub mod vault;
 pub mod withdraw;
 
-pub use domain::{order_domain, sdk_domain};
-pub use order::{sign_order, OrderPayload, OrderSide};
+pub use domain::{custom_domain, default_eip712_domain};
+pub use order::{order_signing_hash, sign_order, OrderPayload, OrderSide};
 pub use register::{sign_delegated_signer, sign_register, DelegatedSignerPayload, RegisterPayload};
 pub use scale::{scale_decimal_str, scale_f64};
 pub use subaccount::{
@@ -51,12 +47,11 @@ use crate::error::{Error, Result};
 
 /// Object-safe abstraction over an EIP-712 signer.
 ///
-/// `sign_hash_sync` takes the EIP-712 *signing hash* (the value
-/// `keccak256(0x1901 || domainSeparator || structHash)`) and returns a
-/// 65-byte signature whose recovery id is normalized to `{27, 28}` -
-/// matching go-ethereum's wire format and what the OBSDN gateway expects in
-/// `req.sig`.
-pub trait EipSigner: Send + Sync {
+/// `sign_hash_sync` takes the EIP-712 *signing hash*
+/// (`keccak256(0x1901 || domainSeparator || structHash)`) and returns a
+/// 65-byte `r || s || v` signature with `v ∈ {27, 28}` - the wire format
+/// expected by the gateway in `req.sig`.
+pub trait Eip712Signer: Send + Sync {
     /// Public address derived from the signer's key.
     fn address(&self) -> Address;
 
@@ -65,14 +60,10 @@ pub trait EipSigner: Send + Sync {
     fn sign_hash_sync(&self, hash: B256) -> Result<[u8; 65]>;
 }
 
-/// Default [`EipSigner`] backed by a local secp256k1 key (`alloy_signer_local`).
+/// Default [`Eip712Signer`] backed by a local secp256k1 key (`alloy_signer_local`).
 ///
-/// Wraps [`PrivateKeySigner`] and:
-///   - exposes the address derived from the key
-///   - bumps recovery id by 27 to match go-ethereum's `crypto.Sign` output
-///
-/// The private key bytes never leave the inner signer - alloy zero-izes the
-/// underlying `SecretKey` on drop.
+/// Wraps [`PrivateKeySigner`]: exposes the derived address and normalizes the
+/// recovery id to `{27, 28}`. The underlying `SecretKey` is zeroed on drop.
 #[derive(Clone)]
 pub struct LocalSigner {
     inner: PrivateKeySigner,
@@ -122,16 +113,13 @@ impl std::fmt::Debug for LocalSigner {
     }
 }
 
-impl EipSigner for LocalSigner {
+impl Eip712Signer for LocalSigner {
     fn address(&self) -> Address {
         self.inner.address()
     }
 
     fn sign_hash_sync(&self, hash: B256) -> Result<[u8; 65]> {
-        // alloy's `sign_hash_sync` returns Signature with `v` already set to
-        // `parity ∈ {0, 1}`. We must serialize as `r || s || v` with v in
-        // {27, 28} to match go-ethereum's `crypto.Sign` wire format
-        // (pkg/ethsig/common.go:`signature[64] += 27`).
+        // alloy returns parity ∈ {0, 1}; gateway expects v ∈ {27, 28}.
         let sig = SignerSync::sign_hash_sync(&self.inner, &hash)
             .map_err(|e| Error::Sign(format!("local signer: {e}")))?;
         let mut out = [0u8; 65];
@@ -142,9 +130,8 @@ impl EipSigner for LocalSigner {
     }
 }
 
-/// Format a 65-byte signature as a `0x`-prefixed lowercase hex string -
-/// the on-the-wire representation expected by the OBSDN gateway in
-/// `PlaceOrderRequest.sig` and friends.
+/// Format a 65-byte signature as a `0x`-prefixed lowercase hex string,
+/// ready to submit as `PlaceOrderRequest.sig` or any equivalent field.
 pub fn signature_hex(sig: &[u8; 65]) -> String {
     let mut s = String::with_capacity(2 + 130);
     s.push_str("0x");

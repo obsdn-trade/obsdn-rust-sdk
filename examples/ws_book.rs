@@ -8,7 +8,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use obsdn_sdk::ws::{Channel, WsEvent};
+use obsdn_sdk::ws::{Channel, Event};
 use obsdn_sdk::{Client, Env};
 
 #[tokio::main]
@@ -19,16 +19,14 @@ async fn main() -> Result<()> {
     let client = Client::builder().env(Env::Production).build()?;
     let ws = client.ws();
     let mut stream = ws
-        .subscribe(Channel::Book {
-            market: market.clone(),
-        })
+        .subscribe(Channel::book(market.clone()))
         .await
         .context("subscribe book")?;
 
     let mut printed = 0;
     while let Some(evt) = stream.next().await {
         match evt {
-            WsEvent::Update(u) => {
+            Event::Update(u) => {
                 let book = u.as_book()?;
                 tracing::info!(
                     gsn = u.gsn,
@@ -44,8 +42,8 @@ async fn main() -> Result<()> {
                     break;
                 }
             }
-            WsEvent::Reconnected => tracing::info!("reconnected"),
-            WsEvent::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
+            Event::Reconnected => tracing::info!("reconnected"),
+            Event::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
         }
     }
     ws.shutdown().await.ok();

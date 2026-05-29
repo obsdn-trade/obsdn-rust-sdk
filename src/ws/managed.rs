@@ -1,32 +1,32 @@
-//! Managed WebSocket client (Phase 6).
+//! Managed WebSocket client.
 //!
-//! Wraps the Phase 5 raw [`super::connection::WsConnection`] in an auto-
-//! reconnecting supervisor. The user sees a single persistent
-//! [`SubscriptionStream`] per channel; underlying socket churn is invisible
-//! except for the [`super::event::WsEvent::Reconnected`] /
-//! [`super::event::WsEvent::Unauthorized`] markers the supervisor injects.
+//! Wraps the raw [`super::connection::WsConnection`] in an auto-reconnecting
+//! supervisor. The user sees a single persistent [`SubscriptionStream`] per
+//! channel; underlying socket churn is invisible except for the
+//! [`super::event::Event::Reconnected`] /
+//! [`super::event::Event::Unauthorized`] markers the supervisor injects.
 //!
 //! ## Lifetime
-//! - [`WsClient::new`] spawns the supervisor task immediately. It sits
-//!   idle until the first [`WsClient::subscribe`] / [`WsClient::authenticate`]
+//! - [`Session::new`] spawns the supervisor task immediately. It sits
+//!   idle until the first [`Session::subscribe`] / [`Session::authenticate`]
 //!   call expresses intent to use the connection.
-//! - [`WsClient::shutdown`] cleanly closes the socket and stops the
+//! - [`Session::shutdown`] cleanly closes the socket and stops the
 //!   supervisor. After shutdown, all subscription streams end.
-//! - Dropping every [`WsClient`] handle without calling `shutdown` also
+//! - Dropping every [`Session`] handle without calling `shutdown` also
 //!   stops the supervisor (cmd_rx returns `None`).
 //!
 //! ## Reconnect semantics
 //! - On socket drop the supervisor backs off exponentially (100ms → 30s),
 //!   reconnects, replays auth (if previously called), replays every active
 //!   subscription, then resumes pumping frames. A
-//!   [`super::event::WsEvent::Reconnected`] marker is emitted to every
+//!   [`super::event::Event::Reconnected`] marker is emitted to every
 //!   sub stream once per reconnect.
 //! - No GSN gap detection - pulse `gsn` is a sparse global watermark, not a
 //!   dense per-sub sequence (see `super` module docs). On reconnect pulse
-//!   rejoins at the current head, not a replay; callers who need byte-perfect
-//!   catch-up must resync via REST.
+//!   rejoins at the current head; callers who need byte-perfect catch-up
+//!   must resync via REST.
 //! - Auth replay failures degrade to public-only mode and emit
-//!   [`super::event::WsEvent::Unauthorized`] on every sub. Public subs keep
+//!   [`super::event::Event::Unauthorized`] on every sub. Public subs keep
 //!   working.
 
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ use crate::error::{Error, Result};
 
 use super::channel::{Channel, ChannelName};
 use super::connection::{Subscription, WsConnection};
-use super::event::{WsEvent, WsUpdate};
+use super::event::{Event, Update};
 
 /// Per-subscription user-facing buffer. Bounded so a stalled consumer can
 /// be detected and the sub dropped rather than backpressuring the
@@ -66,7 +66,7 @@ type SubKey = (ChannelName, String);
 /// Public managed WebSocket client. Cheap to clone - backed by an
 /// `Arc<Handle>`; cloning shares the supervisor task.
 #[derive(Clone)]
-pub struct WsClient {
+pub struct Session {
     inner: Arc<Handle>,
 }
 
@@ -74,7 +74,7 @@ struct Handle {
     cmd_tx: mpsc::Sender<SupCommand>,
 }
 
-impl WsClient {
+impl Session {
     pub(crate) fn new(env: Env, hmac: Option<HmacSigner>) -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel(CMD_BUFFER);
         let supervisor = Supervisor {
@@ -93,9 +93,9 @@ impl WsClient {
         }
     }
 
-    /// Subscribe to a channel. Returns a stream of [`WsEvent`]s that
+    /// Subscribe to a channel. Returns a stream of [`Event`]s that
     /// survives reconnects - internal connection swaps surface as
-    /// [`WsEvent::Reconnected`] markers.
+    /// [`Event::Reconnected`] markers.
     ///
     /// Subscribing while the supervisor is mid-reconnect is safe: the
     /// channel is registered immediately, the user receiver is returned,
@@ -168,16 +168,16 @@ impl WsClient {
     }
 }
 
-/// Stream of [`WsEvent`]s for a single subscription. Drop to free the
+/// Stream of [`Event`]s for a single subscription. Drop to free the
 /// receiver - the supervisor notices the closed channel and unsubscribes
 /// server-side. Holding the stream across disconnects is safe; the
 /// supervisor pumps fresh frames into it after every reconnect.
 pub struct SubscriptionStream {
-    inner: ReceiverStream<WsEvent>,
+    inner: ReceiverStream<Event>,
 }
 
 impl futures_util::Stream for SubscriptionStream {
-    type Item = WsEvent;
+    type Item = Event;
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
@@ -192,7 +192,7 @@ impl futures_util::Stream for SubscriptionStream {
 enum SupCommand {
     Subscribe {
         channel: Channel,
-        ack: oneshot::Sender<Result<mpsc::Receiver<WsEvent>>>,
+        ack: oneshot::Sender<Result<mpsc::Receiver<Event>>>,
     },
     Unsubscribe {
         channel: Channel,
@@ -217,7 +217,7 @@ struct ReplayMarks {
 
 struct SubSlot {
     channel: Channel,
-    user_tx: mpsc::Sender<WsEvent>,
+    user_tx: mpsc::Sender<Event>,
     /// First-subscribe ack. Held while the supervisor is mid-(re)connect or
     /// awaiting the server `subscribed` reply. Fired once the server has
     /// confirmed the subscription; cleared after - subsequent reconnects
@@ -226,8 +226,8 @@ struct SubSlot {
 }
 
 struct PendingSub {
-    ack: oneshot::Sender<Result<mpsc::Receiver<WsEvent>>>,
-    user_rx: mpsc::Receiver<WsEvent>,
+    ack: oneshot::Sender<Result<mpsc::Receiver<Event>>>,
+    user_rx: mpsc::Receiver<Event>,
 }
 
 struct Supervisor {
@@ -262,7 +262,7 @@ impl Supervisor {
             if !self.has_intent() {
                 match self.cmd_rx.recv().await {
                     Some(c) => self.handle_disconnected(c),
-                    None => return, // every WsClient handle dropped
+                    None => return, // every Session handle dropped
                 }
                 continue;
             }
@@ -291,7 +291,7 @@ impl Supervisor {
                             let _ = ack.send(Err(Error::Ws(detail.clone())));
                         }
                         let empty = ReplayMarks::default();
-                        self.broadcast(WsEvent::Unauthorized(detail), &empty).await;
+                        self.broadcast(Event::Unauthorized(detail), &empty).await;
                     }
                 }
             }
@@ -373,7 +373,7 @@ impl Supervisor {
                             if let Some(p) = slot.pending {
                                 let _ = p.ack.send(Err(Error::Ws(detail)));
                             } else {
-                                let _ = slot.user_tx.send(WsEvent::Unauthorized(detail)).await;
+                                let _ = slot.user_tx.send(Event::Unauthorized(detail)).await;
                             }
                         }
                     }
@@ -392,7 +392,7 @@ impl Supervisor {
                 // Skip subs that JUST got their first ack this cycle -
                 // from the caller's POV they didn't experience a
                 // reconnect, they just freshly subscribed.
-                self.broadcast(WsEvent::Reconnected, &marks).await;
+                self.broadcast(Event::Reconnected, &marks).await;
             }
             first = false;
             // Drive until the connection drops or shutdown is requested.
@@ -702,7 +702,7 @@ impl Supervisor {
     async fn route_update(
         &mut self,
         key: SubKey,
-        update: WsUpdate,
+        update: Update,
         conn: &WsConnection,
     ) -> Option<DriveExit> {
         let Some(slot) = self.subs.get_mut(&key) else {
@@ -710,13 +710,12 @@ impl Supervisor {
             // drop it.
             return None;
         };
-        // try_send: blocking await here would back up
-        // the entire supervisor (cmd loop, other subs, conn.closed()
-        // detection) on the slowest consumer. Phase doc Risk Assessment
-        // mentions "drop-oldest policy" but tokio mpsc lacks that - we
-        // drop the sub on Full and let the caller see the stream end.
+        // try_send: blocking await here would back up the entire supervisor
+        // (cmd loop, other subs, conn.closed() detection) on the slowest
+        // consumer. A "drop-oldest policy" is not available in tokio mpsc,
+        // so we drop the sub on Full and let the caller see the stream end.
         // They can resubscribe to start fresh.
-        match slot.user_tx.try_send(WsEvent::Update(update)) {
+        match slot.user_tx.try_send(Event::Update(update)) {
             Ok(()) => None,
             Err(mpsc::error::TrySendError::Full(_)) => {
                 tracing::warn!(?key, "ws subscriber buffer full; dropping sub");
@@ -738,7 +737,7 @@ impl Supervisor {
         }
     }
 
-    async fn broadcast(&mut self, event: WsEvent, skip: &ReplayMarks) {
+    async fn broadcast(&mut self, event: Event, skip: &ReplayMarks) {
         let keys: Vec<SubKey> = self.subs.keys().cloned().collect();
         for key in keys {
             // Skip subs that just got their first ack this cycle - from

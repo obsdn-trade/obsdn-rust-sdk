@@ -5,7 +5,7 @@ use alloy_primitives::Address;
 use alloy_sol_types::{sol, Eip712Domain, SolStruct};
 
 use crate::error::Result;
-use crate::sign::EipSigner;
+use crate::sign::Eip712Signer;
 
 sol! {
     /// Authorize a new subaccount under a main address.
@@ -16,7 +16,6 @@ sol! {
     }
 
     /// Authorize an additional signer key for a child account.
-    /// Mirrors `register_child_account_signer.json.tmpl`.
     #[derive(Debug)]
     struct RegisterChildAccountSigner {
         address main;
@@ -48,7 +47,7 @@ impl CreateSubaccountPayload {
 
 /// Sign a [`CreateSubaccountPayload`].
 pub fn sign_create_subaccount(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: CreateSubaccountPayload,
 ) -> Result<[u8; 65]> {
@@ -86,7 +85,7 @@ impl RegisterChildAccountSignerPayload {
 
 /// Sign a [`RegisterChildAccountSignerPayload`].
 pub fn sign_register_child_account_signer(
-    signer: &dyn EipSigner,
+    signer: &dyn Eip712Signer,
     domain: &Eip712Domain,
     payload: RegisterChildAccountSignerPayload,
 ) -> Result<[u8; 65]> {

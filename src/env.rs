@@ -1,8 +1,8 @@
 //! Environment selection - REST + WebSocket endpoints per env.
 //!
-//! Internal Twingate-gated hosts are NOT exposed here - those require a
-//! private network. SDK consumers should pass an explicit [`Env::Custom`]
-//! base URL when targeting `*.int.obsdn.trade`.
+//! Private/internal hosts are NOT exposed here - those require a private
+//! network. Pass an explicit [`Env::Custom`] base URL when targeting
+//! `*.int.obsdn.trade`.
 
 /// Target environment for [`crate::Client`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,9 +11,9 @@ pub enum Env {
     Staging,
     /// Production public: `https://api.obsdn.trade`.
     Production,
-    /// Caller-supplied REST + WS base URLs - for Twingate-gated internal
-    /// hosts, a forked staging stack, or a locally-run backend. The caller
-    /// is responsible for pairing this with the matching EIP-712 domain via
+    /// Caller-supplied REST + WS base URLs - for private/internal hosts,
+    /// a forked staging stack, or a locally-run backend. The caller is
+    /// responsible for pairing this with the matching EIP-712 domain via
     /// [`crate::ClientBuilder::eip712_domain`].
     Custom {
         /// REST base URL (e.g. `https://nova.stg.int.obsdn.trade`).

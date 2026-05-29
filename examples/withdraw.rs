@@ -6,18 +6,14 @@
 //!     cargo run --example withdraw
 //! ```
 //!
-//! Signs the EIP-712 `Withdraw` payload, then POSTs `/transfers/withdraw`.
-//! The chain-writer service picks up the request and submits the on-chain
-//! transaction; observe completion via the `notification` WS channel.
+//! Signs the withdrawal and posts it; the chain-writer service submits the
+//! on-chain transaction. Track completion via the `notification` WS channel.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use alloy_primitives::Address;
 use anyhow::{Context, Result};
-use obsdn_sdk::sign::{scale_decimal_str, sign_withdraw, withdraw::WithdrawPayload};
-use obsdn_sdk::types::v1::WithdrawCollateralRequest;
-use obsdn_sdk::{Client, EipSigner, Env, LocalSigner};
+use obsdn_sdk::{Client, Env, LocalSigner};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,31 +25,19 @@ async fn main() -> Result<()> {
     let token: Address = std::env::var("OBSDN_TOKEN")
         .context("OBSDN_TOKEN")?
         .parse()?;
-    let amount = std::env::var("OBSDN_AMOUNT").unwrap_or_else(|_| "1.0".into());
+    let amount: f64 = std::env::var("OBSDN_AMOUNT")
+        .unwrap_or_else(|_| "1.0".into())
+        .parse()?;
 
     let signer = Arc::new(LocalSigner::from_hex(&private_key)?);
     let client = Client::builder()
         .env(Env::Production)
         .api_key(api_key, api_secret)
-        .eip_signer(signer.clone())
+        .eip712_signer(signer)
         .build()?;
 
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() as u64;
-    let payload = WithdrawPayload {
-        sender: signer.address(),
-        token,
-        amount: scale_decimal_str(&amount)?,
-        nonce,
-    };
-    let sig = sign_withdraw(signer.as_ref(), client.eip712_domain(), payload)?;
-
-    let req = WithdrawCollateralRequest {
-        tkn: format!("{token:#x}"),
-        amt: amount,
-        nonce,
-        sig: obsdn_sdk::sign::signature_hex(&sig),
-    };
-    let resp = client.account().withdraw_collateral(req).await?;
-    tracing::info!(?resp, "withdraw_collateral result");
+    // One call scales the amount, signs the EIP-712 Withdraw, and posts it.
+    let resp = client.account().withdraw(token, amount).await?;
+    tracing::info!(?resp, "withdraw result");
     Ok(())
 }
