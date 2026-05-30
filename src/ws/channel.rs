@@ -8,8 +8,12 @@ use serde::{Deserialize, Serialize};
 
 /// Lower-case channel name as it appears on the wire (`"book"`, `"oracle"`,
 /// ...). Used as the routing key for incoming snapshot/update frames.
+///
+/// Marked `#[non_exhaustive]`: new channels may be added in future releases,
+/// so downstream `match` arms must include a `_` fallback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ChannelName {
     /// `oracle` - price feed per asset.
     Oracle,
@@ -33,14 +37,23 @@ pub enum ChannelName {
 
 impl ChannelName {
     /// Server requires authentication before subscribing to these.
+    ///
+    /// Exhaustive match (not `matches!`) so a future channel variant forces an
+    /// explicit private/public classification at compile time rather than
+    /// silently defaulting to public (which would allow an unauthenticated
+    /// subscribe attempt on a private channel).
     pub fn is_private(self) -> bool {
-        matches!(
-            self,
+        match self {
             ChannelName::Order
-                | ChannelName::Position
-                | ChannelName::Portfolio
-                | ChannelName::Notification
-        )
+            | ChannelName::Position
+            | ChannelName::Portfolio
+            | ChannelName::Notification => true,
+            ChannelName::Oracle
+            | ChannelName::Trade
+            | ChannelName::Book
+            | ChannelName::Ticker
+            | ChannelName::Event => false,
+        }
     }
 
     /// Wire string (`"oracle"`, `"book"`, ...).
@@ -61,7 +74,13 @@ impl ChannelName {
 
 /// User-facing subscription request. Carries the channel name and its filter.
 /// The SDK validates the filter shape before sending.
+///
+/// Marked `#[non_exhaustive]`: new channels may be added in future releases,
+/// so downstream `match` arms must include a `_` fallback. Variants are still
+/// constructible directly or via the helper constructors ([`Channel::book`],
+/// [`Channel::order`], ...).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Channel {
     /// `oracle` - `asset` (e.g. `"BTC"`) is required.
     Oracle {

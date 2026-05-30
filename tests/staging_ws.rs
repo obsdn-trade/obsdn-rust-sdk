@@ -41,6 +41,7 @@ async fn first_data(stream: &mut SubscriptionStream, secs: u64) -> Option<Update
             Ok(Some(Event::Update(u))) => return Some(u),
             Ok(Some(Event::Unauthorized(m))) => panic!("ws auth rejected: {m}"),
             Ok(Some(Event::Reconnected)) => continue,
+            Ok(Some(_)) => return None, // Lagged or future variant
             Ok(None) | Err(_) => return None,
         }
     }

@@ -21,7 +21,7 @@ full API reference; this file is the orientation, not the spec.
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                              Client (Arc-clone-cheap)                      │
 │                                                                            │
-│   .markets()    .orders()    .portfolio()   .price()   .transfers()  .ws() │
+│   .markets()    .orders()    .portfolio()   .price()   .account()    .ws() │
 │       │             │              │            │           │          │   │
 └───────┼─────────────┼──────────────┼────────────┼───────────┼──────────┼───┘
         │             │              │            │           │          │
@@ -35,15 +35,15 @@ full API reference; this file is the orientation, not the spec.
   │                       │                          │  │   │  (reconnect+   │
   │                       ▼                          │  │   │   exp backoff) │
   │  ┌──────────────────────────────────────────┐    │  │   ├─ subs registry │
-  │  │   RestClient  (reqwest::Client, Arc)     │    │  │   ├─ GSN tracker   │
-  │  │   ├─ HMAC sign (ts+method+path+body)     │    │  │   │  (gsn.rs)      │
+  │  │   RestClient  (reqwest::Client, Arc)     │    │  │   ├─ no gap detect │
+  │  │   ├─ HMAC sign (ts+method+path+body)     │    │  │   │  (raw gsn)     │
   │  │   ├─ retry on 5xx / network              │    │  │   └─ replay subs   │
   │  │   ├─ JSON-named wire types               │    │  │      after reconn  │
   │  │   └─ Error enum (Http/Api/Sign/Config)   │    │  │                    │
   │  └──────────────────────────────────────────┘    │  │  Channel::Book{…}  │
   │                                                  │  │  Channel::Order    │
   │  place_limit() flow:                              │  │  Channel::Trade    │
-  │   1. resolve_market(mkt_id) → MarketCache        │  │  Channel::Fill     │
+  │   1. resolve_market(mkt_id) → MarketCache        │  │  Channel::Event    │
   │   2. scale_f64 size/px → 18-dec fixed            │  │  Channel::Position │
   │   3. sign EIP-712 Order (sign/order.rs)          │  │  Channel::Oracle   │
   │   4. POST /orders with HMAC + sig                │  │  Channel::Ticker   │
@@ -76,17 +76,20 @@ full API reference; this file is the orientation, not the spec.
                         TradeView OrderView. NOT running state - decode +
                         drop. Caller owns aggregation.
 
-  ws/gsn.rs             Tracks last_gsn per (channel,market). Emits Gap
-                        when next != last+1. Caller does REST resync.
+  ws/managed.rs         Supervisor: one socket multiplexes every sub,
+                        auto-reconnect + auth/sub replay. No gap detection;
+                        gsn is exposed raw and a slow consumer is dropped
+                        with a terminal Event::Lagged. Resync via REST.
 ```
 
 ## Event flow on WS
 
 ```
-   pulse  ──frame──▶  Connection  ──▶  GsnTracker  ──▶  SubscriptionStream
+   pulse  ──frame──▶  Connection  ──▶  Supervisor  ──▶  SubscriptionStream
                        │                    │
-                       │                    └─ contiguous? → Event::Update
-                       │                    └─ skipped?    → Event::Gap{from,to}
+                       │                    └─ data frame    → Event::Update
+                       │                    └─ slow consumer  → Event::Lagged
+                       │                       (sub buffer full; sub dropped)
                        │
                        ├─ disconnect      → supervisor backoff + reconnect
                        │                  → re-subscribe all subs
@@ -132,7 +135,7 @@ full API reference; this file is the orientation, not the spec.
   ✗ No live order book maintained for you (you keep the BTreeMap)
   ✗ No open-orders / positions / balances cache
   ✗ No strategy framework, no risk layer, no portfolio analytics
-  ✗ No auto-resync on Gap (SDK signals; you decide what to refetch)
+  ✗ No gap detection (gsn is a sparse watermark; resync via REST on reconnect)
 ```
 
 ## Crate layout
@@ -151,9 +154,9 @@ full API reference; this file is the orientation, not the spec.
       ├── auth.rs         HMAC signer
       ├── error.rs        Error enum + Result alias
       ├── rest/           orders / portfolio / markets / price /
-      │                   transfers + RestClient + query helpers
+      │                   account + RestClient + query helpers
       ├── sign/           EIP-712 order/transfer/withdraw + LocalSigner
       ├── types/          generated wire types (committed under generated/)
       └── ws/             managed.rs (top-level), connection.rs (raw),
-                          channel.rs, event.rs, frame.rs, views.rs, gsn.rs
+                          channel.rs, event.rs, frame.rs, views.rs, auth.rs
 ```

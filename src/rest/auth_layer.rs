@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use reqwest::{header::HeaderName, RequestBuilder};
 
 use crate::auth::HmacSigner;
+use crate::error::{Error, Result};
 
 /// `x-api-key` header - identifies the API key.
 pub const HEADER_API_KEY: HeaderName = HeaderName::from_static("x-api-key");
@@ -29,20 +30,24 @@ pub fn apply_auth(
     method: &str,
     path: &str,
     body: &[u8],
-) -> RequestBuilder {
-    let timestamp = current_unix_seconds();
+) -> Result<RequestBuilder> {
+    let timestamp = current_unix_seconds()?;
     let signature = signer.sign(&timestamp, method, path, body);
-    builder
+    Ok(builder
         .header(HEADER_API_KEY, signer.api_key())
         .header(HEADER_API_SIGNATURE, signature)
-        .header(HEADER_API_TIMESTAMP, timestamp)
+        .header(HEADER_API_TIMESTAMP, timestamp))
 }
 
-/// Unix-epoch seconds as a decimal string. Pre-epoch clocks emit `"0"`
-/// rather than panic.
-fn current_unix_seconds() -> String {
+/// Unix-epoch seconds as a decimal string. Fails closed on a pre-epoch
+/// clock: a `"0"` timestamp would be rejected by the server's signing
+/// window anyway, so surface it as an error rather than send a doomed
+/// request.
+fn current_unix_seconds() -> Result<String> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs().to_string())
-        .unwrap_or_else(|_| "0".to_string())
+        .map_err(|_| {
+            Error::Auth("system clock is before the Unix epoch; cannot sign request".into())
+        })
 }

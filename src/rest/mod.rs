@@ -226,7 +226,7 @@ impl RestClient {
         builder = match auth {
             AuthMode::Required => match self.signer.as_ref() {
                 Some(s) => {
-                    auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())
+                    auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())?
                 }
                 None => {
                     return Err(Error::Auth(
@@ -236,7 +236,7 @@ impl RestClient {
             },
             AuthMode::Optional => match self.signer.as_ref() {
                 Some(s) => {
-                    auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())
+                    auth_layer::apply_auth(builder, s, method.as_str(), &sign_path, body.as_ref())?
                 }
                 None => builder,
             },
@@ -273,11 +273,47 @@ fn decode_error(status: StatusCode, body: Bytes) -> Error {
 /// Wall-clock nanoseconds since the Unix epoch. Default EIP-712 nonce used by
 /// the one-call signing helpers (`Orders::place_limit`, `Account::transfer` /
 /// `withdraw`).
-pub(crate) fn now_unix_nanos() -> u64 {
+pub(crate) fn now_unix_nanos() -> Result<u64> {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        // Pre-1970 clocks are a bigger problem than nonce uniqueness.
-        .unwrap_or(0)
+        .map(|d| nanos_to_nonce(d.as_nanos()))
+        // Fail closed: signing with a zero nonce would risk EIP-712 replay
+        // and cross-request nonce collisions.
+        .map_err(|_| {
+            Error::Sign("system clock is before the Unix epoch; cannot generate nonce".into())
+        })
+}
+
+/// Reduce nanoseconds-since-epoch to a `u64` nonce. Truncates (wraps ~every 584
+/// years) rather than saturating: wrapping keeps the nonce unique within each
+/// window, whereas saturating to `u64::MAX` would make every nonce identical
+/// past year ~2554 and break replay protection.
+fn nanos_to_nonce(nanos: u128) -> u64 {
+    nanos as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nanos_to_nonce;
+
+    #[test]
+    fn nonce_wraps_instead_of_saturating() {
+        // Below u64::MAX: identity.
+        assert_eq!(
+            nanos_to_nonce(1_700_000_000_000_000_000),
+            1_700_000_000_000_000_000
+        );
+        // At/above u64::MAX it must WRAP, not pin to u64::MAX (which would
+        // collide every subsequent nonce and break replay protection).
+        assert_eq!(nanos_to_nonce(u64::MAX as u128), u64::MAX);
+        assert_eq!(nanos_to_nonce(u64::MAX as u128 + 1), 0);
+        assert_eq!(nanos_to_nonce(u64::MAX as u128 + 2), 1);
+        // Two distinct post-2554 instants stay distinct (the property that a
+        // saturating cast would destroy).
+        assert_ne!(
+            nanos_to_nonce(u64::MAX as u128 + 100),
+            nanos_to_nonce(u64::MAX as u128 + 200)
+        );
+    }
 }

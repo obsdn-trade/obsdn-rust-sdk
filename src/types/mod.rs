@@ -55,3 +55,34 @@ impl v1::Market {
         self.max_lev.parse().ok()
     }
 }
+
+impl v1::GetMarketsResponse {
+    /// The available markets. Convenience accessor over the wire field
+    /// `mkts`.
+    pub fn markets(&self) -> &[v1::Market] {
+        &self.mkts
+    }
+}
+
+impl v1::Order {
+    /// Order side as a typed enum. The wire field `sd` is a raw `i32`;
+    /// returns `None` if it is not a known [`v1::OrderSide`].
+    pub fn side(&self) -> Option<v1::OrderSide> {
+        v1::OrderSide::try_from(self.sd).ok()
+    }
+
+    /// Order type as a typed enum (wire field `ot`). `None` if unknown.
+    pub fn order_type(&self) -> Option<v1::OrderType> {
+        v1::OrderType::try_from(self.ot).ok()
+    }
+
+    /// Time-in-force as a typed enum (wire field `tif`). `None` if unknown.
+    pub fn time_in_force(&self) -> Option<v1::TimeInForce> {
+        v1::TimeInForce::try_from(self.tif).ok()
+    }
+
+    /// Order status as a typed enum (wire field `st`). `None` if unknown.
+    pub fn status(&self) -> Option<v1::OrderStatus> {
+        v1::OrderStatus::try_from(self.st).ok()
+    }
+}

@@ -10,20 +10,23 @@ use alloy_primitives::{address, Address};
 use alloy_sol_types::{eip712_domain, Eip712Domain};
 
 use crate::env::Env;
+use crate::error::{Error, Result};
 
 /// Returns the EIP-712 domain for the given environment.
 ///
 /// All signer families (orders, transfers, withdrawals, vaults, registers)
-/// share a single domain. Panics if called with [`Env::Custom`]; use
-/// [`custom_domain`] or `ClientBuilder::eip712_domain()` instead.
-pub fn default_eip712_domain(env: &Env) -> Eip712Domain {
+/// share a single domain. Returns [`Error::Config`] for [`Env::Custom`],
+/// which has no canonical domain; use [`custom_domain`] or
+/// `ClientBuilder::eip712_domain()` instead.
+pub fn default_eip712_domain(env: &Env) -> Result<Eip712Domain> {
     match env {
-        Env::Staging => staging_domain(),
-        Env::Production => production_domain(),
-        Env::Custom { .. } => panic!(
+        Env::Staging => Ok(staging_domain()),
+        Env::Production => Ok(production_domain()),
+        Env::Custom { .. } => Err(Error::Config(
             "default_eip712_domain() cannot determine the correct domain for Env::Custom - \
              use custom_domain() or ClientBuilder::eip712_domain() instead"
-        ),
+                .into(),
+        )),
     }
 }
 

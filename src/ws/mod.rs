@@ -28,8 +28,10 @@
 //! while let Some(evt) = stream.next().await {
 //!     match evt {
 //!         Event::Update(u) => println!("gsn={} kind={:?}", u.gsn, u.kind),
+//!         Event::Lagged { channel, .. } => eprintln!("lagged on {channel:?}; resubscribe"),
 //!         Event::Reconnected => eprintln!("re-attached"),
 //!         Event::Unauthorized(msg) => eprintln!("auth replay failed: {msg}"),
+//!         _ => {}
 //!     }
 //! }
 //! ws.shutdown().await?;

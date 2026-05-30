@@ -79,6 +79,12 @@ impl LocalSigner {
     }
 
     /// Build from a hex-encoded private key (`0x`-prefixed or bare).
+    ///
+    /// The intermediate decoded bytes are zeroized internally, but this
+    /// function cannot zeroize `hex_str` itself (it is caller-owned). If the
+    /// key text came from a `String` or similar, zeroize that source after
+    /// this call, or load raw key bytes through [`Self::from_bytes`] from a
+    /// `Zeroizing<[u8; 32]>` to avoid a plaintext copy entirely.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
         let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let mut bytes = hex::decode(stripped)

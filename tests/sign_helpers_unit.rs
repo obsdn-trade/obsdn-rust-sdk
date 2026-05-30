@@ -19,7 +19,7 @@ fn scale_f64_rejects_non_finite_and_negative() {
 
 #[test]
 fn production_domain_constants() {
-    let d = default_eip712_domain(&Env::Production);
+    let d = default_eip712_domain(&Env::Production).expect("production domain");
     assert_eq!(d.name.as_deref(), Some("Obsidian"));
     assert_eq!(d.version.as_deref(), Some("1"));
     assert_eq!(d.chain_id.unwrap().to_string(), "143");
@@ -31,7 +31,7 @@ fn production_domain_constants() {
 
 #[test]
 fn staging_domain_constants() {
-    let d = default_eip712_domain(&Env::Staging);
+    let d = default_eip712_domain(&Env::Staging).expect("staging domain");
     assert_eq!(d.chain_id.unwrap().to_string(), "10143");
     assert_eq!(
         d.verifying_contract.unwrap().to_string().to_lowercase(),

@@ -11,7 +11,11 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors returned by the SDK surface.
+///
+/// Marked `#[non_exhaustive]`: new variants may be added in future releases,
+/// so downstream `match` arms must include a `_` fallback.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     /// Network / TLS / I/O failure before a response was parsed.
     #[error("transport error: {0}")]

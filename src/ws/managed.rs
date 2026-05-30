@@ -70,6 +70,12 @@ pub struct Session {
     inner: Arc<Handle>,
 }
 
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session").finish_non_exhaustive()
+    }
+}
+
 struct Handle {
     cmd_tx: mpsc::Sender<SupCommand>,
 }
@@ -113,6 +119,7 @@ impl Session {
             .map_err(|_| Error::Ws("supervisor dropped subscribe ack".into()))??;
         Ok(SubscriptionStream {
             inner: ReceiverStream::new(rx),
+            terminated: false,
         })
     }
 
@@ -174,16 +181,47 @@ impl Session {
 /// supervisor pumps fresh frames into it after every reconnect.
 pub struct SubscriptionStream {
     inner: ReceiverStream<Event>,
+    /// `true` once `poll_next` has yielded `None`, so [`FusedStream`] can
+    /// report termination.
+    ///
+    /// [`FusedStream`]: futures_util::stream::FusedStream
+    terminated: bool,
+}
+
+impl std::fmt::Debug for SubscriptionStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SubscriptionStream")
+            .field("terminated", &self.terminated)
+            .finish_non_exhaustive()
+    }
 }
 
 impl futures_util::Stream for SubscriptionStream {
     type Item = Event;
 
+    #[inline]
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        std::pin::Pin::new(&mut self.inner).poll_next(cx)
+        match std::pin::Pin::new(&mut self.inner).poll_next(cx) {
+            std::task::Poll::Ready(None) => {
+                self.terminated = true;
+                std::task::Poll::Ready(None)
+            }
+            other => other,
+        }
+    }
+}
+
+impl futures_util::stream::FusedStream for SubscriptionStream {
+    // `terminated` is set only after `poll_next` observes the end, so this is a
+    // post-poll signal: it reports `false` until the stream has actually been
+    // polled to completion, not the instant the supervisor closes the channel.
+    // Don't use it as a pre-poll liveness check.
+    #[inline]
+    fn is_terminated(&self) -> bool {
+        self.terminated
     }
 }
 
@@ -291,7 +329,8 @@ impl Supervisor {
                             let _ = ack.send(Err(Error::Ws(detail.clone())));
                         }
                         let empty = ReplayMarks::default();
-                        self.broadcast(Event::Unauthorized(detail), &empty).await;
+                        self.broadcast(Event::Unauthorized(detail), &empty, &conn)
+                            .await;
                     }
                 }
             }
@@ -392,7 +431,7 @@ impl Supervisor {
                 // Skip subs that JUST got their first ack this cycle -
                 // from the caller's POV they didn't experience a
                 // reconnect, they just freshly subscribed.
-                self.broadcast(Event::Reconnected, &marks).await;
+                self.broadcast(Event::Reconnected, &marks, &conn).await;
             }
             first = false;
             // Drive until the connection drops or shutdown is requested.
@@ -705,24 +744,35 @@ impl Supervisor {
         update: Update,
         conn: &WsConnection,
     ) -> Option<DriveExit> {
-        let Some(slot) = self.subs.get_mut(&key) else {
-            // Sub was unsubscribed locally but a stale frame arrived;
-            // drop it.
-            return None;
-        };
         // try_send: blocking await here would back up the entire supervisor
         // (cmd loop, other subs, conn.closed() detection) on the slowest
-        // consumer. A "drop-oldest policy" is not available in tokio mpsc,
-        // so we drop the sub on Full and let the caller see the stream end.
-        // They can resubscribe to start fresh.
-        match slot.user_tx.try_send(Event::Update(update)) {
-            Ok(()) => None,
-            Err(mpsc::error::TrySendError::Full(_)) => {
+        // consumer. A "drop-oldest" policy is not available in tokio mpsc, so
+        // on Full we drop the sub and let the caller see the stream end. They
+        // can resubscribe to start fresh. The borrow of `slot` is scoped to
+        // this block so `drop_sub` (which needs `&mut self`) can run after.
+        {
+            let Some(slot) = self.subs.get_mut(&key) else {
+                // Sub was unsubscribed locally but a stale frame arrived; drop it.
+                return None;
+            };
+            // Reserve the last buffer slot for the terminal Event::Lagged marker.
+            // While more than one slot is free, deliver the update; once only the
+            // reserved slot remains, stop delivering data and spend it on the
+            // marker so a lagging consumer always sees why the stream ended.
+            // (Sending the marker into an already-full channel would drop it.)
+            if slot.user_tx.capacity() > 1 {
+                if slot.user_tx.try_send(Event::Update(update)).is_ok() {
+                    return None;
+                }
+                // Only this task sends to user_tx, so Full is impossible while
+                // capacity > 1; an error here means the receiver was dropped
+                // (Closed). Fall through to drop the sub.
+            } else {
                 tracing::warn!(?key, "ws subscriber buffer full; dropping sub");
-                self.drop_sub(&key, conn).await
+                let _ = slot.user_tx.try_send(lagged_event(&key));
             }
-            Err(mpsc::error::TrySendError::Closed(_)) => self.drop_sub(&key, conn).await,
         }
+        self.drop_sub(&key, conn).await
     }
 
     async fn drop_sub(&mut self, key: &SubKey, conn: &WsConnection) -> Option<DriveExit> {
@@ -737,7 +787,7 @@ impl Supervisor {
         }
     }
 
-    async fn broadcast(&mut self, event: Event, skip: &ReplayMarks) {
+    async fn broadcast(&mut self, event: Event, skip: &ReplayMarks, conn: &WsConnection) {
         let keys: Vec<SubKey> = self.subs.keys().cloned().collect();
         for key in keys {
             // Skip subs that just got their first ack this cycle - from
@@ -754,13 +804,32 @@ impl Supervisor {
             if slot.pending.is_some() {
                 continue;
             }
-            // try_send so a stalled consumer doesn't block the rest of the
-            // broadcast. Reconnected/Unauthorized are informational; if
-            // the consumer is too far behind to receive them, they'll see
-            // it implicitly via the next Gap.
-            if let Err(mpsc::error::TrySendError::Closed(_)) = slot.user_tx.try_send(event.clone())
-            {
-                self.subs.remove(&key);
+            // Respect the reserved lag slot (see route_update): only spend a
+            // slot on a lifecycle marker while more than the reserved slot is
+            // free. Consuming the last slot here would starve a subsequent
+            // route_update of the slot it needs for the terminal Event::Lagged.
+            // Once the consumer is down to the reserved slot it is lagging, so
+            // treat this as the lag-drop and spend that slot on Event::Lagged.
+            // try_send throughout so a stalled consumer never blocks the
+            // broadcast to the others. Either drop path goes through drop_sub
+            // so the server-side subscription is released (otherwise the socket
+            // keeps draining it and a resubscribe is rejected as a duplicate);
+            // drop_sub drops the connection-level sender, so the raw Subscription
+            // stream ends and `drive`'s StreamMap removes it on the next poll
+            // (the same implicit pruning route_update relies on).
+            // The DriveExit that drop_sub may return (conn gone during unsub) is
+            // intentionally dropped here: broadcast can't short-circuit, and
+            // drive's conn.closed() arm catches a dead connection right after.
+            if slot.user_tx.capacity() > 1 {
+                // capacity > 1 rules out Full (only this task sends), so an
+                // error here is a dropped receiver: drop it + server-side unsub.
+                if slot.user_tx.try_send(event.clone()).is_err() {
+                    let _ = self.drop_sub(&key, conn).await;
+                }
+            } else {
+                tracing::warn!(?key, "ws subscriber buffer full on broadcast; dropping sub");
+                let _ = slot.user_tx.try_send(lagged_event(&key));
+                let _ = self.drop_sub(&key, conn).await;
             }
         }
     }
@@ -811,6 +880,16 @@ enum DriveExit {
 /// the underlying driver has exited. We distinguish that from real
 /// protocol errors so we can transition into reconnect rather than
 /// surfacing it to the user.
+/// Build the terminal `Event::Lagged` marker for a dropped subscription from
+/// its registry key. Shared by `route_update` and `broadcast` so the variant's
+/// shape is defined in one place.
+fn lagged_event(key: &SubKey) -> Event {
+    Event::Lagged {
+        channel: key.0,
+        filter: key.1.clone(),
+    }
+}
+
 fn is_conn_gone(e: &Error) -> bool {
     match e {
         Error::Ws(s) => s.contains("connection task is gone") || s.contains("connection closed"),

@@ -94,7 +94,7 @@ async fn staging_chain_config_matches_sdk_domain() {
         .domain
         .expect("chain config should carry an EIP-712 domain");
 
-    let sdk = sign::default_eip712_domain(&Env::Staging);
+    let sdk = sign::default_eip712_domain(&Env::Staging).expect("staging domain");
     assert_eq!(
         live.nm,
         sdk.name.as_deref().unwrap_or_default(),

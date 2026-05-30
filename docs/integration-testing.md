@@ -8,12 +8,12 @@
 cargo test --all-targets
 ```
 
-Runs all 86 tests including:
+Runs the full offline suite, including:
 
 - **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches the exchange's reference signer byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
-- **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, gap detection, frame loss.
+- **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, sub-replay, wildcard routing, sparse GSN.
 - **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) - wiremock-based.
-- **View roundtrip** - BookView, TickerView, OracleView, OrderView deserialization.
+- **View roundtrip** (`tests/ws_views_unit.rs`) - BookView, TickerView, OracleView, OrderView deserialization.
 - **Codegen** (`tests/codegen_smoke.rs`) - generated types compile and have expected fields.
 
 ### Production Smoke (unauthenticated)

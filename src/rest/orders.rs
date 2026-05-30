@@ -105,7 +105,7 @@ impl Orders {
 
     /// `GET /orders/by-client-id/{cl_oid}` - fetch by client-assigned ID.
     /// **Auth:** required (read-only allowed).
-    pub async fn by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
+    pub async fn get_by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
         let _ = GetOrderByClientIdRequest::default();
         self.rest.get(&path, AuthMode::Required).await
@@ -159,7 +159,7 @@ impl Orders {
     /// - `Error::Config` - `mkt_id` is unknown.
     /// - `Error::Sign` - no `eip712_signer` configured, scaling failed, or
     ///   `side` is `Unspecified`.
-    pub async fn place_limit(&self, req: LimitOrder<'_>) -> Result<PlaceOrderResponse> {
+    pub async fn place_limit(&self, req: LimitOrder) -> Result<PlaceOrderResponse> {
         let client = &self.client;
         let signer = client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
@@ -174,18 +174,18 @@ impl Orders {
                 "order price must be a positive finite number".into(),
             ));
         }
-        let market = client.resolve_market(req.mkt_id).await?;
+        let market = client.resolve_market(&req.mkt_id).await?;
         let market_index = MarketCache::idx_as_u16(&market)?;
         let size_x18 = scale_f64(req.size)?;
         let price_x18 = scale_f64(req.price)?;
         let nonce = if req.nonce == 0 {
-            super::now_unix_nanos()
+            super::now_unix_nanos()?
         } else {
             req.nonce
         };
 
         let payload = OrderPayload {
-            sender: client.sender_address(),
+            sender: client.sender_address()?,
             market_index,
             // `OrderSide::Unspecified` is rejected by `try_into()`.
             side: req.side.try_into()?,
@@ -206,7 +206,7 @@ impl Orders {
             po: req.post_only,
             ro: req.reduce_only,
             stp: req.stp as i32,
-            cl_oid: req.client_order_id.unwrap_or_default().to_string(),
+            cl_oid: req.client_order_id.unwrap_or_default(),
             nonce,
             sig: signature_hex(&sig),
             r#await: req.await_match,
@@ -221,9 +221,9 @@ impl Orders {
 /// `sig`). Optional fields default to "off"/"unspecified" - the same
 /// proto defaults a hand-built request would produce.
 #[derive(Debug, Clone)]
-pub struct LimitOrder<'a> {
+pub struct LimitOrder {
     /// Market symbol (e.g. `"BTC-PERP"`).
-    pub mkt_id: &'a str,
+    pub mkt_id: String,
     /// Buy or sell (`Side::Buy` / `Side::Sell`). `Unspecified` returns
     /// `Error::Sign`.
     pub side: OrderSide,
@@ -241,7 +241,7 @@ pub struct LimitOrder<'a> {
     /// Self-trade prevention.
     pub stp: SelfTradePrevention,
     /// Optional client-assigned id (max 32 chars; `None` → server-assigned).
-    pub client_order_id: Option<&'a str>,
+    pub client_order_id: Option<String>,
     /// `0` → use wall-clock nanos. Pass non-zero for deterministic test
     /// fixtures or idempotent retry.
     pub nonce: u64,
@@ -250,13 +250,13 @@ pub struct LimitOrder<'a> {
     pub await_match: bool,
 }
 
-impl<'a> LimitOrder<'a> {
+impl LimitOrder {
     /// A LIMIT order with sane defaults (GTC, no post-only/reduce-only, no
     /// STP, server-assigned client id, auto nonce). Refine via the builder
     /// methods.
-    pub fn new(mkt_id: &'a str, side: OrderSide, price: f64, size: f64) -> Self {
+    pub fn new(mkt_id: impl Into<String>, side: OrderSide, price: f64, size: f64) -> Self {
         Self {
-            mkt_id,
+            mkt_id: mkt_id.into(),
             side,
             price,
             size,
@@ -295,8 +295,8 @@ impl<'a> LimitOrder<'a> {
     }
 
     /// Attach a caller-assigned client order id (max 32 chars).
-    pub fn client_order_id(mut self, id: &'a str) -> Self {
-        self.client_order_id = Some(id);
+    pub fn client_order_id(mut self, id: impl Into<String>) -> Self {
+        self.client_order_id = Some(id.into());
         self
     }
 

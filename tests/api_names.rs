@@ -81,9 +81,23 @@ fn _ws_match(e: Event) {
             let _: ChannelName = u.channel;
             let _: u64 = u.gsn;
         }
+        Event::Lagged { channel, filter } => {
+            let _: ChannelName = channel;
+            let _: String = filter;
+        }
         Event::Reconnected => {}
         Event::Unauthorized(_) => {}
+        // `Event` is `#[non_exhaustive]`; a wildcard is required.
+        _ => {}
     }
+}
+
+// Methods renamed or moved in this revision resolve at their new paths.
+// Fn-item references assert the name resolves; these are async network methods,
+// so we don't call them.
+fn _renamed_methods() {
+    let _ = Orders::get_by_client_id;
+    let _ = Account::trade_history;
 }
 
 #[test]
