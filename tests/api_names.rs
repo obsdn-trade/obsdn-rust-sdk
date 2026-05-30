@@ -20,8 +20,9 @@ use obsdn_sdk::rest::subaccount::Subaccount;
 use obsdn_sdk::rest::vault::Vault;
 use obsdn_sdk::types::v1::{SelfTradePrevention, TimeInForce};
 use obsdn_sdk::ws::{
-    Book, Channel, ChannelName, CollateralAsset, Event, Oracle, Order, Portfolio as WsPortfolio,
-    Position, Session, SubscriptionStream, Ticker, TickerLevel, Trade, Update, UpdateKind,
+    Book, Channel, ChannelName, CollateralAsset, Event, Notification, Oracle, Order,
+    Portfolio as WsPortfolio, Position, Session, SubscriptionStream, Ticker, TickerLevel, Trade,
+    Update, UpdateKind,
 };
 use obsdn_sdk::{
     Client, ClientBuilder, Eip712Signer, Env, Error, LocalSigner, OrderSide, Result, Side,
@@ -70,6 +71,7 @@ fn _ws_types() {
     let _: Option<Position> = None;
     let _: Option<WsPortfolio> = None;
     let _: Option<CollateralAsset> = None;
+    let _: Option<Notification> = None;
     let _: Option<TickerLevel> = None;
     let _: Option<Update> = None;
 }

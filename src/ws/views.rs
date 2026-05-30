@@ -397,6 +397,26 @@ pub struct Order {
     pub cancel_requested: bool,
 }
 
+/// Account notification frame (`notification` channel): deposit/withdrawal and
+/// subaccount lifecycle alerts a market maker uses for collateral management.
+///
+/// The `payload` shape depends on `notification_type` (e.g. `"deposit.confirmed"`,
+/// `"withdrawal.completed"`, `"subaccount.created"`), so it is left as raw
+/// `serde_json::Value` for the caller to decode by type.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Notification {
+    /// Event kind, e.g. `"deposit.confirmed"`, `"withdrawal.failed"`,
+    /// `"subaccount.created"`.
+    pub notification_type: String,
+    /// Server timestamp (nanoseconds). `0` if absent.
+    #[serde(default)]
+    pub timestamp: i64,
+    /// Type-specific payload (deposit/withdrawal/subaccount fields). Decode
+    /// per `notification_type`. `Null` if absent.
+    #[serde(default)]
+    pub payload: serde_json::Value,
+}
+
 impl Update {
     /// Decode `data` as a [`Book`]. Returns `Error::Decode` on shape
     /// mismatch, or if the update is for a different channel.
@@ -458,6 +478,12 @@ impl Update {
     /// a single portfolio object.
     pub fn as_portfolio(&self) -> Result<Portfolio> {
         parse_view(self, ChannelName::Portfolio)
+    }
+
+    /// Decode `data` as a [`Notification`] (deposit/withdrawal/subaccount
+    /// alert). Returns `Error::Decode` on channel mismatch.
+    pub fn as_notification(&self) -> Result<Notification> {
+        parse_view(self, ChannelName::Notification)
     }
 }
 
