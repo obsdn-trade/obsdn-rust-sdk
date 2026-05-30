@@ -94,8 +94,8 @@ fn order_round_trips() {
 /// the SCREAMING_SNAKE form ("ORDER_SIDE_BUY") and the integer form (1).
 #[test]
 fn enum_accepts_both_string_and_int() {
-    let as_string = r#"{"mktId":"BTC-PERP","sd":"ORDER_SIDE_BUY","ot":"ORDER_TYPE_MARKET","sz":1.0,"px":0,"tif":"TIME_IN_FORCE_GTC","po":false,"ro":false,"stp":"SELF_TRADE_PREVENTION_CANCEL_TAKER","clOid":"x","nonce":"1","sig":""}"#;
-    let as_int = r#"{"mktId":"BTC-PERP","sd":1,"ot":2,"sz":1.0,"px":0,"tif":1,"po":false,"ro":false,"stp":1,"clOid":"x","nonce":"1","sig":""}"#;
+    let as_string = r#"{"mktId":"BTC-PERP","sd":"ORDER_SIDE_BUY","ot":"ORDER_TYPE_MARKET","sz":"1","px":"0","tif":"TIME_IN_FORCE_GTC","po":false,"ro":false,"stp":"SELF_TRADE_PREVENTION_CANCEL_TAKER","clOid":"x","nonce":"1","sig":""}"#;
+    let as_int = r#"{"mktId":"BTC-PERP","sd":1,"ot":2,"sz":"1","px":"0","tif":1,"po":false,"ro":false,"stp":1,"clOid":"x","nonce":"1","sig":""}"#;
 
     let from_string: PlaceOrderRequest =
         serde_json::from_str(as_string).expect("string-form enum must parse");

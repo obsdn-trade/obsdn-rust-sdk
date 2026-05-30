@@ -1240,12 +1240,12 @@ pub struct PlaceOrderRequest {
     /// Order type (LIMIT, MARKET, STOP, TWAP).
     #[prost(enumeration = "OrderType", tag = "3")]
     pub ot: i32,
-    /// Order quantity in base asset units.
-    #[prost(double, tag = "4")]
-    pub sz: f64,
-    /// Limit price in quote asset units.
-    #[prost(double, tag = "5")]
-    pub px: f64,
+    /// Order quantity in base asset units (decimal string).
+    #[prost(string, tag = "4")]
+    pub sz: ::prost::alloc::string::String,
+    /// Limit price in quote asset units (decimal string).
+    #[prost(string, tag = "5")]
+    pub px: ::prost::alloc::string::String,
     /// Time-in-force policy. Defaults to GTC.
     #[prost(enumeration = "TimeInForce", tag = "6")]
     pub tif: i32,
@@ -1270,9 +1270,9 @@ pub struct PlaceOrderRequest {
     /// Type of stop order (stop_loss or take_profit). For STOP orders.
     #[prost(enumeration = "StopType", tag = "13")]
     pub stop_t: i32,
-    /// Price at which the stop order triggers. For STOP orders.
-    #[prost(double, tag = "14")]
-    pub stop_px: f64,
+    /// Price at which the stop order triggers (decimal string). For STOP orders.
+    #[prost(string, tag = "14")]
+    pub stop_px: ::prost::alloc::string::String,
     /// Price source for stop evaluation. For STOP orders.
     #[prost(enumeration = "StopPriceType", tag = "15")]
     pub stop_px_type: i32,
@@ -1349,12 +1349,12 @@ pub mod place_twap_orders_request {
     /// SubOrder represents an individual TWAP sub-order.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SubOrder {
-        /// Limit price in quote asset units.
-        #[prost(double, tag = "1")]
-        pub px: f64,
-        /// Order quantity in base asset units.
-        #[prost(double, tag = "2")]
-        pub sz: f64,
+        /// Limit price in quote asset units (decimal string).
+        #[prost(string, tag = "1")]
+        pub px: ::prost::alloc::string::String,
+        /// Order quantity in base asset units (decimal string).
+        #[prost(string, tag = "2")]
+        pub sz: ::prost::alloc::string::String,
         /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes of server time.
         #[prost(uint64, tag = "3")]
         pub nonce: u64,

@@ -80,8 +80,8 @@ async fn place_limit_resolves_signs_and_posts() {
     assert_eq!(body.mkt_id, "BTC-PERP");
     assert_eq!(body.sd, OrderSide::Buy as i32);
     assert_eq!(body.ot, OrderType::Limit as i32);
-    assert_eq!(body.sz, 1.0);
-    assert_eq!(body.px, 100.0);
+    assert_eq!(body.sz, "1");
+    assert_eq!(body.px, "100");
     assert!(body.po);
     assert_eq!(body.nonce, 12345);
     assert!(

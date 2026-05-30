@@ -229,8 +229,8 @@ async fn place_resting_order(acct: &TestAccount, market: &str) -> String {
             mkt_id: market.into(),
             sd: 1, // BUY
             ot: 1, // LIMIT
-            sz: 0.0001,
-            px: 1000.0,
+            sz: "0.0001".into(),
+            px: "1000".into(),
             nonce: order_nonce,
             sig: signature_hex(&sig),
             ..Default::default()
@@ -987,8 +987,8 @@ async fn e2e_advanced_orders() {
         mkt_id: "BTC-PERP".into(),
         sd: 1, // BUY
         ot: 1, // LIMIT
-        sz: 0.0001,
-        px: 1000.0,
+        sz: "0.0001".into(),
+        px: "1000".into(),
         nonce: grp_nonce,
         sig: signature_hex(&grp_sig),
         ..Default::default()
@@ -1016,12 +1016,12 @@ async fn e2e_advanced_orders() {
         mkt_id: "BTC-PERP".into(),
         sd: 2, // SELL
         ot: 3, // STOP
-        sz: 0.0001,
-        px: 1100.0,
+        sz: "0.0001".into(),
+        px: "1100".into(),
         tif: 2, // IOC
         ro: true,
-        stop_t: 2,       // TAKE_PROFIT
-        stop_px: 1100.0, // above the parent entry (1000), required for a long
+        stop_t: 2,              // TAKE_PROFIT
+        stop_px: "1100".into(), // above the parent entry (1000), required for a long
         nonce: tp_nonce,
         sig: signature_hex(&tp_sig),
         ..Default::default()
@@ -1057,8 +1057,8 @@ async fn e2e_advanced_orders() {
             mkt_id: "BTC-PERP".into(),
             sd: 1, // BUY
             sub_ords: vec![obsdn_sdk::types::v1::place_twap_orders_request::SubOrder {
-                px: 1000.0,
-                sz: 0.0001,
+                px: "1000".into(),
+                sz: "0.0001".into(),
                 nonce: twap_nonce,
                 sig: signature_hex(&twap_sig),
                 // Must be >= 10s out; use 30s. A single sub-order has no

@@ -26848,10 +26848,10 @@ impl serde::Serialize for PlaceOrderRequest {
         if self.ot != 0 {
             len += 1;
         }
-        if self.sz != 0. {
+        if !self.sz.is_empty() {
             len += 1;
         }
-        if self.px != 0. {
+        if !self.px.is_empty() {
             len += 1;
         }
         if self.tif != 0 {
@@ -26878,7 +26878,7 @@ impl serde::Serialize for PlaceOrderRequest {
         if self.stop_t != 0 {
             len += 1;
         }
-        if self.stop_px != 0. {
+        if !self.stop_px.is_empty() {
             len += 1;
         }
         if self.stop_px_type != 0 {
@@ -26907,10 +26907,10 @@ impl serde::Serialize for PlaceOrderRequest {
                 .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.ot)))?;
             struct_ser.serialize_field("ot", &v)?;
         }
-        if self.sz != 0. {
+        if !self.sz.is_empty() {
             struct_ser.serialize_field("sz", &self.sz)?;
         }
-        if self.px != 0. {
+        if !self.px.is_empty() {
             struct_ser.serialize_field("px", &self.px)?;
         }
         if self.tif != 0 {
@@ -26945,7 +26945,7 @@ impl serde::Serialize for PlaceOrderRequest {
                 .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.stop_t)))?;
             struct_ser.serialize_field("stopT", &v)?;
         }
-        if self.stop_px != 0. {
+        if !self.stop_px.is_empty() {
             struct_ser.serialize_field("stopPx", &self.stop_px)?;
         }
         if self.stop_px_type != 0 {
@@ -27123,17 +27123,13 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                             if sz__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sz"));
                             }
-                            sz__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            sz__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Px => {
                             if px__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("px"));
                             }
-                            px__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            px__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Tif => {
                             if tif__.is_some() {
@@ -27189,9 +27185,7 @@ impl<'de> serde::Deserialize<'de> for PlaceOrderRequest {
                             if stop_px__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("stopPx"));
                             }
-                            stop_px__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            stop_px__ = Some(map_.next_value()?);
                         }
                         GeneratedField::StopPxType => {
                             if stop_px_type__.is_some() {
@@ -27512,10 +27506,10 @@ impl serde::Serialize for place_twap_orders_request::SubOrder {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.px != 0. {
+        if !self.px.is_empty() {
             len += 1;
         }
-        if self.sz != 0. {
+        if !self.sz.is_empty() {
             len += 1;
         }
         if self.nonce != 0 {
@@ -27528,10 +27522,10 @@ impl serde::Serialize for place_twap_orders_request::SubOrder {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("nil.v1.PlaceTWAPOrdersRequest.SubOrder", len)?;
-        if self.px != 0. {
+        if !self.px.is_empty() {
             struct_ser.serialize_field("px", &self.px)?;
         }
-        if self.sz != 0. {
+        if !self.sz.is_empty() {
             struct_ser.serialize_field("sz", &self.sz)?;
         }
         if self.nonce != 0 {
@@ -27628,17 +27622,13 @@ impl<'de> serde::Deserialize<'de> for place_twap_orders_request::SubOrder {
                             if px__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("px"));
                             }
-                            px__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            px__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Sz => {
                             if sz__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("sz"));
                             }
-                            sz__ = 
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
+                            sz__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Nonce => {
                             if nonce__.is_some() {

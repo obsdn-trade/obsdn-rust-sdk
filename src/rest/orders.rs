@@ -200,8 +200,11 @@ impl Orders {
             mkt_id: market.mkt_id.clone(),
             sd: req.side as i32,
             ot: OrderType::Limit as i32,
-            sz: req.size,
-            px: req.price,
+            // Decimal string matches the value scaled into the signed x18
+            // payload (`scale_f64` formats `f64` the same way), so server-side
+            // signature verification re-derives the identical price/size.
+            sz: format!("{}", req.size),
+            px: format!("{}", req.price),
             tif: req.tif as i32,
             po: req.post_only,
             ro: req.reduce_only,
