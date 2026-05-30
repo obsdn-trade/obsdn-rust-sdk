@@ -1,0 +1,5 @@
+# The crate's MSRV is declared via `rust-version` in Cargo.toml (currently 1.95).
+# This file pins the channel used in local development and CI.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

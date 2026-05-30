@@ -550,10 +550,15 @@ where
             // from; server drains its outbox before honoring unsub.
             return;
         };
-        let sender = self
-            .subscribers
-            .get(&key)
-            .expect("key just confirmed present");
+        // `key` was just resolved from `contains_key` above with no await in
+        // between, so this lookup cannot miss. Use a defensive branch rather
+        // than `expect` so a future refactor can never panic the driver task.
+        let Some(sender) = self.subscribers.get(&key) else {
+            // Unreachable under the single-task invariant above; log if a
+            // future refactor ever breaks it, so the dropped frame is visible.
+            tracing::warn!(?key, "ws route: subscriber vanished after contains_key");
+            return;
+        };
         let kind = match frame.kind {
             WireType::Snapshot => UpdateKind::Snapshot,
             _ => UpdateKind::Update,

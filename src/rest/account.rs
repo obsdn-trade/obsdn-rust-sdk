@@ -13,9 +13,9 @@ use crate::sign::{
 };
 use crate::types::v1::{
     FaucetRequest, FaucetResponse, GetAccountRequest, GetAccountResponse,
-    GetTransferHistoryRequest, GetTransferHistoryResponse, GetWithdrawalRequestsRequest,
-    GetWithdrawalRequestsResponse, SendFundsRequest, SendFundsResponse, WithdrawCollateralRequest,
-    WithdrawCollateralResponse,
+    GetAccountTradeHistoryRequest, GetAccountTradeHistoryResponse, GetTransferHistoryRequest,
+    GetTransferHistoryResponse, GetWithdrawalRequestsRequest, GetWithdrawalRequestsResponse,
+    SendFundsRequest, SendFundsResponse, WithdrawCollateralRequest, WithdrawCollateralResponse,
 };
 
 /// Cheap handle to the account endpoints. Carries a back-reference to the
@@ -83,6 +83,18 @@ impl Account {
             .await
     }
 
+    /// `GET /trade-history` - the authenticated account's trade (fill)
+    /// history.
+    /// **Auth:** required (read-only allowed).
+    pub async fn trade_history(
+        &self,
+        req: GetAccountTradeHistoryRequest,
+    ) -> Result<GetAccountTradeHistoryResponse> {
+        self.rest
+            .get_with_query("/trade-history", &req, AuthMode::Required)
+            .await
+    }
+
     /// `POST /transfers/send-funds` - send funds to another account.
     /// **Auth:** required.
     ///
@@ -118,12 +130,12 @@ impl Account {
                 "transfer amount must be a positive finite number".into(),
             ));
         }
-        let from = self.client.sender_address();
+        let from = self.client.sender_address()?;
         // The signed `amount` and the wire `amt` string are derived from the
         // same decimal text, so the server scales an identical value.
         let amt = format!("{amount}");
         let amount_x18 = scale_decimal_str(&amt)?;
-        let nonce = super::now_unix_nanos();
+        let nonce = super::now_unix_nanos()?;
         let payload = TransferPayload {
             from,
             to,
@@ -165,10 +177,10 @@ impl Account {
                 "withdraw amount must be a positive finite number".into(),
             ));
         }
-        let sender = self.client.sender_address();
+        let sender = self.client.sender_address()?;
         let amt = format!("{amount}");
         let amount_x18 = scale_decimal_str(&amt)?;
-        let nonce = super::now_unix_nanos();
+        let nonce = super::now_unix_nanos()?;
         let payload = WithdrawPayload {
             sender,
             token,

@@ -29,7 +29,7 @@ Async Rust client for the [OBSDN](https://obsdn.trade) perpetual exchange - REST
 
 - **REST** - the public service surface (~50 RPCs) across 11 typed handles: `orders`, `markets`, `account`, `asset`, `auth`, `chain`, `general`, `portfolio`, `price`, `subaccount`, and `vault`. Covers leverage, margin mode, margin transfer, and fee-tier endpoints. Authenticated requests are signed with HMAC.
 - **EIP-712 signing** - a local secp256k1 signer (`LocalSigner`) whose output is byte-equal to the exchange's reference signer, verified against golden fixtures. Templates: Order, Transfer, Withdraw, Vault (Create / Stake / Unstake), Subaccount, Register, and DelegatedSigner.
-- **WebSocket** - a managed client with automatic reconnect, exponential backoff, HMAC auth replay, and GSN (global sequence number) gap detection. Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, and `order`.
+- **WebSocket** - a managed client with automatic reconnect, exponential backoff, and HMAC auth replay. Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, and `order`. The raw `gsn` (global sequence number) watermark is exposed on each frame; the client does not infer gaps (`gsn` is sparse per subscription), so resync via REST after a reconnect if you need byte-perfect catch-up.
 
 ## Status
 
@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Call a REST handle: `markets()` exposes the markets endpoints.
     let markets = client.markets().list().await?;
-    println!("{} markets available", markets.mkts.len());
+    println!("{} markets available", markets.markets().len());
     Ok(())
 }
 ```
@@ -95,12 +95,16 @@ Place an order - `place_limit` resolves the market index, signs the EIP-712 payl
 use std::sync::Arc;
 use obsdn_sdk::rest::orders::LimitOrder;
 use obsdn_sdk::types::v1::OrderSide;
-use obsdn_sdk::{Client, LocalSigner};
+use obsdn_sdk::{Client, Env, LocalSigner};
 
 // The signer holds the secp256k1 key used for EIP-712 signing.
 let signer = Arc::new(LocalSigner::from_hex(&std::env::var("OBSDN_PRIVATE_KEY")?)?);
 
+// The env is set explicitly: when `.env()` is omitted the builder defaults to
+// `Env::Production`, and the call below signs and submits a REAL order. Use
+// `Env::Staging` to try it against staging first.
 let client = Client::builder()
+    .env(Env::Production)
     .api_key(std::env::var("OBSDN_API_KEY")?, std::env::var("OBSDN_API_SECRET")?)
     .eip712_signer(signer) // attach the signer so orders can be signed
     .build()?;
@@ -150,7 +154,7 @@ The `examples/` directory holds runnable end-to-end flows. Run one with `cargo r
 | `ws_private_orders` | HMAC auth on WebSocket + `Channel::Order`, streams order lifecycle events. |
 | `transfer`          | Sign EIP-712 `Transfer`, post `/transfers/send-funds`.                   |
 | `withdraw`          | Sign EIP-712 `Withdraw`, post `/transfers/withdraw`.                     |
-| `book_with_resync`  | Maintain a local book; on `Gap`, refetch via REST snapshot.              |
+| `book_with_resync`  | Maintain a local book; on reconnect, refetch via REST snapshot.          |
 
 ## Project layout
 
@@ -171,7 +175,7 @@ The `examples/` directory holds runnable end-to-end flows. Run one with `cargo r
 │   ├── rest/           # REST handles + helpers + auth layer
 │   ├── sign/           # EIP-712 templates + LocalSigner
 │   ├── types/          # Generated wire types (committed under generated/)
-│   └── ws/             # Managed WS, typed views, GSN tracking
+│   └── ws/             # Managed WS, typed channel views
 └── tests/              # Golden, chaos, REST smoke, staging E2E
 ```
 
@@ -179,12 +183,12 @@ The `examples/` directory holds runnable end-to-end flows. Run one with `cargo r
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo doc --no-deps
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 ```
 
-The Makefile mirrors CI: `make style`, `make lint`, `make test`, `make doc`, or `make check` for all four. `make fmt` applies formatting.
+The Makefile mirrors CI. Run `make help` to list targets: `make check` runs the full gate (style, lint, test, doc); `make fmt` formats; `make deny` runs the supply-chain gate; `make e2e` runs the live staging suite.
 
 `cargo build` requires no external code-generation tooling. Wire types are committed under `src/types/generated/`.
 

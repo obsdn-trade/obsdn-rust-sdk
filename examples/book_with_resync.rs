@@ -77,6 +77,7 @@ async fn main() -> Result<()> {
                 match u.kind {
                     obsdn_sdk::ws::UpdateKind::Snapshot => book.replace_with(&view),
                     obsdn_sdk::ws::UpdateKind::Update => book.apply_diff(&view),
+                    _ => {}
                 }
                 let (bid, ask, nb, na) = book.summary();
                 tracing::info!(?bid, ?ask, nb, na, gsn = u.gsn, "book");
@@ -94,6 +95,10 @@ async fn main() -> Result<()> {
                 // which `replace_with` applies - either path rebuilds.
             }
             Event::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
+            Event::Lagged { channel, filter } => {
+                tracing::warn!(?channel, %filter, "lagged - reseed from a REST snapshot");
+            }
+            _ => {}
         }
     }
     Ok(())

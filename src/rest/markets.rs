@@ -6,9 +6,9 @@ use crate::error::Result;
 use crate::rest::query::percent_encode_segment;
 use crate::rest::{AuthMode, RestClient};
 use crate::types::v1::{
-    GetAccountTradeHistoryRequest, GetAccountTradeHistoryResponse, GetFundingRateHistoryRequest,
-    GetFundingRateHistoryResponse, GetMarketCandlesRequest, GetMarketCandlesResponse,
-    GetMarketTradesRequest, GetMarketTradesResponse, GetMarketsResponse, GetOrderBookResponse,
+    GetFundingRateHistoryRequest, GetFundingRateHistoryResponse, GetMarketCandlesRequest,
+    GetMarketCandlesResponse, GetMarketTradesRequest, GetMarketTradesResponse, GetMarketsResponse,
+    GetOrderBookResponse,
 };
 
 /// Cheap handle to the market data endpoints.
@@ -72,16 +72,5 @@ impl Markets {
             percent_encode_segment(mkt_id)
         );
         self.rest.get_with_query(&path, &req, AuthMode::None).await
-    }
-
-    /// `GET /trade-history` - authenticated account's trade history.
-    /// **Auth:** required (read-only allowed).
-    pub async fn account_trade_history(
-        &self,
-        req: GetAccountTradeHistoryRequest,
-    ) -> Result<GetAccountTradeHistoryResponse> {
-        self.rest
-            .get_with_query("/trade-history", &req, AuthMode::Required)
-            .await
     }
 }

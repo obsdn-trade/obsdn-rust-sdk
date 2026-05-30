@@ -47,6 +47,11 @@ async fn main() -> Result<()> {
                 tracing::error!(%msg, "unauthorized - auth replay failed");
                 break;
             }
+            Event::Lagged { channel, filter } => {
+                tracing::warn!(?channel, %filter, "lagged - resubscribe to resync");
+                break;
+            }
+            _ => {}
         }
     }
     Ok(())

@@ -44,6 +44,11 @@ async fn main() -> Result<()> {
             }
             Event::Reconnected => tracing::info!("reconnected"),
             Event::Unauthorized(msg) => tracing::error!(%msg, "unauthorized"),
+            Event::Lagged { channel, filter } => {
+                tracing::warn!(?channel, %filter, "lagged - resubscribe to resync");
+                break;
+            }
+            _ => {}
         }
     }
     ws.shutdown().await.ok();

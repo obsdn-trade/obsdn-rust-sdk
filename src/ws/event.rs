@@ -55,7 +55,11 @@ where
 }
 
 /// Whether a data frame is the initial state or a subsequent diff.
+///
+/// Marked `#[non_exhaustive]`: new kinds may be added in future releases, so
+/// downstream `match` arms must include a `_` fallback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UpdateKind {
     /// Initial state - replace any cached state for this filter.
     Snapshot,
@@ -95,14 +99,33 @@ pub struct Update {
 /// Variants:
 /// - [`Event::Update`]: snapshot or update frame. Inspect `update.kind` to
 ///   discriminate - both flow through this variant.
+/// - [`Event::Lagged`]: the consumer fell behind, the per-subscription
+///   buffer filled, and the subscription was dropped. This is the last
+///   item the stream yields before it ends. Resubscribe to resume from a
+///   fresh snapshot.
 /// - [`Event::Reconnected`]: the socket dropped and the supervisor
 ///   re-attached with auth + subs replayed. Emitted once per reconnect.
 /// - [`Event::Unauthorized`]: auth replay failed (e.g. revoked key).
 ///   Private subscriptions stop delivering; public subs continue.
+///
+/// Marked `#[non_exhaustive]`: new lifecycle variants may be added in future
+/// releases, so downstream `match` arms must include a `_` fallback.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Event {
     /// Normal data frame (snapshot or update).
     Update(Update),
+    /// The consumer could not keep up: the subscription's bounded buffer
+    /// filled and the subscription was dropped. Delivered on a best-effort
+    /// basis as the final item before the stream ends. If the buffer was
+    /// fully saturated the stream may simply end without this marker, so do
+    /// not rely on it as the sole liveness signal. Resubscribe to resync.
+    Lagged {
+        /// Channel of the dropped subscription.
+        channel: ChannelName,
+        /// Filter of the dropped subscription (`""` for filter-less channels).
+        filter: String,
+    },
     /// Underlying connection re-attached. Subs replayed.
     Reconnected,
     /// Auth replay rejected by the server. Carries the server's error

@@ -52,6 +52,9 @@ struct MockState {
     /// `connection_id` and lets tests assert that a reconnect actually
     /// happened.
     conn_seq: u64,
+    /// (channel, filter) pairs the client has sent an `unsub` for, across all
+    /// connections. Lets tests assert a server-side unsubscribe was issued.
+    unsubbed: Vec<(String, String)>,
 }
 
 struct MockPulse {
@@ -145,6 +148,16 @@ impl MockPulse {
 
     async fn conn_seq(&self) -> u64 {
         self.state.lock().await.conn_seq
+    }
+
+    /// Whether the client has sent an `unsub` for `(channel, filter)`.
+    async fn was_unsubbed(&self, channel: &str, filter: &str) -> bool {
+        self.state
+            .lock()
+            .await
+            .unsubbed
+            .iter()
+            .any(|(c, f)| c == channel && f == filter)
     }
 }
 
@@ -244,6 +257,11 @@ where
                     }
                     "unsub" => {
                         subs.remove(&(channel.clone(), filter.clone()));
+                        state
+                            .lock()
+                            .await
+                            .unsubbed
+                            .push((channel.clone(), filter.clone()));
                         let mut ack = json!({ "type": "unsubscribed", "channel": channel });
                         if !filter.is_empty() { ack["filter"] = json!(filter); }
                         if ws.send(Message::Text(ack.to_string())).await.is_err() { return; }
@@ -492,6 +510,7 @@ async fn reconnect_emits_reconnected_and_resubscribes() {
                 saw_update = true;
             }
             Event::Unauthorized(m) => panic!("unexpected unauthorized: {m}"),
+            _ => {}
         }
     }
     ws.shutdown().await.expect("shutdown");
@@ -772,6 +791,155 @@ async fn slow_consumer_does_not_deadlock_supervisor() {
     ws.shutdown().await.expect("shutdown");
 }
 
+/// A consumer that overflows its buffer must receive a terminal
+/// `Event::Lagged` marker before the stream ends, so a lag-drop is
+/// distinguishable from a clean unsubscribe. The supervisor reserves the last
+/// buffer slot for this marker; without that reservation it would be dropped
+/// into the already-full channel. Regression test for that reservation.
+#[tokio::test]
+async fn slow_consumer_receives_lagged_marker_before_end() {
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws
+        .subscribe(Channel::Book {
+            market: "BTC-PERP".into(),
+        })
+        .await
+        .expect("subscribe");
+    // Overflow the 256-slot buffer without reading.
+    for gsn in 1..=400 {
+        mock.send(MockCmd::Push {
+            kind: "update",
+            channel: "book",
+            filter: Some("BTC-PERP"),
+            gsn,
+            data: json!({}),
+        })
+        .await;
+    }
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // Drain the buffered updates; the stream must yield exactly one Lagged
+    // marker and then end (None), never silently ending without it.
+    let mut saw_lagged = false;
+    loop {
+        match timeout(Duration::from_secs(2), stream.next())
+            .await
+            .expect("stream must not hang")
+        {
+            Some(Event::Update(_)) => {}
+            Some(Event::Lagged { channel, filter }) => {
+                assert_eq!(channel, ChannelName::Book);
+                assert_eq!(filter, "BTC-PERP");
+                saw_lagged = true;
+            }
+            Some(other) => panic!("unexpected event: {other:?}"),
+            None => break,
+        }
+    }
+    assert!(
+        saw_lagged,
+        "lagged subscriber must receive Event::Lagged before the stream ends"
+    );
+
+    // The lag-drop must also release the server-side subscription on the live
+    // connection (route_update -> drop_sub -> conn.unsubscribe), so the socket
+    // stops draining it and a resubscribe is not a duplicate.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    while !mock.was_unsubbed("book", "BTC-PERP").await {
+        if tokio::time::Instant::now() >= deadline {
+            panic!("lag-drop did not issue a server-side unsub for the dropped sub");
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A reconnect broadcast must not consume the slot reserved for the terminal
+/// `Event::Lagged`. Fill the buffer to exactly its last free slot, then trigger
+/// a reconnect: the `Reconnected` broadcast must yield the reserved slot to a
+/// `Lagged` marker (the consumer is lagging) rather than spend it on the
+/// lifecycle event and starve the lag signal. Regression test for the broadcast
+/// path mirroring the route_update reservation.
+#[tokio::test]
+async fn reconnect_broadcast_does_not_starve_lagged_marker() {
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws
+        .subscribe(Channel::Book {
+            market: "BTC-PERP".into(),
+        })
+        .await
+        .expect("subscribe");
+    // Push exactly SUB_USER_BUFFER - 1 (255) updates without reading. Each is
+    // delivered while capacity > 1, leaving capacity at exactly 1 (the reserved
+    // slot); the sub is not dropped (the 256th frame would be). Nothing else
+    // feeds the buffer until the reconnect below, so capacity is exactly 1.
+    for gsn in 1..=255 {
+        mock.send(MockCmd::Push {
+            kind: "update",
+            channel: "book",
+            filter: Some("BTC-PERP"),
+            gsn,
+            data: json!({}),
+        })
+        .await;
+    }
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // Reconnect: the supervisor resubscribes and broadcasts Reconnected to this
+    // established sub. With only the reserved slot free, that broadcast must
+    // become the Lagged drop, not a Reconnected that starves it.
+    mock.send(MockCmd::KillConn).await;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while mock.conn_seq().await < 2 {
+        if tokio::time::Instant::now() >= deadline {
+            panic!("mock did not see reconnect within 5s");
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    // Drain: the stream must yield a terminal Lagged and then end, never end
+    // silently (which is what consuming the reserved slot would cause).
+    let mut saw_lagged = false;
+    loop {
+        match timeout(Duration::from_secs(5), stream.next())
+            .await
+            .expect("stream must not hang")
+        {
+            Some(Event::Update(_)) => {}
+            Some(Event::Lagged { channel, .. }) => {
+                assert_eq!(channel, ChannelName::Book);
+                saw_lagged = true;
+            }
+            // A Reconnected here would mean the reserved slot was spent on the
+            // lifecycle event instead of the lag marker.
+            Some(Event::Reconnected) => panic!("reserved slot spent on Reconnected, not Lagged"),
+            Some(other) => panic!("unexpected event: {other:?}"),
+            None => break,
+        }
+    }
+    assert!(
+        saw_lagged,
+        "reconnect broadcast must yield the reserved slot to Event::Lagged"
+    );
+
+    // The lag-drop must also release the server-side subscription (via
+    // conn.unsubscribe), otherwise the socket keeps draining it and a
+    // resubscribe is rejected as a duplicate. The unsub round-trips after the
+    // Lagged marker is queued, so poll briefly for it.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    while !mock.was_unsubbed("book", "BTC-PERP").await {
+        if tokio::time::Instant::now() >= deadline {
+            panic!("lag-drop did not issue a server-side unsub for the dropped sub");
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
 /// Dropping the `SubscriptionStream` should let the supervisor notice
 /// (next data frame) and unsub server-side; AND a fresh subscribe to
 /// the same channel afterwards must succeed.
@@ -975,4 +1143,35 @@ async fn mid_replay_conn_death_preserves_subs() {
     await_update(&mut book).await;
     await_update(&mut tick).await;
     ws.shutdown().await.expect("shutdown");
+}
+
+/// `SubscriptionStream` implements `FusedStream`: after it yields `None` it must
+/// report `is_terminated() == true`, the contract `select!`/stream combinators
+/// rely on. Pre-poll it reports `false` (the documented post-poll semantics).
+#[tokio::test]
+async fn subscription_stream_is_fused_after_termination() {
+    use futures_util::stream::FusedStream;
+
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws
+        .subscribe(Channel::Book {
+            market: "BTC-PERP".into(),
+        })
+        .await
+        .expect("subscribe");
+    assert!(!stream.is_terminated(), "fresh stream is not terminated");
+
+    // Shutdown drops the supervisor's senders, ending the stream.
+    ws.shutdown().await.expect("shutdown");
+    while timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("stream must not hang")
+        .is_some()
+    {}
+    assert!(
+        stream.is_terminated(),
+        "stream must report terminated after yielding None"
+    );
 }

@@ -3,7 +3,9 @@
 //! Async Rust SDK for the OBSDN perpetual exchange. Covers the public
 //! REST surface (~50 RPCs across 11 services), EIP-712 signing for
 //! orders/transfers/withdrawals, and a managed WebSocket client with
-//! auto-reconnect, GSN gap detection, and typed channel views.
+//! auto-reconnect and typed channel views. The WS layer does not do gap
+//! detection (`gsn` is a sparse watermark); resync via REST after a
+//! reconnect if you need byte-perfect catch-up.
 //!
 //! ## Quick start - REST
 //!
@@ -17,7 +19,7 @@
 //!     .build()?;
 //!
 //! let markets = client.markets().list().await?;
-//! println!("{} markets", markets.mkts.len());
+//! println!("{} markets", markets.markets().len());
 //! # Ok(()) }
 //! ```
 //!
@@ -92,3 +94,15 @@ pub use sign::{Eip712Signer, LocalSigner};
 /// `Side::Sell`).
 pub use types::v1::OrderSide;
 pub use types::v1::OrderSide as Side;
+
+/// Common imports for getting started. `use obsdn_sdk::prelude::*;` brings the
+/// client, environment, error types, signer, the order-building types, and the
+/// core WebSocket types into scope.
+pub mod prelude {
+    pub use crate::rest::orders::LimitOrder;
+    pub use crate::types::v1::{SelfTradePrevention, TimeInForce};
+    pub use crate::ws::{Channel, Event, Session, UpdateKind};
+    pub use crate::{
+        Client, ClientBuilder, Eip712Signer, Env, Error, LocalSigner, OrderSide, Result, Side,
+    };
+}

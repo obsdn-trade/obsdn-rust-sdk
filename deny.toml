@@ -1,0 +1,55 @@
+# deny.toml - mirrors the supply-chain gate run in CI via `cargo deny check`.
+# See https://embarkstudios.github.io/cargo-deny/ for schema reference.
+
+[graph]
+# Evaluate the full dependency graph (default workspace members).
+
+[licenses]
+# Require all dependencies to use one of these permissive licenses.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "MPL-2.0",
+    "CC0-1.0",
+    "OpenSSL",
+    # Community Data License Agreement: used by the webpki/cert-data transitives.
+    "CDLA-Permissive-2.0",
+]
+
+[advisories]
+# Pull the RustSec advisory database.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Yanked crates indicate the author pulled the release for a reason.
+yanked = "deny"
+ignore = [
+    # rustls-pemfile is unmaintained with no safe upgrade. It arrives purely as
+    # a transitive of tokio-tungstenite -> rustls-native-certs and is a thin
+    # wrapper over rustls-pki-types. Revisit when tokio-tungstenite drops it.
+    "RUSTSEC-2025-0134",
+    # paste is unmaintained with no replacement. It is a build-time transitive
+    # of the alloy-sol-macro proc-macros (compile-time only, not shipped).
+    # Revisit when the alloy macro stack drops it.
+    "RUSTSEC-2024-0436",
+]
+
+[bans]
+# Warn on duplicate versions of the same crate; multiple versions of a dep
+# can silently bloat the binary and hide vulnerability fixes.
+multiple-versions = "warn"
+# Wildcard version requirements (*) are too broad for a supply-chain gate,
+# but some build-time crates use them; demote to a warning rather than deny.
+wildcards = "allow"
+
+[sources]
+# Only allow crates from crates.io and git sources (for the sdk itself, which
+# is distributed via git rather than crates.io).
+unknown-registry = "deny"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

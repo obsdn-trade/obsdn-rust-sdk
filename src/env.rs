@@ -5,7 +5,11 @@
 //! `*.int.obsdn.trade`.
 
 /// Target environment for [`crate::Client`].
+///
+/// Marked `#[non_exhaustive]`: new environments may be added in future
+/// releases, so downstream `match` arms must include a `_` fallback.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Env {
     /// Staging public: `https://nova.staging.obsdn.trade`.
     Staging,

@@ -129,6 +129,13 @@ impl Client {
     /// supervised connection that multiplexes every subscription and
     /// auto-reconnects. Inherits the HMAC API key configured on the builder
     /// so private channels can authenticate.
+    ///
+    /// Each call constructs a *new, independent* `Session` backed by its own
+    /// supervised socket. A `Session` is cheap to [`Clone`] and every
+    /// subscription multiplexes over its single connection, so obtain one
+    /// `Session` and clone the handle where needed rather than calling
+    /// `ws()` repeatedly (each extra call opens and authenticates another
+    /// socket).
     pub fn ws(&self) -> Session {
         Session::new(self.env.clone(), self.hmac.clone())
     }
@@ -146,15 +153,18 @@ impl Client {
     /// returns the main wallet address while [`Self::eip712_signer`] holds the
     /// delegated key. In normal mode it falls back to the signer's address.
     ///
-    /// Panics if no EIP signer is configured - callers that need the sender
-    /// address should check for a signer first.
-    pub(crate) fn sender_address(&self) -> Address {
-        self.sender_address.unwrap_or_else(|| {
-            self.eip712_signer
-                .as_ref()
-                .expect("no eip712_signer configured")
-                .address()
-        })
+    /// Returns [`Error::Sign`] when neither an explicit sender nor an EIP-712
+    /// signer is configured.
+    pub(crate) fn sender_address(&self) -> Result<Address> {
+        if let Some(addr) = self.sender_address {
+            return Ok(addr);
+        }
+        self.eip712_signer
+            .as_ref()
+            .map(|s| s.address())
+            .ok_or_else(|| {
+                Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
+            })
     }
 
     /// EIP-712 domain for this client's environment. Pass to
@@ -232,6 +242,10 @@ impl std::fmt::Debug for ClientBuilder {
             .field("sender_address", &self.sender_address)
             .field("timeout", &self.timeout)
             .field("user_agent", &self.user_agent)
+            .field(
+                "danger_accept_invalid_certs",
+                &self.danger_accept_invalid_certs,
+            )
             .finish()
     }
 }
@@ -314,6 +328,12 @@ impl ClientBuilder {
         };
         let base_url = Url::parse(&base)
             .map_err(|e| Error::Config(format!("invalid base url {base}: {e}")))?;
+        // Validate the custom WS endpoint up front (the REST base is parsed
+        // above). Fail at build time rather than on the first `ws()` call.
+        if let Env::Custom { .. } = &env {
+            let ws = env.ws_url();
+            Url::parse(ws).map_err(|e| Error::Config(format!("invalid ws url {ws}: {e}")))?;
+        }
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
         let hmac = self.signer.clone();
         let rest = RestClient::new(
@@ -333,7 +353,7 @@ impl ClientBuilder {
                         .into(),
                 ));
             }
-            (env, None) => default_eip712_domain(env),
+            (env, None) => default_eip712_domain(env)?,
         };
         let markets_api = Markets::new(Arc::clone(&rest));
         let markets_cache = Arc::new(MarketCache::new(markets_api));
