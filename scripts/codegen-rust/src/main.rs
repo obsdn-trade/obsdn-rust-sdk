@@ -81,8 +81,12 @@ fn main() {
         .expect("`buf export` failed - install buf and run `make codegen` once first");
     assert!(status.success(), "buf export exited non-zero");
 
-    // 2. Discover compilable .proto files under nil/v1, excluding admin
-    //    (admin RPCs are out of scope for the public SDK).
+    // 2. Discover compilable .proto files under nil/v1, excluding RPC
+    //    surfaces that are out of scope for the public SDK (no handlers
+    //    wrap them, and they carry private/internal endpoints). Excluding
+    //    the whole file is correct because the SDK exposes none of their
+    //    messages.
+    const EXCLUDED_PROTOS: &[&str] = &["admin.proto", "referral.proto", "whitelist.proto"];
     let nil_v1_dir = export_dir.join("nil/v1");
     let proto_files: Vec<PathBuf> = std::fs::read_dir(&nil_v1_dir)
         .expect("read nil/v1 dir")
@@ -92,7 +96,7 @@ fn main() {
         .filter(|p| {
             p.file_name()
                 .and_then(|n| n.to_str())
-                .map(|n| n != "admin.proto")
+                .map(|n| !EXCLUDED_PROTOS.contains(&n))
                 .unwrap_or(false)
         })
         .collect();
