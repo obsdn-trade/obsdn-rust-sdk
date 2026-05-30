@@ -43,6 +43,23 @@ fn custom_env_with_domain_builds() {
 }
 
 #[test]
+fn empty_api_credentials_are_config_error() {
+    // An empty secret would produce a valid-but-forgeable HMAC, so build()
+    // must reject empty key/secret rather than sign with them.
+    let err = Client::builder()
+        .api_key("key", "")
+        .build()
+        .expect_err("empty secret should be rejected");
+    assert!(matches!(err, Error::Config(_)), "got {err:?}");
+
+    let err = Client::builder()
+        .api_key("", "secret")
+        .build()
+        .expect_err("empty key should be rejected");
+    assert!(matches!(err, Error::Config(_)), "got {err:?}");
+}
+
+#[test]
 fn eip712_domain_override_threads_through() {
     let client = Client::builder()
         .env(Env::Production)

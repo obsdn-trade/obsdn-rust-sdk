@@ -9,9 +9,8 @@ use crate::rest::query::percent_encode_segment;
 use crate::rest::{AuthMode, RestClient};
 use crate::sign::{order::OrderPayload, scale_f64, sign_order, signature_hex};
 use crate::types::v1::{
-    CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderByClientIdRequest,
-    CancelOrderByClientIdResponse, CancelOrderRequest, CancelOrderResponse, CancelOrdersRequest,
-    CancelOrdersResponse, GetOrderByClientIdRequest, GetOrderByClientIdResponse, GetOrderRequest,
+    CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderByClientIdResponse,
+    CancelOrderResponse, CancelOrdersRequest, CancelOrdersResponse, GetOrderByClientIdResponse,
     GetOrderResponse, ListOpenOrdersRequest, ListOpenOrdersResponse, ListOrderHistoryRequest,
     ListOrderHistoryResponse, OrderSide, OrderType, PlaceOrderGroupRequest,
     PlaceOrderGroupResponse, PlaceOrderRequest, PlaceOrderResponse, PlaceTwapOrdersRequest,
@@ -64,9 +63,8 @@ impl Orders {
     /// `DELETE /orders/{oid}` - cancel by order ID.
     /// **Auth:** required.
     pub async fn cancel(&self, oid: &str) -> Result<CancelOrderResponse> {
+        // The `oid` is a path param; the request struct carries only that field.
         let path = format!("/orders/{}", percent_encode_segment(oid));
-        // CancelOrderRequest has only the `oid` field, already in the path.
-        let _ = CancelOrderRequest::default();
         self.rest.delete(&path, AuthMode::Required).await
     }
 
@@ -74,7 +72,6 @@ impl Orders {
     /// **Auth:** required.
     pub async fn cancel_by_client_id(&self, cl_oid: &str) -> Result<CancelOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
-        let _ = CancelOrderByClientIdRequest::default();
         self.rest.delete(&path, AuthMode::Required).await
     }
 
@@ -99,7 +96,6 @@ impl Orders {
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, oid: &str) -> Result<GetOrderResponse> {
         let path = format!("/orders/{}", percent_encode_segment(oid));
-        let _ = GetOrderRequest::default();
         self.rest.get(&path, AuthMode::Required).await
     }
 
@@ -107,7 +103,6 @@ impl Orders {
     /// **Auth:** required (read-only allowed).
     pub async fn get_by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
-        let _ = GetOrderByClientIdRequest::default();
         self.rest.get(&path, AuthMode::Required).await
     }
 

@@ -25,9 +25,12 @@
 //!   dense per-sub sequence (see `super` module docs). On reconnect pulse
 //!   rejoins at the current head; callers who need byte-perfect catch-up
 //!   must resync via REST.
-//! - Auth replay failures degrade to public-only mode and emit
-//!   [`super::event::Event::Unauthorized`] on every sub. Public subs keep
-//!   working.
+//! - Auth replay failures emit [`super::event::Event::Unauthorized`] on every
+//!   sub but are retried on subsequent reconnects (a transient failure, e.g. a
+//!   server restart, recovers the private feed automatically). Only after
+//!   [`MAX_AUTH_REPLAY_FAILURES`] consecutive failures does the supervisor give
+//!   up and downgrade to public-only until the caller invokes `authenticate()`
+//!   again. Public subs keep working throughout.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -58,6 +61,11 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(15);
 /// Per-attempt timeout when calling [`WsConnection::ping`] for liveness.
 /// Short - we'd rather declare dead and reconnect than hang.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Consecutive auth-replay failures tolerated before the supervisor gives up
+/// and downgrades to public-only. A transient failure (server restart, brief
+/// clock skew) recovers on the next reconnect; a permanently-revoked key stops
+/// retrying after this many attempts. Reset to zero on any auth success.
+const MAX_AUTH_REPLAY_FAILURES: u32 = 5;
 
 /// Routing key for the registry: `(ChannelName, filter_string)`. Filter is
 /// `""` for filter-less channels (`portfolio`, `notification`).
@@ -91,6 +99,7 @@ impl Session {
             auth_active: false,
             auth_address: None,
             pending_auth_acks: Vec::new(),
+            auth_failures: 0,
             shutdown: false,
         };
         tokio::spawn(supervisor.run());
@@ -283,6 +292,10 @@ struct Supervisor {
     /// Fired with the resolved address once the next connect+auth
     /// succeeds, or with the auth-replay error.
     pending_auth_acks: Vec<oneshot::Sender<Result<String>>>,
+    /// Consecutive auth-replay failures. Reset on success; once it exceeds
+    /// [`MAX_AUTH_REPLAY_FAILURES`] the supervisor stops retrying auth and
+    /// downgrades to public-only.
+    auth_failures: u32,
     shutdown: bool,
 }
 
@@ -308,10 +321,23 @@ impl Supervisor {
                 ConnectOutcome::Connected(c) => c,
                 ConnectOutcome::Stop => return,
             };
-            // Auth replay → if it fails, downgrade to public-only.
+            // Auth replay. A transient failure should not permanently kill the
+            // private feed, so keep `auth_active` set and retry on the next
+            // reconnect, bounded by MAX_AUTH_REPLAY_FAILURES. Only after the
+            // bound is exceeded do we give up and downgrade to public-only
+            // (treating the key as revoked). Recovery happens on the next
+            // natural reconnect; we don't force one just to retry auth.
+            //
+            // `authed_this_cycle` gates private-channel replay below: if auth
+            // failed this cycle we must NOT resubscribe private channels (the
+            // server rejects them unauthenticated, which would drop them from
+            // the registry). We leave them parked so the next reconnect's auth
+            // can re-establish them.
+            let mut authed_this_cycle = true;
             if self.auth_active {
                 match conn.authenticate().await {
                     Ok(addr) => {
+                        self.auth_failures = 0;
                         self.auth_address = Some(addr.clone());
                         // Fire any callers blocked on `authenticate()` from
                         // the disconnected state.
@@ -320,16 +346,36 @@ impl Supervisor {
                         }
                     }
                     Err(e) => {
+                        authed_this_cycle = false;
                         let detail = format!("{e}");
-                        tracing::warn!(error = %detail, "auth replay failed");
-                        self.auth_active = false;
+                        self.auth_failures += 1;
                         self.auth_address = None;
-                        // Pending callers see the failure too.
+                        let gave_up = self.auth_failures > MAX_AUTH_REPLAY_FAILURES;
+                        if gave_up {
+                            // Stop retrying: downgrade to public-only until the
+                            // caller invokes `authenticate()` again.
+                            self.auth_active = false;
+                            tracing::warn!(
+                                error = %detail,
+                                failures = self.auth_failures,
+                                "auth replay failed; giving up, downgrading to public-only"
+                            );
+                        } else {
+                            tracing::warn!(
+                                error = %detail,
+                                failures = self.auth_failures,
+                                "auth replay failed; will retry on next reconnect"
+                            );
+                        }
+                        // A caller blocked on `authenticate()` gets a prompt
+                        // error for this attempt (it must not hang if the
+                        // connection recovers without auth). The sticky
+                        // `auth_active` retry is independent: the session still
+                        // re-attempts auth on the next reconnect.
                         for ack in self.pending_auth_acks.drain(..) {
                             let _ = ack.send(Err(Error::Ws(detail.clone())));
                         }
-                        let empty = ReplayMarks::default();
-                        self.broadcast(Event::Unauthorized(detail), &empty, &conn)
+                        self.broadcast(Event::Unauthorized(detail), &ReplayMarks::default(), &conn)
                             .await;
                     }
                 }
@@ -358,6 +404,13 @@ impl Supervisor {
                 let Some(slot) = self.subs.get(&key) else {
                     continue;
                 };
+                // If auth failed this cycle, don't replay private channels - the
+                // server would reject them unauthenticated and we'd drop them.
+                // Leave them parked; the next reconnect's auth retry re-attaches
+                // them. Public channels replay normally.
+                if !authed_this_cycle && key.0.is_private() {
+                    continue;
+                }
                 match conn.subscribe(slot.channel.clone()).await {
                     Ok(stream) => {
                         streams.insert(key.clone(), stream);
@@ -712,14 +765,17 @@ impl Supervisor {
                 match conn.authenticate().await {
                     Ok(addr) => {
                         self.auth_active = true;
+                        self.auth_failures = 0;
                         self.auth_address = Some(addr.clone());
                         let _ = ack.send(Ok(addr));
                     }
                     Err(e) if is_conn_gone(&e) => {
                         // Park the ack alongside the disconnected-state
                         // pending list - connect-loop fires it after the
-                        // next successful auth replay.
+                        // next successful auth replay. An explicit
+                        // authenticate() grants a fresh retry budget.
                         self.auth_active = true;
+                        self.auth_failures = 0;
                         self.pending_auth_acks.push(ack);
                         return Some(DriveExit::ConnDropped);
                     }
@@ -769,7 +825,13 @@ impl Supervisor {
                 // (Closed). Fall through to drop the sub.
             } else {
                 tracing::warn!(?key, "ws subscriber buffer full; dropping sub");
-                let _ = slot.user_tx.try_send(lagged_event(&key));
+                // Best-effort terminal marker. The reserved slot makes this
+                // succeed in the normal lag case; if the consumer also dropped
+                // the receiver (Closed) it's moot. Log if it's ever lost so a
+                // silently-ending stream is diagnosable.
+                if let Err(e) = slot.user_tx.try_send(lagged_event(&key)) {
+                    tracing::warn!(?key, ?e, "could not deliver Lagged marker before drop");
+                }
             }
         }
         self.drop_sub(&key, conn).await
@@ -958,18 +1020,13 @@ impl Backoff {
 /// (different stack frames); two processes started simultaneously
 /// diverge via ASLR. Avoids pulling the `rand` crate.
 fn seed_for_backoff() -> u64 {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hasher;
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let mut h = DefaultHasher::new();
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0);
-    h.write_u64(nanos);
-    let local = 0u8;
-    h.write_usize(&local as *const _ as usize);
-    let s = h.finish();
+    use std::hash::BuildHasher;
+    // `RandomState` seeds from OS entropy on construction, so each call yields
+    // an independent value - two clients reconnecting on the same host at the
+    // same millisecond get independent jitter (avoids a thundering herd),
+    // without depending on a usable clock or on ASLR. Hash the thread id for
+    // extra per-task divergence.
+    let s = std::collections::hash_map::RandomState::new().hash_one(std::thread::current().id());
     if s == 0 {
         1
     } else {
