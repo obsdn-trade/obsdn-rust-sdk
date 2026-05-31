@@ -111,13 +111,16 @@ fn push_or_lag(sender: &mpsc::Sender<RawSubItem>, update: Update) -> PushOutcome
             Err(_) => PushOutcome::Closed,
         }
     } else {
-        // Only the reserved slot remains: spend it on the terminal marker. If
-        // the receiver was dropped meanwhile the sentinel is moot, so report
-        // Closed - the sub is dropped either way and the caller's log stays
-        // accurate about whether lag was actually signalled.
+        // Only the reserved slot remains: spend it on the terminal marker.
         match sender.try_send(RawSubItem::Lagged) {
             Ok(()) => PushOutcome::Lagged,
-            Err(_) => PushOutcome::Closed,
+            // Buffer full but the receiver is alive: the sub is lagging, so drop
+            // it as a lag even though the marker couldn't be queued. (Under the
+            // single-producer reserved-slot invariant this is unreachable, but
+            // keep the lag semantics if that ever changes.)
+            Err(mpsc::error::TrySendError::Full(_)) => PushOutcome::Lagged,
+            // Receiver gone: nothing to signal, just drop.
+            Err(mpsc::error::TrySendError::Closed(_)) => PushOutcome::Closed,
         }
     }
 }
