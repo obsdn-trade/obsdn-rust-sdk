@@ -792,7 +792,7 @@ async fn e2e_order_ergonomics() {
     let placed = client
         .orders()
         .place_limit(
-            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, 1000.0, 0.0001)
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
                 .client_order_id(&cl_oid)
                 .await_match(true),
         )
@@ -840,7 +840,7 @@ async fn e2e_order_ergonomics() {
         let r = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, 1000.0, 0.0001)
+                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
                     .await_match(true),
             )
             .await
@@ -923,7 +923,7 @@ async fn e2e_market_maker_flow() {
     let bid = client
         .orders()
         .place_limit(
-            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, 1000.0, 0.0001)
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
                 .post_only(true)
                 .client_order_id(&bid_cl)
                 .await_match(true),
@@ -934,7 +934,7 @@ async fn e2e_market_maker_flow() {
     let ask = client
         .orders()
         .place_limit(
-            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Sell, 500_000.0, 0.0001)
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Sell, "500000", "0.0001")
                 .post_only(true)
                 .client_order_id(format!("mm-ask-{}", nonce()))
                 .await_match(true),
@@ -1055,8 +1055,13 @@ async fn e2e_position_controls() {
         let opened = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, ask, 0.0001)
-                    .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
+                LimitOrder::new(
+                    "BTC-PERP",
+                    obsdn_sdk::OrderSide::Buy,
+                    format!("{ask}"),
+                    "0.0001",
+                )
+                .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
             )
             .await;
         eprintln!(
@@ -1092,9 +1097,14 @@ async fn e2e_position_controls() {
         let _ = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Sell, bid, 0.0001)
-                    .reduce_only(true)
-                    .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
+                LimitOrder::new(
+                    "BTC-PERP",
+                    obsdn_sdk::OrderSide::Sell,
+                    format!("{bid}"),
+                    "0.0001",
+                )
+                .reduce_only(true)
+                .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
             )
             .await;
     }
@@ -1381,13 +1391,13 @@ async fn e2e_collateral_movements() {
         Some(addr) => addr,
         None => create_and_establish_subaccount(&acct).await,
     };
-    let r = main_client.account().transfer(to, token, 1.0).await;
+    let r = main_client.account().transfer(to, token, "1").await;
     expect_ok_or_tolerated("transfer", r, &["previous send funds request pending"]);
 
     // Withdraw collateral - routed to the chain-writer service. Amount is
     // above the server minimum (2 USDC) so a rejection reflects staging
     // gating, not the amount.
-    let r = main_client.account().withdraw(token, 5.0).await;
+    let r = main_client.account().withdraw(token, "5").await;
     expect_ok("withdraw", r);
 
     eprintln!("=== E2E COLLATERAL MOVEMENTS PASSED ===");

@@ -44,7 +44,7 @@ full API reference; this file is the orientation, not the spec.
   │                                                  │  │  Channel::Order    │
   │  place_limit() flow:                              │  │  Channel::Trade    │
   │   1. resolve_market(mkt_id) → MarketCache        │  │  Channel::Event    │
-  │   2. scale_f64 size/px → 18-dec fixed            │  │  Channel::Position │
+  │   2. scale_decimal_str size/px → 18-dec fixed    │  │  Channel::Position │
   │   3. sign EIP-712 Order (sign/order.rs)          │  │  Channel::Oracle   │
   │   4. POST /orders with HMAC + sig                │  │  Channel::Ticker   │
   └────────────────┬─────────────────────────────────┘  └──────────┬─────────┘
@@ -102,7 +102,7 @@ full API reference; this file is the orientation, not the spec.
 ## Order placement happy path
 
 ```
-  bot.place_limit(LimitOrder::new("BTC-PERP", Buy, 50_000.0, 0.001))
+  bot.place_limit(LimitOrder::new("BTC-PERP", Buy, "50000", "0.001"))
        │
        ▼
   Orders::place_limit
@@ -112,8 +112,8 @@ full API reference; this file is the orientation, not the spec.
   Client::resolve_market("BTC-PERP")
        │  MarketCache hit? return cached. miss? fetch /markets, swap Arc.
        ▼
-  scale_f64(0.001) → "1000000000000000"  (18-dec fixed)
-  scale_f64(50_000.0) → "50000000000000000000000"
+  scale_decimal_str("0.001") → "1000000000000000"  (18-dec fixed)
+  scale_decimal_str("50000") → "50000000000000000000000"
        │
        ▼
   sign_order(local_signer, eip_domain, OrderPayload{ … })

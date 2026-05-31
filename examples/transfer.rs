@@ -23,9 +23,8 @@ async fn main() -> Result<()> {
     let token: Address = std::env::var("OBSDN_TOKEN")
         .context("OBSDN_TOKEN")?
         .parse()?;
-    let amount: f64 = std::env::var("OBSDN_AMOUNT")
-        .unwrap_or_else(|_| "1.0".into())
-        .parse()?;
+    // A decimal string, passed through verbatim (no f64 round-trip).
+    let amount = std::env::var("OBSDN_AMOUNT").unwrap_or_else(|_| "1".into());
 
     let signer = Arc::new(LocalSigner::from_hex(&private_key)?);
     let client = Client::builder()

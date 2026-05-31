@@ -38,7 +38,7 @@ async fn transfer_scales_signs_and_posts() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     signed_client(&server)
         .account()
-        .transfer(to, token, 1.5)
+        .transfer(to, token, "1.5")
         .await
         .expect("transfer");
 
@@ -71,7 +71,7 @@ async fn withdraw_scales_signs_and_posts() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     signed_client(&server)
         .account()
-        .withdraw(token, 2.25)
+        .withdraw(token, "2.25")
         .await
         .expect("withdraw");
 
@@ -105,7 +105,7 @@ async fn transfer_with_nonce_threads_the_given_nonce() {
     let nonce = 1_700_000_000_000_000_000u64;
     signed_client(&server)
         .account()
-        .transfer_with_nonce(to, token, 1.5, nonce)
+        .transfer_with_nonce(to, token, "1.5", nonce)
         .await
         .expect("transfer_with_nonce");
 
@@ -134,7 +134,7 @@ async fn withdraw_with_nonce_threads_the_given_nonce() {
     let nonce = 1_700_000_000_000_000_001u64;
     signed_client(&server)
         .account()
-        .withdraw_with_nonce(token, 2.25, nonce)
+        .withdraw_with_nonce(token, "2.25", nonce)
         .await
         .expect("withdraw_with_nonce");
 
@@ -158,7 +158,7 @@ async fn transfer_without_signer_errors() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     let err = client
         .account()
-        .transfer(to, token, 1.0)
+        .transfer(to, token, "1")
         .await
         .expect_err("must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");
@@ -177,13 +177,13 @@ async fn with_nonce_helpers_require_signer() {
     // signer requirement as the auto-nonce forms.
     let err = client
         .account()
-        .transfer_with_nonce(to, token, 1.0, 42)
+        .transfer_with_nonce(to, token, "1", 42)
         .await
         .expect_err("transfer_with_nonce must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");
     let err = client
         .account()
-        .withdraw_with_nonce(token, 1.0, 42)
+        .withdraw_with_nonce(token, "1", 42)
         .await
         .expect_err("withdraw_with_nonce must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");

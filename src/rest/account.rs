@@ -115,14 +115,17 @@ impl Account {
     /// timeout: a retry signs a fresh nonce and can move funds twice. Use
     /// [`Self::transfer_with_nonce`] with a stable nonce for idempotent retry.
     ///
+    /// `amount` is a decimal string (e.g. `"100"`, `"2.5"`); it is signed and
+    /// sent verbatim, so the exact value is preserved at any magnitude.
+    ///
     /// Errors:
-    /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is not a
-    ///   positive finite number.
+    /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is empty,
+    ///   malformed, or not positive.
     pub async fn transfer(
         &self,
         to: Address,
         token: Address,
-        amount: f64,
+        amount: impl Into<String>,
     ) -> Result<SendFundsResponse> {
         self.transfer_with_nonce(to, token, amount, super::now_unix_nanos()?)
             .await
@@ -142,22 +145,20 @@ impl Account {
         &self,
         to: Address,
         token: Address,
-        amount: f64,
+        amount: impl Into<String>,
         nonce: u64,
     ) -> Result<SendFundsResponse> {
         let signer = self.client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
         })?;
-        if !amount.is_finite() || amount <= 0.0 {
-            return Err(Error::Sign(
-                "transfer amount must be a positive finite number".into(),
-            ));
-        }
         let from = self.client.sender_address()?;
-        // The signed `amount` and the wire `amt` string are derived from the
-        // same decimal text, so the server scales an identical value.
-        let amt = format!("{amount}");
+        // The signed value and the wire `amt` string are the same decimal text,
+        // so the server scales an identical value.
+        let amt = amount.into();
         let amount_x18 = scale_decimal_str(&amt)?;
+        if amount_x18 == 0 {
+            return Err(Error::Sign("transfer amount must be positive".into()));
+        }
         let payload = TransferPayload {
             from,
             to,
@@ -187,13 +188,16 @@ impl Account {
     /// after a timeout: a retry signs a fresh nonce and can withdraw twice. Use
     /// [`Self::withdraw_with_nonce`] with a stable nonce for idempotent retry.
     ///
+    /// `amount` is a decimal string (e.g. `"100"`, `"2.5"`); it is signed and
+    /// sent verbatim, so the exact value is preserved at any magnitude.
+    ///
     /// Errors:
-    /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is not a
-    ///   positive finite number.
+    /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is empty,
+    ///   malformed, or not positive.
     pub async fn withdraw(
         &self,
         token: Address,
-        amount: f64,
+        amount: impl Into<String>,
     ) -> Result<WithdrawCollateralResponse> {
         self.withdraw_with_nonce(token, amount, super::now_unix_nanos()?)
             .await
@@ -212,20 +216,18 @@ impl Account {
     pub async fn withdraw_with_nonce(
         &self,
         token: Address,
-        amount: f64,
+        amount: impl Into<String>,
         nonce: u64,
     ) -> Result<WithdrawCollateralResponse> {
         let signer = self.client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
         })?;
-        if !amount.is_finite() || amount <= 0.0 {
-            return Err(Error::Sign(
-                "withdraw amount must be a positive finite number".into(),
-            ));
-        }
         let sender = self.client.sender_address()?;
-        let amt = format!("{amount}");
+        let amt = amount.into();
         let amount_x18 = scale_decimal_str(&amt)?;
+        if amount_x18 == 0 {
+            return Err(Error::Sign("withdraw amount must be positive".into()));
+        }
         let payload = WithdrawPayload {
             sender,
             token,

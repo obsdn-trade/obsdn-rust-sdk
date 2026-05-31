@@ -42,7 +42,9 @@ async fn main() -> Result<()> {
 
     let resp = client
         .orders()
-        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, bid, 0.001).post_only(true))
+        .place_limit(
+            LimitOrder::new("BTC-PERP", Side::Buy, format!("{bid}"), "0.001").post_only(true),
+        )
         .await?;
     tracing::info!(?resp, "order placed");
     Ok(())

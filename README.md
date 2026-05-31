@@ -113,7 +113,7 @@ let client = Client::builder()
 // signing, and the POST.
 client
     .orders()
-    .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
+    .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, "50000", "0.001"))
     .await?;
 ```
 

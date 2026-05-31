@@ -105,7 +105,7 @@ fn _renamed_methods() {
 #[test]
 fn constructors_and_variants_compile() {
     // Order builder, full chain.
-    let _ = LimitOrder::new("BTC-PERP", Side::Buy, 100.0, 1.0)
+    let _ = LimitOrder::new("BTC-PERP", Side::Buy, "100", "1")
         .post_only(true)
         .reduce_only(false)
         .time_in_force(TimeInForce::Gtc)

@@ -57,7 +57,7 @@ async fn place_limit_resolves_signs_and_posts() {
     client
         .orders()
         .place_limit(
-            LimitOrder::new("BTC-PERP", Side::Buy, 100.0, 1.0)
+            LimitOrder::new("BTC-PERP", Side::Buy, "100", "1")
                 .post_only(true)
                 .nonce(12345),
         )
@@ -101,7 +101,7 @@ async fn place_limit_without_signer_errors() {
         .unwrap();
     let err = client
         .orders()
-        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, 100.0, 1.0))
+        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, "100", "1"))
         .await
         .expect_err("must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");
@@ -117,7 +117,7 @@ async fn place_limit_rejects_non_positive_size() {
         .unwrap();
     let err = client
         .orders()
-        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, 100.0, 0.0))
+        .place_limit(LimitOrder::new("BTC-PERP", Side::Buy, "100", "0"))
         .await
         .expect_err("zero size must error");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");

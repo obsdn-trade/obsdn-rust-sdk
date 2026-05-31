@@ -104,7 +104,7 @@ async fn place_quotes(client: &Client, market: &str, mark: f64) {
     for (side, px) in [(OrderSide::Buy, bid), (OrderSide::Sell, ask)] {
         let res = client
             .orders()
-            .place_limit(LimitOrder::new(market, side, px, 0.001).post_only(true))
+            .place_limit(LimitOrder::new(market, side, format!("{px}"), "0.001").post_only(true))
             .await;
         match res {
             Ok(_) => tracing::info!(?side, px, "quote placed"),
