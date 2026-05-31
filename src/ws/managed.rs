@@ -345,6 +345,17 @@ impl Supervisor {
                             let _ = ack.send(Ok(addr.clone()));
                         }
                     }
+                    Err(e) if is_conn_gone(&e) => {
+                        // The socket dropped mid-auth: a transport failure, not a
+                        // credential rejection. Don't consume the retry budget or
+                        // emit Unauthorized - the connect loop reconnects and
+                        // replays auth, and parked acks stay queued for the next
+                        // successful auth. Otherwise a flaky network could exhaust
+                        // MAX_AUTH_REPLAY_FAILURES and falsely downgrade.
+                        authed_this_cycle = false;
+                        self.auth_address = None;
+                        tracing::info!(error = %e, "auth replay interrupted by conn drop; will retry");
+                    }
                     Err(e) => {
                         authed_this_cycle = false;
                         let detail = format!("{e}");
@@ -656,7 +667,19 @@ impl Supervisor {
                 // Conn died mid-replay: the next reconnect re-attaches it.
                 Err(e) if is_conn_gone(&e) => return,
                 Err(e) => {
-                    tracing::warn!(?key, error = %e, "parked private resubscribe failed");
+                    // Terminal rejection (validation/permission): drop the sub
+                    // so a pending caller isn't left hanging and an established
+                    // stream isn't left silently registered. Mirrors the
+                    // reconnect resubscribe path.
+                    let detail = format!("resubscribe failed: {e}");
+                    tracing::warn!(?key, error = %detail, "parked private resubscribe rejected; dropping sub");
+                    if let Some(slot) = self.subs.remove(&key) {
+                        if let Some(p) = slot.pending {
+                            let _ = p.ack.send(Err(Error::Ws(detail)));
+                        } else {
+                            let _ = slot.user_tx.send(Event::Unauthorized(detail)).await;
+                        }
+                    }
                 }
             }
         }
