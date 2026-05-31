@@ -334,6 +334,16 @@ impl ClientBuilder {
             let ws = env.ws_url();
             Url::parse(ws).map_err(|e| Error::Config(format!("invalid ws url {ws}: {e}")))?;
         }
+        // Reject an empty API key/secret: an empty HMAC secret produces a
+        // valid-but-trivially-forgeable signature, so fail fast rather than
+        // sign with it.
+        if let Some(signer) = &self.signer {
+            if signer.api_key().is_empty() || signer.secret_bytes().is_empty() {
+                return Err(Error::Config(
+                    "api_key and api_secret must both be non-empty".into(),
+                ));
+            }
+        }
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
         let hmac = self.signer.clone();
         let rest = RestClient::new(

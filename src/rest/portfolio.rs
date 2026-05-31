@@ -96,11 +96,14 @@ impl Portfolio {
 
     /// `POST /positions/{mkt_id}/leverage` - update leverage for a market position.
     /// **Auth:** required.
-    pub async fn set_leverage(&self, req: SetLeverageRequest) -> Result<SetLeverageResponse> {
+    pub async fn set_leverage(&self, mut req: SetLeverageRequest) -> Result<SetLeverageResponse> {
         let path = format!(
             "/positions/{}/leverage",
             percent_encode_segment(&req.mkt_id)
         );
+        // `mkt_id` is a path param; clear it from the body so it isn't sent
+        // twice (matches the markets-module pattern).
+        req.mkt_id = String::new();
         self.rest.post(&path, &req, AuthMode::Required).await
     }
 
@@ -108,12 +111,13 @@ impl Portfolio {
     /// **Auth:** required.
     pub async fn set_margin_mode(
         &self,
-        req: SetMarginModeRequest,
+        mut req: SetMarginModeRequest,
     ) -> Result<SetMarginModeResponse> {
         let path = format!(
             "/positions/{}/margin-mode",
             percent_encode_segment(&req.mkt_id)
         );
+        req.mkt_id = String::new();
         self.rest.post(&path, &req, AuthMode::Required).await
     }
 
@@ -121,9 +125,10 @@ impl Portfolio {
     /// **Auth:** required.
     pub async fn transfer_margin(
         &self,
-        req: TransferMarginRequest,
+        mut req: TransferMarginRequest,
     ) -> Result<TransferMarginResponse> {
         let path = format!("/positions/{}/margin", percent_encode_segment(&req.mkt_id));
+        req.mkt_id = String::new();
         self.rest.post(&path, &req, AuthMode::Required).await
     }
 }

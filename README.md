@@ -29,7 +29,7 @@ Async Rust client for the [OBSDN](https://obsdn.trade) perpetual exchange - REST
 
 - **REST** - the public service surface (~50 RPCs) across 11 typed handles: `orders`, `markets`, `account`, `asset`, `auth`, `chain`, `general`, `portfolio`, `price`, `subaccount`, and `vault`. Covers leverage, margin mode, margin transfer, and fee-tier endpoints. Authenticated requests are signed with HMAC.
 - **EIP-712 signing** - a local secp256k1 signer (`LocalSigner`) whose output is byte-equal to the exchange's reference signer, verified against golden fixtures. Templates: Order, Transfer, Withdraw, Vault (Create / Stake / Unstake), Subaccount, Register, and DelegatedSigner.
-- **WebSocket** - a managed client with automatic reconnect, exponential backoff, and HMAC auth replay. Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, and `order`. The raw `gsn` (global sequence number) watermark is exposed on each frame; the client does not infer gaps (`gsn` is sparse per subscription), so resync via REST after a reconnect if you need byte-perfect catch-up.
+- **WebSocket** - a managed client with automatic reconnect, exponential backoff, and HMAC auth replay (retried on reconnect, bounded before downgrading to public-only). Typed views per channel: `book` (with checksum), `ticker`, `oracle`, `trade`, `order`, `position`, `portfolio`, and `notification`. The raw `gsn` (global sequence number) watermark is exposed on each frame; the client does not infer gaps (`gsn` is sparse per subscription), so resync via REST after a reconnect if you need byte-perfect catch-up.
 
 ## Status
 
@@ -113,7 +113,7 @@ let client = Client::builder()
 // signing, and the POST.
 client
     .orders()
-    .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, 50_000.0, 0.001))
+    .place_limit(LimitOrder::new("BTC-PERP", OrderSide::Buy, "50000", "0.001"))
     .await?;
 ```
 
@@ -150,8 +150,9 @@ The `examples/` directory holds runnable end-to-end flows. Run one with `cargo r
 |---------------------|--------------------------------------------------------------------------|
 | `place_order`       | REST + EIP-712 signing via `place_limit`. Quotes 5% under mark.           |
 | `cancel_order`      | Cancel by order id (HMAC only, no EIP-712 needed).                       |
-| `ws_book`           | Public managed WebSocket, typed `BookView`, prints 10 frames.            |
+| `ws_book`           | Public managed WebSocket, typed `Book` view, prints 10 frames.           |
 | `ws_private_orders` | HMAC auth on WebSocket + `Channel::Order`, streams order lifecycle events. |
+| `market_maker`      | One authed WS fanned across book/ticker/order/position, post-only quotes, full `Event` handling (lag→resubscribe, reconnect, unauthorized), `cancel_all` on shutdown. |
 | `transfer`          | Sign EIP-712 `Transfer`, post `/transfers/send-funds`.                   |
 | `withdraw`          | Sign EIP-712 `Withdraw`, post `/transfers/withdraw`.                     |
 | `book_with_resync`  | Maintain a local book; on reconnect, refetch via REST snapshot.          |
@@ -205,10 +206,12 @@ OBSDN_SMOKE=1 cargo test --test integration_smoke -- --nocapture
 # Staging smoke (public + authed)
 OBSDN_STAGING=1 cargo test --test staging_smoke -- --nocapture
 
-# E2E staging - REST + live WS observer:
-#   e2e_combined_flow: register → faucet → ws auth → place/cancel via REST,
-#                      observing order updates over the WS wildcard sub
-#   e2e_ws_public_book: public book snapshot + follow-up update (no auth)
+# E2E staging - 8 flows over REST + a live WS, each setting up its own state:
+#   combined_flow (register/auth, place+cancel observed over the wildcard sub),
+#   order_ergonomics (place_limit read-back + cancel_many), market_maker_flow
+#   (fan-out + post-only quotes), collateral_movements (transfer/withdraw),
+#   advanced_orders (bracket + TWAP), position_controls (margin mode +
+#   transfer_margin), subaccount_lifecycle, and ws_public_book.
 OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 ```
 

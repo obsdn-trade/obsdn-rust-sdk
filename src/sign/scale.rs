@@ -32,8 +32,13 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
         Some((i, f)) => (i, f),
         None => (s, ""),
     };
-    if int_part.is_empty() && frac_part.is_empty() {
-        return Err(Error::Sign("empty decimal".into()));
+    // Require an integer part: only `digits` and `digits.digits` are accepted,
+    // not leading-dot forms like `.5` (which `scale_f64`'s formatter never
+    // produces). This keeps the accepted grammar explicit and unambiguous.
+    if int_part.is_empty() {
+        return Err(Error::Sign(format!(
+            "decimal must have an integer part: {s}"
+        )));
     }
     if frac_part.contains('.') {
         return Err(Error::Sign(format!("malformed decimal: {s}")));
@@ -47,7 +52,7 @@ pub fn scale_decimal_str(s: &str) -> Result<u128> {
     // Pad/truncate fractional part to exactly 18 digits: scale by 10^18,
     // truncate toward zero.
     let mut padded = String::with_capacity(int_part.len() + 18);
-    padded.push_str(if int_part.is_empty() { "0" } else { int_part });
+    padded.push_str(int_part);
     if frac_part.len() >= 18 {
         padded.push_str(&frac_part[..18]);
     } else {
@@ -122,6 +127,18 @@ mod tests {
         assert!(scale_decimal_str("1e3").is_err());
         assert!(scale_decimal_str("").is_err());
         assert!(scale_decimal_str("1.2.3").is_err());
+    }
+
+    #[test]
+    fn rejects_leading_dot() {
+        // Only `digits` and `digits.digits` are accepted - not `.5` or `.`.
+        assert!(scale_decimal_str(".5").is_err());
+        assert!(scale_decimal_str(".").is_err());
+        // The well-formed equivalent is accepted.
+        assert_eq!(
+            scale_decimal_str("0.5").unwrap(),
+            500_000_000_000_000_000u128
+        );
     }
 
     #[test]

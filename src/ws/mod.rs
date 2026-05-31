@@ -50,5 +50,6 @@ pub use channel::{Channel, ChannelName};
 pub use event::{Event, Update, UpdateKind};
 pub use managed::{Session, SubscriptionStream};
 pub use views::{
-    Book, CollateralAsset, Oracle, Order, Portfolio, Position, Ticker, TickerLevel, Trade,
+    Book, CollateralAsset, Notification, Oracle, Order, Portfolio, Position, Ticker, TickerLevel,
+    Trade,
 };

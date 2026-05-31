@@ -7,11 +7,10 @@ use crate::error::{Error, Result};
 use crate::market_cache::MarketCache;
 use crate::rest::query::percent_encode_segment;
 use crate::rest::{AuthMode, RestClient};
-use crate::sign::{order::OrderPayload, scale_f64, sign_order, signature_hex};
+use crate::sign::{order::OrderPayload, scale_decimal_str, sign_order, signature_hex};
 use crate::types::v1::{
-    CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderByClientIdRequest,
-    CancelOrderByClientIdResponse, CancelOrderRequest, CancelOrderResponse, CancelOrdersRequest,
-    CancelOrdersResponse, GetOrderByClientIdRequest, GetOrderByClientIdResponse, GetOrderRequest,
+    CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderByClientIdResponse,
+    CancelOrderResponse, CancelOrdersRequest, CancelOrdersResponse, GetOrderByClientIdResponse,
     GetOrderResponse, ListOpenOrdersRequest, ListOpenOrdersResponse, ListOrderHistoryRequest,
     ListOrderHistoryResponse, OrderSide, OrderType, PlaceOrderGroupRequest,
     PlaceOrderGroupResponse, PlaceOrderRequest, PlaceOrderResponse, PlaceTwapOrdersRequest,
@@ -64,9 +63,8 @@ impl Orders {
     /// `DELETE /orders/{oid}` - cancel by order ID.
     /// **Auth:** required.
     pub async fn cancel(&self, oid: &str) -> Result<CancelOrderResponse> {
+        // The `oid` is a path param; the request struct carries only that field.
         let path = format!("/orders/{}", percent_encode_segment(oid));
-        // CancelOrderRequest has only the `oid` field, already in the path.
-        let _ = CancelOrderRequest::default();
         self.rest.delete(&path, AuthMode::Required).await
     }
 
@@ -74,7 +72,6 @@ impl Orders {
     /// **Auth:** required.
     pub async fn cancel_by_client_id(&self, cl_oid: &str) -> Result<CancelOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
-        let _ = CancelOrderByClientIdRequest::default();
         self.rest.delete(&path, AuthMode::Required).await
     }
 
@@ -99,7 +96,6 @@ impl Orders {
     /// **Auth:** required (read-only allowed).
     pub async fn get(&self, oid: &str) -> Result<GetOrderResponse> {
         let path = format!("/orders/{}", percent_encode_segment(oid));
-        let _ = GetOrderRequest::default();
         self.rest.get(&path, AuthMode::Required).await
     }
 
@@ -107,7 +103,6 @@ impl Orders {
     /// **Auth:** required (read-only allowed).
     pub async fn get_by_client_id(&self, cl_oid: &str) -> Result<GetOrderByClientIdResponse> {
         let path = format!("/orders/by-client-id/{}", percent_encode_segment(cl_oid));
-        let _ = GetOrderByClientIdRequest::default();
         self.rest.get(&path, AuthMode::Required).await
     }
 
@@ -132,7 +127,7 @@ impl Orders {
 
     /// One-call resolve-sign-place for the common LIMIT path.
     ///
-    /// Resolves `mkt_id` via the client's market cache, scales `size`/`px`
+    /// Resolves `mkt_id` via the client's market cache, scales `size`/`price`
     /// to 18-decimal fixed-point, signs the EIP-712 `Order` payload with
     /// the configured signer, and POSTs `/orders`.
     ///
@@ -140,12 +135,10 @@ impl Orders {
     /// explicit value for deterministic test fixtures or when retrying
     /// idempotently.
     ///
-    /// **Precision:** `price` and `size` are `f64`, which provides ~15-17
-    /// significant decimal digits. This is sufficient for most trading use
-    /// cases. For sub-penny precision at high prices (e.g., exact
-    /// `0.01` increments above `$100,000`), use
-    /// [`crate::sign::scale_decimal_str`] with a raw [`PlaceOrderRequest`]
-    /// and [`crate::Client::sign_place_order`] instead.
+    /// **Precision:** `price` and `size` are decimal strings (e.g.
+    /// `"50000.25"`, `"0.001"`). The same string is signed and sent on the
+    /// wire, so the exact value is preserved at any magnitude - no f64
+    /// rounding between what the caller asked for and what is signed.
     ///
     /// **Scope:** LIMIT only. The exchange does not implement a true
     /// MARKET order - IOC at top-of-book is the supported substitute, set
@@ -164,20 +157,21 @@ impl Orders {
         let signer = client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
         })?;
-        if !req.size.is_finite() || req.size <= 0.0 {
-            return Err(Error::Sign(
-                "order size must be a positive finite number".into(),
-            ));
+        // Scale the decimal strings to 18-dp fixed point up front: this
+        // validates the inputs and lets us reject a non-positive order before
+        // any network call. The same strings go on the wire (`sz`/`px`), so the
+        // server scales the identical value and the signature verifies - no f64
+        // round-trip between what the caller asked for and what is signed.
+        let size_x18 = scale_decimal_str(&req.size)?;
+        let price_x18 = scale_decimal_str(&req.price)?;
+        if size_x18 == 0 {
+            return Err(Error::Sign("order size must be positive".into()));
         }
-        if !req.price.is_finite() || req.price <= 0.0 {
-            return Err(Error::Sign(
-                "order price must be a positive finite number".into(),
-            ));
+        if price_x18 == 0 {
+            return Err(Error::Sign("order price must be positive".into()));
         }
         let market = client.resolve_market(&req.mkt_id).await?;
         let market_index = MarketCache::idx_as_u16(&market)?;
-        let size_x18 = scale_f64(req.size)?;
-        let price_x18 = scale_f64(req.price)?;
         let nonce = if req.nonce == 0 {
             super::now_unix_nanos()?
         } else {
@@ -200,11 +194,8 @@ impl Orders {
             mkt_id: market.mkt_id.clone(),
             sd: req.side as i32,
             ot: OrderType::Limit as i32,
-            // Decimal string matches the value scaled into the signed x18
-            // payload (`scale_f64` formats `f64` the same way), so server-side
-            // signature verification re-derives the identical price/size.
-            sz: format!("{}", req.size),
-            px: format!("{}", req.price),
+            sz: req.size,
+            px: req.price,
             tif: req.tif as i32,
             po: req.post_only,
             ro: req.reduce_only,
@@ -230,10 +221,12 @@ pub struct LimitOrder {
     /// Buy or sell (`Side::Buy` / `Side::Sell`). `Unspecified` returns
     /// `Error::Sign`.
     pub side: OrderSide,
-    /// Quote-asset price (limit price).
-    pub price: f64,
-    /// Base-asset size.
-    pub size: f64,
+    /// Quote-asset price (limit price) as a decimal string, e.g. `"50000"` or
+    /// `"50000.25"`. Sent on the wire and signed from the same string, so the
+    /// exact value is preserved at any magnitude (no f64 rounding).
+    pub price: String,
+    /// Base-asset size as a decimal string, e.g. `"0.001"`.
+    pub size: String,
     /// Time in force. Default `OrderTimeInForceUnspecified` → server
     /// applies GTC.
     pub tif: TimeInForce,
@@ -257,12 +250,17 @@ impl LimitOrder {
     /// A LIMIT order with sane defaults (GTC, no post-only/reduce-only, no
     /// STP, server-assigned client id, auto nonce). Refine via the builder
     /// methods.
-    pub fn new(mkt_id: impl Into<String>, side: OrderSide, price: f64, size: f64) -> Self {
+    pub fn new(
+        mkt_id: impl Into<String>,
+        side: OrderSide,
+        price: impl Into<String>,
+        size: impl Into<String>,
+    ) -> Self {
         Self {
             mkt_id: mkt_id.into(),
             side,
-            price,
-            size,
+            price: price.into(),
+            size: size.into(),
             tif: TimeInForce::Unspecified,
             post_only: false,
             reduce_only: false,

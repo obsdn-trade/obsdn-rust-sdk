@@ -38,7 +38,7 @@ async fn transfer_scales_signs_and_posts() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     signed_client(&server)
         .account()
-        .transfer(to, token, 1.5)
+        .transfer(to, token, "1.5")
         .await
         .expect("transfer");
 
@@ -71,7 +71,7 @@ async fn withdraw_scales_signs_and_posts() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     signed_client(&server)
         .account()
-        .withdraw(token, 2.25)
+        .withdraw(token, "2.25")
         .await
         .expect("withdraw");
 
@@ -87,6 +87,67 @@ async fn withdraw_scales_signs_and_posts() {
 }
 
 #[tokio::test]
+async fn transfer_with_nonce_threads_the_given_nonce() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/transfers/send-funds"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"data": SendFundsResponse::default()})),
+        )
+        .mount(&server)
+        .await;
+
+    let to: Address = address!("0000000000000000000000000000000000000001");
+    let token: Address = address!("0000000000000000000000000000000000000002");
+    // A fixed nonce makes the signed transfer idempotent: a retry with the same
+    // nonce is deduplicated server-side instead of moving funds twice.
+    let nonce = 1_700_000_000_000_000_000u64;
+    signed_client(&server)
+        .account()
+        .transfer_with_nonce(to, token, "1.5", nonce)
+        .await
+        .expect("transfer_with_nonce");
+
+    let reqs = server.received_requests().await.unwrap();
+    let r = reqs
+        .iter()
+        .find(|r| r.url.path() == "/transfers/send-funds")
+        .expect("send-funds posted");
+    let body: SendFundsRequest = serde_json::from_slice(&r.body).expect("body decodes");
+    assert_eq!(body.nonce, nonce, "the supplied nonce is signed and sent");
+}
+
+#[tokio::test]
+async fn withdraw_with_nonce_threads_the_given_nonce() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/transfers/withdraw"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"data": WithdrawCollateralResponse::default()})),
+        )
+        .mount(&server)
+        .await;
+
+    let token: Address = address!("0000000000000000000000000000000000000002");
+    let nonce = 1_700_000_000_000_000_001u64;
+    signed_client(&server)
+        .account()
+        .withdraw_with_nonce(token, "2.25", nonce)
+        .await
+        .expect("withdraw_with_nonce");
+
+    let reqs = server.received_requests().await.unwrap();
+    let r = reqs
+        .iter()
+        .find(|r| r.url.path() == "/transfers/withdraw")
+        .expect("withdraw posted");
+    let body: WithdrawCollateralRequest = serde_json::from_slice(&r.body).expect("body decodes");
+    assert_eq!(body.nonce, nonce, "the supplied nonce is signed and sent");
+}
+
+#[tokio::test]
 async fn transfer_without_signer_errors() {
     let client = Client::builder()
         .env(Env::Staging)
@@ -97,8 +158,33 @@ async fn transfer_without_signer_errors() {
     let token: Address = address!("0000000000000000000000000000000000000002");
     let err = client
         .account()
-        .transfer(to, token, 1.0)
+        .transfer(to, token, "1")
         .await
         .expect_err("must require a signer");
+    assert!(matches!(err, Error::Sign(_)), "got {err:?}");
+}
+
+#[tokio::test]
+async fn with_nonce_helpers_require_signer() {
+    let client = Client::builder()
+        .env(Env::Staging)
+        .api_key("KEY", "SECRET")
+        .build()
+        .unwrap();
+    let to: Address = address!("0000000000000000000000000000000000000001");
+    let token: Address = address!("0000000000000000000000000000000000000002");
+    // The idempotent variants move funds too, so they must enforce the same
+    // signer requirement as the auto-nonce forms.
+    let err = client
+        .account()
+        .transfer_with_nonce(to, token, "1", 42)
+        .await
+        .expect_err("transfer_with_nonce must require a signer");
+    assert!(matches!(err, Error::Sign(_)), "got {err:?}");
+    let err = client
+        .account()
+        .withdraw_with_nonce(token, "1", 42)
+        .await
+        .expect_err("withdraw_with_nonce must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");
 }

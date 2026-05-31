@@ -212,8 +212,14 @@ impl RestClient {
         let url = Url::parse(&raw_url)
             .map_err(|e| Error::Config(format!("invalid url {raw_url}: {e}")))?;
 
-        // HMAC signing covers the URL path only (no query, no host).
-        // `Url::path` returns the percent-encoded path the server will see.
+        // SECURITY: the HMAC prehash covers the URL path only - not the query
+        // string or host. This matches the gateway's verification today (the
+        // staging e2e suite's authenticated GET-with-query calls pass). Do NOT
+        // start signing the query here unilaterally: the gateway verifies
+        // path-only, so adding the query would break every authenticated
+        // GET/DELETE-with-query until the server is updated in lockstep. Change
+        // both sides together. `Url::path` is the percent-encoded path the
+        // server sees.
         let sign_path = url.path().to_string();
 
         let mut builder = self.http.request(method.clone(), url);
@@ -264,9 +270,22 @@ fn decode_error(status: StatusCode, body: Bytes) -> Error {
             request_id: parsed.request_id,
         };
     }
+    // Cap the surfaced body so a pathological error page (e.g. a multi-MB WAF
+    // HTML response) doesn't bloat the error string. Truncate the raw bytes
+    // before decoding so the full payload isn't decoded just to be capped;
+    // `from_utf8_lossy` repairs a byte-boundary split mid-character.
+    const MAX_BODY: usize = 4096;
+    let body = if body.len() > MAX_BODY {
+        format!(
+            "{}… (truncated)",
+            String::from_utf8_lossy(&body[..MAX_BODY])
+        )
+    } else {
+        String::from_utf8_lossy(&body).into_owned()
+    };
     Error::UnparsedBody {
         status: status.as_u16(),
-        body: String::from_utf8_lossy(&body).into_owned(),
+        body,
     }
 }
 

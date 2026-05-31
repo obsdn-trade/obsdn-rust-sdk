@@ -15,6 +15,9 @@
 //! - `e2e_order_ergonomics`: the README headline `place_limit` (delegated
 //!   signing), read back by oid + client id, list_open membership, then
 //!   `cancel_by_client_id` and bulk `cancel_many`.
+//! - `e2e_market_maker_flow`: one authenticated WS fanned out across book/
+//!   ticker/order/portfolio, resting post-only quotes on both sides observed
+//!   over the wildcard order feed, then flattened with `cancel_all`.
 //! - `e2e_collateral_movements`: resolve live USDC → `transfer` (to an
 //!   established subaccount) → `withdraw`. Both are signed with the MAIN wallet
 //!   key: the server verifies withdraw/transfer against the main account's own
@@ -789,7 +792,7 @@ async fn e2e_order_ergonomics() {
     let placed = client
         .orders()
         .place_limit(
-            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, 1000.0, 0.0001)
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
                 .client_order_id(&cl_oid)
                 .await_match(true),
         )
@@ -837,7 +840,7 @@ async fn e2e_order_ergonomics() {
         let r = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, 1000.0, 0.0001)
+                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
                     .await_match(true),
             )
             .await
@@ -859,6 +862,138 @@ async fn e2e_order_ergonomics() {
         .cancel_all(CancelAllOrdersRequest::default())
         .await;
     eprintln!("=== E2E ORDER ERGONOMICS PASSED ===");
+}
+
+/// A full market-maker session: one authenticated WS fanned out across the
+/// pricing + private channels, resting post-only quotes on both sides observed
+/// over the wildcard order feed, then flattened with `cancel_all`. Leaves the
+/// account with no open orders.
+#[tokio::test]
+async fn e2e_market_maker_flow() {
+    if skip() {
+        return;
+    }
+    let acct = setup_test_account().await;
+    let client = &acct.client;
+    let sender_addr = obsdn_sdk::Eip712Signer::address(acct.sender.as_ref());
+
+    // Fund so the quotes can rest.
+    let _ = client
+        .account()
+        .faucet(FaucetRequest {
+            usr_addr: format!("{sender_addr:#x}"),
+            asset: "USDC".into(),
+            amt: "10000".into(),
+            on_chain: false,
+        })
+        .await;
+
+    // This shared staging account persists across runs; a prior run may have
+    // left BTC-PERP in isolated margin mode, where these post-only quotes will
+    // not rest. Reset to cross (best-effort; the account is flat here).
+    let _ = client
+        .portfolio()
+        .set_margin_mode(SetMarginModeRequest {
+            mkt_id: "BTC-PERP".into(),
+            mrgn_mode: MarginMode::Cross as i32,
+        })
+        .await;
+
+    // One session: authenticate, then fan out across the channels a maker uses.
+    let ws = client.ws();
+    ws.authenticate().await.expect("ws authenticate");
+    let mut order_stream = ws.subscribe(Channel::order(None)).await.expect("sub order");
+    let _book = ws
+        .subscribe(Channel::book("BTC-PERP"))
+        .await
+        .expect("sub book");
+    let _ticker = ws
+        .subscribe(Channel::ticker("BTC-PERP"))
+        .await
+        .expect("sub ticker");
+    let _portfolio = ws
+        .subscribe(Channel::Portfolio)
+        .await
+        .expect("sub portfolio");
+    eprintln!("OK MM: authenticated + subscribed book/ticker/order/portfolio");
+
+    // Resting post-only quotes far from market (won't cross or fill). Tiny size
+    // so the short side's margin is trivial on the funded account.
+    let bid_cl = format!("mm-bid-{}", nonce());
+    let bid = client
+        .orders()
+        .place_limit(
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, "1000", "0.0001")
+                .post_only(true)
+                .client_order_id(&bid_cl)
+                .await_match(true),
+        )
+        .await
+        .expect("place bid quote");
+    let bid_oid = bid.ord.expect("bid order").oid;
+    let ask = client
+        .orders()
+        .place_limit(
+            LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Sell, "500000", "0.0001")
+                .post_only(true)
+                .client_order_id(format!("mm-ask-{}", nonce()))
+                .await_match(true),
+        )
+        .await
+        .expect("place ask quote");
+    let ask_oid = ask.ord.expect("ask order").oid;
+    eprintln!("OK MM: placed resting quotes bid={bid_oid} ask={ask_oid}");
+
+    // The wildcard order feed must deliver our own bid's lifecycle update.
+    let seen = await_order_update(&mut order_stream, &bid_oid, 20).await;
+    assert!(
+        seen.is_some(),
+        "MM must observe its placed bid over the WS order feed"
+    );
+    eprintln!("OK MM: observed bid quote over WS order feed");
+
+    // Both quotes must be open.
+    let open = client
+        .orders()
+        .list_open(ListOpenOrdersRequest::default())
+        .await
+        .expect("list_open");
+    assert!(
+        open.ords.iter().any(|o| o.oid == bid_oid),
+        "bid quote should be open"
+    );
+    assert!(
+        open.ords.iter().any(|o| o.oid == ask_oid),
+        "ask quote should be open"
+    );
+    eprintln!("OK MM: both quotes open ({} total)", open.ords.len());
+
+    // Flatten and confirm the book clears for this account.
+    client
+        .orders()
+        .cancel_all(CancelAllOrdersRequest::default())
+        .await
+        .expect("cancel_all");
+    let mut cleared = false;
+    for _ in 0..12 {
+        let open = client
+            .orders()
+            .list_open(ListOpenOrdersRequest::default())
+            .await
+            .expect("list_open after cancel_all");
+        if !open
+            .ords
+            .iter()
+            .any(|o| o.oid == bid_oid || o.oid == ask_oid)
+        {
+            cleared = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    assert!(cleared, "cancel_all must flatten the MM quotes");
+    ws.shutdown().await.ok();
+    eprintln!("=== E2E MARKET MAKER FLOW PASSED ===");
 }
 
 /// Position margin controls. `set_margin_mode(Cross)` should succeed with no
@@ -920,8 +1055,13 @@ async fn e2e_position_controls() {
         let opened = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Buy, ask, 0.0001)
-                    .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
+                LimitOrder::new(
+                    "BTC-PERP",
+                    obsdn_sdk::OrderSide::Buy,
+                    format!("{ask}"),
+                    "0.0001",
+                )
+                .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
             )
             .await;
         eprintln!(
@@ -957,9 +1097,14 @@ async fn e2e_position_controls() {
         let _ = client
             .orders()
             .place_limit(
-                LimitOrder::new("BTC-PERP", obsdn_sdk::OrderSide::Sell, bid, 0.0001)
-                    .reduce_only(true)
-                    .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
+                LimitOrder::new(
+                    "BTC-PERP",
+                    obsdn_sdk::OrderSide::Sell,
+                    format!("{bid}"),
+                    "0.0001",
+                )
+                .reduce_only(true)
+                .time_in_force(obsdn_sdk::types::v1::TimeInForce::Ioc),
             )
             .await;
     }
@@ -1246,13 +1391,13 @@ async fn e2e_collateral_movements() {
         Some(addr) => addr,
         None => create_and_establish_subaccount(&acct).await,
     };
-    let r = main_client.account().transfer(to, token, 1.0).await;
+    let r = main_client.account().transfer(to, token, "1").await;
     expect_ok_or_tolerated("transfer", r, &["previous send funds request pending"]);
 
     // Withdraw collateral - routed to the chain-writer service. Amount is
     // above the server minimum (2 USDC) so a rejection reflects staging
     // gating, not the amount.
-    let r = main_client.account().withdraw(token, 5.0).await;
+    let r = main_client.account().withdraw(token, "5").await;
     expect_ok("withdraw", r);
 
     eprintln!("=== E2E COLLATERAL MOVEMENTS PASSED ===");

@@ -11,6 +11,7 @@
 use obsdn_sdk::types::v1::{
     CancelAllOrdersRequest, CancelAllOrdersResponse, CancelOrderResponse, CancelOrdersRequest,
     CancelOrdersResponse, GetMarketsResponse, ListOpenOrdersRequest, ListOpenOrdersResponse, Order,
+    SetLeverageRequest, SetLeverageResponse,
 };
 use obsdn_sdk::{Client, Env};
 use wiremock::matchers::{body_json, method, path, query_param};
@@ -112,6 +113,36 @@ async fn cancel_orders_sends_json_body_on_delete() {
         .await;
 
     let _ = client(&server).orders().cancel_many(req).await.unwrap();
+}
+
+#[tokio::test]
+async fn set_leverage_puts_market_in_path_not_body() {
+    let server = MockServer::start().await;
+    // The market id is a path param; the JSON body must carry an empty `mkt_id`
+    // (cleared by the SDK) so it isn't sent twice. The body_json matcher only
+    // matches if `mkt_id` is empty - if the SDK left it populated, the mock
+    // 404s and the call errors.
+    let expected_body = SetLeverageRequest {
+        mkt_id: String::new(),
+        lev: 10,
+    };
+    let resp = serde_json::json!({"data": SetLeverageResponse { ok: true }});
+    Mock::given(method("POST"))
+        .and(path("/positions/BTC-PERP/leverage"))
+        .and(body_json(&expected_body))
+        .respond_with(ResponseTemplate::new(200).set_body_json(&resp))
+        .mount(&server)
+        .await;
+
+    let out = client(&server)
+        .portfolio()
+        .set_leverage(SetLeverageRequest {
+            mkt_id: "BTC-PERP".into(),
+            lev: 10,
+        })
+        .await
+        .expect("set_leverage");
+    assert!(out.ok);
 }
 
 #[tokio::test]

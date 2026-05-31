@@ -105,8 +105,10 @@ pub struct Update {
 ///   fresh snapshot.
 /// - [`Event::Reconnected`]: the socket dropped and the supervisor
 ///   re-attached with auth + subs replayed. Emitted once per reconnect.
-/// - [`Event::Unauthorized`]: auth replay failed (e.g. revoked key).
-///   Private subscriptions stop delivering; public subs continue.
+/// - [`Event::Unauthorized`]: auth replay failed (e.g. revoked key). Emitted on
+///   each failed attempt; the supervisor retries auth on subsequent reconnects
+///   and only gives up (private subs stop delivering) after several consecutive
+///   failures. Public subs continue throughout.
 ///
 /// Marked `#[non_exhaustive]`: new lifecycle variants may be added in future
 /// releases, so downstream `match` arms must include a `_` fallback.

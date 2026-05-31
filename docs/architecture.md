@@ -44,7 +44,7 @@ full API reference; this file is the orientation, not the spec.
   │                                                  │  │  Channel::Order    │
   │  place_limit() flow:                              │  │  Channel::Trade    │
   │   1. resolve_market(mkt_id) → MarketCache        │  │  Channel::Event    │
-  │   2. scale_f64 size/px → 18-dec fixed            │  │  Channel::Position │
+  │   2. scale_decimal_str size/px → 18-dec fixed    │  │  Channel::Position │
   │   3. sign EIP-712 Order (sign/order.rs)          │  │  Channel::Oracle   │
   │   4. POST /orders with HMAC + sig                │  │  Channel::Ticker   │
   └────────────────┬─────────────────────────────────┘  └──────────┬─────────┘
@@ -72,9 +72,9 @@ full API reference; this file is the orientation, not the spec.
 
   types/v1/             generated wire types committed under src/types/generated/
 
-  ws/views.rs           Per-frame parsers: BookView TickerView OracleView
-                        TradeView OrderView. NOT running state - decode +
-                        drop. Caller owns aggregation.
+  ws/views.rs           Per-frame parsers: Book Ticker Oracle Trade Order
+                        Position Portfolio Notification. NOT running state -
+                        decode + drop. Caller owns aggregation.
 
   ws/managed.rs         Supervisor: one socket multiplexes every sub,
                         auto-reconnect + auth/sub replay. No gap detection;
@@ -102,18 +102,18 @@ full API reference; this file is the orientation, not the spec.
 ## Order placement happy path
 
 ```
-  bot.place_limit(LimitOrder::new("BTC-PERP", Buy, 50_000.0, 0.001))
+  bot.place_limit(LimitOrder::new("BTC-PERP", Buy, "50000", "0.001"))
        │
        ▼
   Orders::place_limit
-       │  reject if order_type ≠ Limit          (no true MARKET on server)
-       │  reject if side ≠ Buy/Sell
+       │  reject if no signer, size/price ≤ 0, or side is Unspecified
+       │  (LIMIT only; no true MARKET on server - use IOC at top-of-book)
        ▼
   Client::resolve_market("BTC-PERP")
        │  MarketCache hit? return cached. miss? fetch /markets, swap Arc.
        ▼
-  scale_f64(0.001) → "1000000000000000"  (18-dec fixed)
-  scale_f64(50_000.0) → "50000000000000000000000"
+  scale_decimal_str("0.001") → "1000000000000000"  (18-dec fixed)
+  scale_decimal_str("50000") → "50000000000000000000000"
        │
        ▼
   sign_order(local_signer, eip_domain, OrderPayload{ … })
@@ -144,8 +144,8 @@ full API reference; this file is the orientation, not the spec.
   obsdn-rust-sdk/
   ├── Cargo.toml          standalone crate
   ├── examples/           place_order, cancel_order, ws_book,
-  │                       ws_private_orders, transfer, withdraw,
-  │                       book_with_resync
+  │                       ws_private_orders, market_maker, transfer,
+  │                       withdraw, book_with_resync
   ├── scripts/            codegen-rust (regenerates committed wire types)
   └── src/
       ├── lib.rs          re-exports Client, Env, LocalSigner

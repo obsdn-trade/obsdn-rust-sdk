@@ -19,7 +19,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use alloy_primitives::Address;
 use alloy_sol_types::eip712_domain;
-use obsdn_sdk::ws::{Channel, ChannelName, Event};
+use obsdn_sdk::ws::{Channel, ChannelName, Event, SubscriptionStream, UpdateKind};
 use obsdn_sdk::{Client, Env};
 
 /// Server-side commands the mock pulse accepts from the test driver.
@@ -39,7 +39,15 @@ enum MockCmd {
     /// Reject the next auth attempt with this message. Otherwise the mock
     /// auto-acks any auth frame.
     RejectNextAuth(String),
+    /// Reject the next `n` auth attempts (each with "auth rejected"), then
+    /// auto-ack. Lets tests exercise bounded auth-retry recovery across
+    /// reconnects.
+    RejectNextNAuth(u32),
 }
+
+/// Server channels that require authentication before subscribing (mirrors
+/// `ChannelName::is_private`).
+const PRIVATE_CHANNELS: [&str; 4] = ["order", "position", "portfolio", "notification"];
 
 #[derive(Default)]
 struct MockState {
@@ -48,6 +56,17 @@ struct MockState {
     out: Option<mpsc::Sender<Message>>,
     /// Reject next auth with this message (one-shot).
     reject_next_auth: Option<String>,
+    /// Reject the next N auth attempts, then auto-ack (decremented per attempt).
+    reject_auth_remaining: u32,
+    /// Total `auth` frames received across all connections.
+    auth_attempts: u32,
+    /// When true, a `sub` to a private channel before `auth` is rejected with
+    /// an error (mirrors the real gateway). Off by default so existing tests
+    /// that subscribe public channels without auth keep working.
+    enforce_private_auth: bool,
+    /// When true, the mock auto-pushes a snapshot frame after acking a `sub`,
+    /// so resync-after-reconnect tests don't have to hand-time the snapshot.
+    auto_snapshot: bool,
     /// Connection counter - incremented every accept. Doubles as a
     /// `connection_id` and lets tests assert that a reconnect actually
     /// happened.
@@ -127,6 +146,9 @@ impl MockPulse {
                     MockCmd::RejectNextAuth(msg) => {
                         s.reject_next_auth = Some(msg);
                     }
+                    MockCmd::RejectNextNAuth(n) => {
+                        s.reject_auth_remaining = n;
+                    }
                 }
             }
         });
@@ -148,6 +170,23 @@ impl MockPulse {
 
     async fn conn_seq(&self) -> u64 {
         self.state.lock().await.conn_seq
+    }
+
+    /// Total `auth` frames the mock has received across all connections.
+    async fn auth_attempts(&self) -> u32 {
+        self.state.lock().await.auth_attempts
+    }
+
+    /// Enable private-channel auth gating: a `sub` to a private channel before
+    /// a successful `auth` on that connection is rejected. Call before connect.
+    async fn enforce_private_auth(&self) {
+        self.state.lock().await.enforce_private_auth = true;
+    }
+
+    /// Auto-push a snapshot frame after each `sub` ack (so resync tests don't
+    /// have to hand-time the snapshot). Call before connect.
+    async fn enable_auto_snapshot(&self) {
+        self.state.lock().await.auto_snapshot = true;
     }
 
     /// Whether the client has sent an `unsub` for `(channel, filter)`.
@@ -196,6 +235,9 @@ where
 
     // Track active subs so we can ignore stale-channel pushes.
     let mut subs: HashMap<(String, String), ()> = HashMap::new();
+    // Per-connection auth state (reset on every new connection, like the real
+    // server). Drives private-channel gating when `enforce_private_auth` is on.
+    let mut authed = false;
 
     loop {
         tokio::select! {
@@ -250,10 +292,26 @@ where
                     .to_string();
                 match op {
                     "sub" => {
+                        let (enforce, auto_snapshot) = {
+                            let st = state.lock().await;
+                            (st.enforce_private_auth, st.auto_snapshot)
+                        };
+                        if enforce && PRIVATE_CHANNELS.contains(&channel.as_str()) && !authed {
+                            let err = json!({ "type": "error", "channel": channel,
+                                "message": "auth required for private channel" });
+                            if ws.send(Message::Text(err.to_string())).await.is_err() { return; }
+                            continue;
+                        }
                         subs.insert((channel.clone(), filter.clone()), ());
                         let mut ack = json!({ "type": "subscribed", "channel": channel });
                         if !filter.is_empty() { ack["filter"] = json!(filter); }
                         if ws.send(Message::Text(ack.to_string())).await.is_err() { return; }
+                        if auto_snapshot {
+                            let mut snap = json!({ "type": "snapshot", "channel": channel,
+                                "gsn": 1, "ts": "0", "data": json!([]) });
+                            if !filter.is_empty() { snap["filter"] = json!(filter); }
+                            if ws.send(Message::Text(snap.to_string())).await.is_err() { return; }
+                        }
                     }
                     "unsub" => {
                         subs.remove(&(channel.clone(), filter.clone()));
@@ -267,10 +325,24 @@ where
                         if ws.send(Message::Text(ack.to_string())).await.is_err() { return; }
                     }
                     "auth" => {
-                        let reject = state.lock().await.reject_next_auth.take();
+                        // Decide accept/reject: one-shot `reject_next_auth` first,
+                        // then the N-count `reject_auth_remaining`.
+                        let reject = {
+                            let mut st = state.lock().await;
+                            st.auth_attempts += 1;
+                            if let Some(msg) = st.reject_next_auth.take() {
+                                Some(msg)
+                            } else if st.reject_auth_remaining > 0 {
+                                st.reject_auth_remaining -= 1;
+                                Some("auth rejected".to_string())
+                            } else {
+                                None
+                            }
+                        };
                         let resp = if let Some(msg) = reject {
                             json!({ "type": "error", "message": msg })
                         } else {
+                            authed = true;
                             json!({ "type": "authenticated", "address": "0xMOCKADDR" })
                         };
                         if ws.send(Message::Text(resp.to_string())).await.is_err() { return; }
@@ -310,6 +382,32 @@ fn build_client(url: String) -> Client {
         .eip712_domain(dummy_domain())
         .build()
         .expect("build client")
+}
+
+/// A client with HMAC creds, so the supervisor will `authenticate()` and
+/// replay auth on reconnect (required for private channels).
+fn build_authed_client(url: String) -> Client {
+    Client::builder()
+        .env(Env::Custom {
+            rest: "http://127.0.0.1:1".into(),
+            ws: url,
+        })
+        .eip712_domain(dummy_domain())
+        .api_key("k", "s")
+        .build()
+        .expect("build authed client")
+}
+
+/// Wait until the mock has accepted at least `n` connections (a reconnect
+/// happened), bounded by a deadline.
+async fn await_conn_seq(mock: &MockPulse, n: u64) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while mock.conn_seq().await < n {
+        if tokio::time::Instant::now() >= deadline {
+            panic!("mock did not reach conn_seq {n} within 5s");
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
 }
 
 #[tokio::test]
@@ -1174,4 +1272,625 @@ async fn subscription_stream_is_fused_after_termination() {
         stream.is_terminated(),
         "stream must report terminated after yielding None"
     );
+}
+
+/* ──── market-maker scenarios ──────────────────────────────────────────── */
+
+/// A market maker fans out across public pricing channels and private
+/// order/position/portfolio channels on one `Session`. Each subscription must
+/// receive only its own channel's frames.
+#[tokio::test]
+async fn multi_channel_fanout_delivers_each_channel_independently() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth");
+
+    let mut book = ws.subscribe(Channel::book("BTC-PERP")).await.expect("book");
+    let mut ticker = ws
+        .subscribe(Channel::ticker("BTC-PERP"))
+        .await
+        .expect("ticker");
+    let mut oracle = ws.subscribe(Channel::oracle("BTC")).await.expect("oracle");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("order");
+    let mut position = ws
+        .subscribe(Channel::position(None))
+        .await
+        .expect("position");
+    let mut portfolio = ws.subscribe(Channel::Portfolio).await.expect("portfolio");
+
+    let pushes: [(&str, Option<&str>); 6] = [
+        ("book", Some("BTC-PERP")),
+        ("ticker", Some("BTC-PERP")),
+        ("oracle", Some("BTC")),
+        ("order", None),
+        ("position", None),
+        ("portfolio", None),
+    ];
+    for (ch, fi) in pushes {
+        mock.send(MockCmd::Push {
+            kind: "snapshot",
+            channel: ch,
+            filter: fi,
+            gsn: 1,
+            data: json!([]),
+        })
+        .await;
+    }
+
+    let expected: [(&mut SubscriptionStream, ChannelName); 6] = [
+        (&mut book, ChannelName::Book),
+        (&mut ticker, ChannelName::Ticker),
+        (&mut oracle, ChannelName::Oracle),
+        (&mut order, ChannelName::Order),
+        (&mut position, ChannelName::Position),
+        (&mut portfolio, ChannelName::Portfolio),
+    ];
+    for (stream, want) in expected {
+        let evt = timeout(Duration::from_secs(2), stream.next())
+            .await
+            .expect("event within 2s")
+            .expect("stream open");
+        match evt {
+            Event::Update(u) => assert_eq!(u.channel, want, "frame routed to wrong stream"),
+            other => panic!("{want:?}: expected Update, got {other:?}"),
+        }
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A lagging consumer that overflows its buffer gets `Event::Lagged`, then the
+/// market maker resubscribes the same channel and resyncs from a fresh
+/// snapshot - the documented recovery loop.
+#[tokio::test]
+async fn lagged_then_resubscribe_resyncs() {
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws.subscribe(Channel::book("BTC-PERP")).await.expect("sub");
+
+    for gsn in 1..=400 {
+        mock.send(MockCmd::Push {
+            kind: "update",
+            channel: "book",
+            filter: Some("BTC-PERP"),
+            gsn,
+            data: json!({}),
+        })
+        .await;
+    }
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    // Drain the buffered updates; the stream ends with a Lagged marker.
+    let mut saw_lagged = false;
+    loop {
+        match timeout(Duration::from_secs(2), stream.next())
+            .await
+            .expect("no hang")
+        {
+            Some(Event::Update(_)) => {}
+            Some(Event::Lagged { channel, .. }) => {
+                assert_eq!(channel, ChannelName::Book);
+                saw_lagged = true;
+            }
+            Some(other) => panic!("unexpected event: {other:?}"),
+            None => break,
+        }
+    }
+    assert!(saw_lagged, "lagged consumer must receive Event::Lagged");
+
+    // Recovery: resubscribe the same channel and resync from a fresh snapshot.
+    let mut stream2 = ws
+        .subscribe(Channel::book("BTC-PERP"))
+        .await
+        .expect("resubscribe after lag");
+    mock.send(MockCmd::Push {
+        kind: "snapshot",
+        channel: "book",
+        filter: Some("BTC-PERP"),
+        gsn: 500,
+        data: json!([]),
+    })
+    .await;
+    let evt = timeout(Duration::from_secs(2), stream2.next())
+        .await
+        .expect("resync snapshot within 2s")
+        .expect("stream open");
+    match evt {
+        Event::Update(u) => {
+            assert_eq!(u.channel, ChannelName::Book);
+            assert_eq!(u.gsn, 500, "resync delivers the fresh snapshot");
+        }
+        other => panic!("expected resync Update, got {other:?}"),
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// Subscribing to a private channel before authenticating is rejected by the
+/// server; after `authenticate()` it succeeds.
+#[tokio::test]
+async fn private_channel_requires_auth() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+
+    let pre = ws.subscribe(Channel::order(None)).await;
+    assert!(
+        pre.is_err(),
+        "private subscribe before auth must be rejected, got {pre:?}"
+    );
+
+    ws.authenticate().await.expect("auth");
+    let _order = ws
+        .subscribe(Channel::order(None))
+        .await
+        .expect("private subscribe after auth succeeds");
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// On reconnect the supervisor must replay auth before resubscribing private
+/// channels. With private-auth enforced, a post-reconnect private update only
+/// arrives if auth was replayed first.
+#[tokio::test]
+async fn reconnect_replays_auth_then_private_subs_resume() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // First frame on connection #1.
+    mock.send(MockCmd::Push {
+        kind: "snapshot",
+        channel: "order",
+        filter: None,
+        gsn: 1,
+        data: json!([]),
+    })
+    .await;
+    let first = timeout(Duration::from_secs(2), order.next())
+        .await
+        .expect("first frame")
+        .expect("open");
+    assert!(matches!(first, Event::Update(_)));
+
+    // Reconnect.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 2).await;
+
+    // This update is only deliverable if `order` was re-subscribed on conn #2,
+    // which (under enforce_private_auth) requires auth to have been replayed.
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "order",
+        filter: None,
+        gsn: 100,
+        data: json!([]),
+    })
+    .await;
+    let mut saw_post = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !saw_post {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Update(u))) if u.gsn == 100 => saw_post = true,
+            Ok(Some(_)) => {} // Reconnected marker, earlier snapshot - skip
+            Ok(None) => panic!("private order stream ended after reconnect"),
+            Err(_) => panic!("no post-reconnect order update; auth/sub replay failed"),
+        }
+    }
+    assert!(
+        mock.auth_attempts().await >= 2,
+        "auth should have been replayed on reconnect"
+    );
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A transient auth failure must not permanently kill the private feed. The
+/// supervisor retries auth on the next reconnect (bounded); once auth succeeds
+/// the parked private subscription is re-established and resumes delivering.
+#[tokio::test]
+async fn bounded_auth_retry_recovers_private_feed() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth conn1");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // The next auth attempt (conn #2's replay) fails; subsequent ones succeed.
+    mock.send(MockCmd::RejectNextNAuth(1)).await;
+
+    // conn #1 -> conn #2: auth replay rejected. The order sub is parked (not
+    // dropped); an Unauthorized is emitted.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 2).await;
+    let mut saw_unauthorized = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !saw_unauthorized {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Unauthorized(_))) => saw_unauthorized = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("order stream ended; sub was dropped instead of parked"),
+            Err(_) => panic!("expected Unauthorized after failed auth replay"),
+        }
+    }
+
+    // conn #2 -> conn #3: auth now succeeds, the parked order sub is replayed.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 3).await;
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "order",
+        filter: None,
+        gsn: 200,
+        data: json!([]),
+    })
+    .await;
+    let mut recovered = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !recovered {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Update(u))) if u.gsn == 200 => recovered = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("private feed not recovered: stream ended"),
+            Err(_) => panic!("private feed did not recover after auth succeeded"),
+        }
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A transient auth failure parks the private sub but the connection stays
+/// healthy (public-only), so no reconnect is triggered. A manual
+/// `authenticate()` on that live connection must re-establish the parked sub
+/// without waiting for a reconnect.
+#[tokio::test]
+async fn manual_authenticate_replays_parked_private_without_reconnect() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth conn1");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // conn #2's auth replay fails once; the order sub is parked (not dropped)
+    // and the connection then stays healthy in public-only mode.
+    mock.send(MockCmd::RejectNextNAuth(1)).await;
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 2).await;
+    let mut saw_unauthorized = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !saw_unauthorized {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Unauthorized(_))) => saw_unauthorized = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("order stream ended; sub was dropped instead of parked"),
+            Err(_) => panic!("expected Unauthorized after failed auth replay"),
+        }
+    }
+
+    // No reconnect. A manual authenticate() on the still-healthy conn #2
+    // succeeds (the reject budget is exhausted) and must replay the parked sub.
+    ws.authenticate()
+        .await
+        .expect("manual re-auth on live conn");
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "order",
+        filter: None,
+        gsn: 300,
+        data: json!([]),
+    })
+    .await;
+    let mut recovered = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !recovered {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Update(u))) if u.gsn == 300 => recovered = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("order stream ended before recovery"),
+            Err(_) => panic!("parked private sub not replayed after manual auth"),
+        }
+    }
+    assert_eq!(
+        mock.conn_seq().await,
+        2,
+        "recovery must not require a reconnect"
+    );
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// After more than MAX_AUTH_REPLAY_FAILURES consecutive failed auth replays the
+/// supervisor gives up: it stops attempting auth and downgrades to public-only.
+/// The next reconnect then replays the private sub unauthenticated, the server
+/// rejects it, and the sub is dropped - the order stream ends. This is the
+/// give-up path, distinct from the transient case where the sub stays parked
+/// and recovers (see `bounded_auth_retry_recovers_private_feed`).
+#[tokio::test]
+async fn auth_retry_gives_up_after_budget_and_drops_private_feed() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth conn1");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // Reject every auth replay. The give-up check is `> MAX_AUTH_REPLAY_FAILURES`
+    // (5), so the 6th consecutive failed replay (conn #7) downgrades the session
+    // to public-only.
+    mock.send(MockCmd::RejectNextNAuth(6)).await;
+    for next_conn in 2..=7 {
+        mock.send(MockCmd::KillConn).await;
+        await_conn_seq(&mock, next_conn).await;
+    }
+
+    // One more reconnect: having given up, the supervisor no longer attempts
+    // auth, replays the private sub unauthenticated, the server rejects it, and
+    // it is dropped. The order stream drains its markers and then ends.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 8).await;
+    let mut ended = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !ended {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            // Drain buffered Unauthorized / Reconnected markers from the cycles.
+            Ok(Some(_)) => {}
+            Ok(None) => ended = true,
+            Err(_) => panic!("private feed should drop after give-up; stream still open"),
+        }
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A full order JSON with the given status/filled-size/done-reason. Other
+/// fields are fixed; only the fill-tracking fields vary.
+fn order_json(status: &str, filled_sz: &str, done_rsn: &str) -> Value {
+    json!([{
+        "oid": "o1", "mkt_id": "BTC-PERP", "sd": "ORDER_SIDE_BUY",
+        "ot": "ORDER_TYPE_LIMIT", "sz": "1.0", "px": "100", "sndr": "0xabc",
+        "nonce": "1", "stp": "SELF_TRADE_PREVENTION_UNSPECIFIED", "po": true,
+        "tif": "TIME_IN_FORCE_GTC", "ro": false, "st": status,
+        "done_rsn": done_rsn, "filled_sz": filled_sz, "avg_px": "100", "tot_fees": "0",
+        "crt_ts": "1", "upd_ts": "2", "cl_oid": "c1", "cancel_req": false
+    }])
+}
+
+/// A market maker tracks fills via the order channel: an order progresses
+/// OPEN(0) -> OPEN(partial) -> DONE(filled). All three updates must be
+/// delivered and decode with the correct fill progression.
+#[tokio::test]
+async fn order_fill_progression_is_delivered_and_decodes() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    let stages = [
+        ("ORDER_STATUS_OPEN", "0", ""),
+        ("ORDER_STATUS_OPEN", "0.5", ""),
+        ("ORDER_STATUS_DONE", "1.0", "DONE_REASON_FILLED"),
+    ];
+    for (i, (st, filled, done)) in stages.iter().enumerate() {
+        mock.send(MockCmd::Push {
+            kind: "update",
+            channel: "order",
+            filter: None,
+            gsn: i as u64 + 1,
+            data: order_json(st, filled, done),
+        })
+        .await;
+    }
+
+    let mut fills = Vec::new();
+    let mut last_done = String::new();
+    for _ in 0..stages.len() {
+        let evt = timeout(Duration::from_secs(2), order.next())
+            .await
+            .expect("order update")
+            .expect("open");
+        match evt {
+            Event::Update(u) => {
+                let orders = u.as_orders().expect("decode order update");
+                fills.push(orders[0].filled_size.clone());
+                last_done = orders[0].done_reason.clone();
+            }
+            other => panic!("expected order Update, got {other:?}"),
+        }
+    }
+    assert_eq!(fills, vec!["0", "0.5", "1.0"], "fill progression");
+    assert_eq!(last_done, "DONE_REASON_FILLED", "terminal done reason");
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A wildcard position subscription (`Channel::position(None)`) must deliver
+/// updates for every market the account holds, each stamped with its concrete
+/// market id.
+#[tokio::test]
+async fn wildcard_position_stream_delivers_all_markets() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth");
+    let mut position = ws
+        .subscribe(Channel::position(None))
+        .await
+        .expect("sub position");
+
+    let position_json = |mkt: &str, idx: u32| {
+        json!({
+            "mkt_idx": idx, "mkt_id": mkt, "net_sz": "1.0", "avg_entry_px": "100",
+            "quote_bal": "0", "mark_px": "101", "idx_px": "100",
+            "mrgn_mode": "MARGIN_MODE_CROSS", "lev": "5", "mrgn_bal": "20",
+            "init_mrgn_req": "2", "maint_mrgn_req": "1", "liq_px": "50",
+            "unrlzd_pnl": "1", "tot_fund_paid": "0", "iso_usdc_bal": "0",
+            "free_iso_usdc_bal": "0", "in_iso_liq": false, "mrgn_ratio": "0.1"
+        })
+    };
+    for (mkt, idx, market_filter) in [("BTC-PERP", 1u32, "BTC-PERP"), ("ETH-PERP", 2, "ETH-PERP")] {
+        mock.send(MockCmd::Push {
+            kind: "update",
+            channel: "position",
+            filter: Some(market_filter),
+            gsn: idx as u64,
+            data: position_json(mkt, idx),
+        })
+        .await;
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..2 {
+        let evt = timeout(Duration::from_secs(2), position.next())
+            .await
+            .expect("position update")
+            .expect("open");
+        match evt {
+            Event::Update(u) => {
+                let ps = u.as_positions().expect("decode positions");
+                seen.insert(ps[0].market_id.clone());
+            }
+            other => panic!("expected position Update, got {other:?}"),
+        }
+    }
+    assert!(
+        seen.contains("BTC-PERP") && seen.contains("ETH-PERP"),
+        "wildcard position stream saw {seen:?}"
+    );
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// A minimal local order book, mirroring `examples/book_with_resync.rs`: a
+/// snapshot replaces state; a diff upserts levels, and `size == "0"` removes a
+/// level.
+#[derive(Default)]
+struct LocalBook {
+    bids: std::collections::BTreeMap<String, String>,
+    asks: std::collections::BTreeMap<String, String>,
+}
+
+impl LocalBook {
+    fn apply(&mut self, kind: UpdateKind, book: &obsdn_sdk::ws::Book) {
+        if kind == UpdateKind::Snapshot {
+            self.bids.clear();
+            self.asks.clear();
+        }
+        for (side, levels) in [(&mut self.bids, &book.bids), (&mut self.asks, &book.asks)] {
+            for [px, sz] in levels {
+                if sz == "0" || sz == "0.0" {
+                    side.remove(px);
+                } else {
+                    side.insert(px.clone(), sz.clone());
+                }
+            }
+        }
+    }
+}
+
+/// Maintaining a local book from a snapshot + diffs: a `size="0"` diff removes
+/// the level, other diffs upsert. Exercises the example's book-maintenance
+/// logic against decoded `Book` views.
+#[tokio::test]
+async fn local_book_applies_snapshot_then_diffs() {
+    let mock = MockPulse::start().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws.subscribe(Channel::book("BTC-PERP")).await.expect("sub");
+
+    // Snapshot: two bid levels, one ask.
+    mock.send(MockCmd::Push {
+        kind: "snapshot",
+        channel: "book",
+        filter: Some("BTC-PERP"),
+        gsn: 1,
+        data: json!({"bids": [["100", "1"], ["99", "2"]], "asks": [["101", "3"]], "checksum": 7}),
+    })
+    .await;
+    // Diff: add a bid at 98, remove the bid at 99 (size 0), grow the ask.
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "book",
+        filter: Some("BTC-PERP"),
+        gsn: 2,
+        data: json!({"bids": [["98", "5"], ["99", "0"]], "asks": [["101", "4"]], "checksum": 9}),
+    })
+    .await;
+
+    let mut book = LocalBook::default();
+    for _ in 0..2 {
+        let evt = timeout(Duration::from_secs(2), stream.next())
+            .await
+            .expect("book frame")
+            .expect("open");
+        match evt {
+            Event::Update(u) => {
+                let view = u.as_book().expect("decode book");
+                book.apply(u.kind, &view);
+            }
+            other => panic!("expected book Update, got {other:?}"),
+        }
+    }
+
+    // 99 removed by the size-0 diff; 98 added; 100 kept; ask upserted to 4.
+    assert_eq!(book.bids.get("100"), Some(&"1".to_string()));
+    assert_eq!(book.bids.get("98"), Some(&"5".to_string()));
+    assert_eq!(
+        book.bids.get("99"),
+        None,
+        "size-0 diff must remove the level"
+    );
+    assert_eq!(book.asks.get("101"), Some(&"4".to_string()));
+    ws.shutdown().await.expect("shutdown");
+}
+
+/// After a reconnect the server re-sends a fresh snapshot for each resubscribed
+/// channel, so a market maker's local book rebuilds automatically. The stream
+/// must surface `Reconnected` and then a `Snapshot`-kind update.
+#[tokio::test]
+async fn reconnect_redelivers_snapshot_for_resync() {
+    let mock = MockPulse::start().await;
+    mock.enable_auto_snapshot().await;
+    let client = build_client(mock.url());
+    let ws = client.ws();
+    let mut stream = ws.subscribe(Channel::book("BTC-PERP")).await.expect("sub");
+
+    // Initial auto-snapshot on first subscribe.
+    let first = timeout(Duration::from_secs(2), stream.next())
+        .await
+        .expect("initial snapshot")
+        .expect("open");
+    assert!(
+        matches!(first, Event::Update(u) if u.kind == UpdateKind::Snapshot),
+        "first frame should be the initial snapshot"
+    );
+
+    // Reconnect: the supervisor resubscribes, and the mock auto-sends a fresh
+    // snapshot for the resubscribed channel.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 2).await;
+
+    let mut saw_resync_snapshot = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !saw_resync_snapshot {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, stream.next()).await {
+            Ok(Some(Event::Update(u))) if u.kind == UpdateKind::Snapshot => {
+                assert_eq!(u.channel, ChannelName::Book);
+                saw_resync_snapshot = true;
+            }
+            Ok(Some(_)) => {} // Reconnected marker - skip
+            Ok(None) => panic!("book stream ended after reconnect"),
+            Err(_) => panic!("no resync snapshot after reconnect"),
+        }
+    }
+    ws.shutdown().await.expect("shutdown");
 }
