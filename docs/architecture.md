@@ -72,9 +72,9 @@ full API reference; this file is the orientation, not the spec.
 
   types/v1/             generated wire types committed under src/types/generated/
 
-  ws/views.rs           Per-frame parsers: BookView TickerView OracleView
-                        TradeView OrderView. NOT running state - decode +
-                        drop. Caller owns aggregation.
+  ws/views.rs           Per-frame parsers: Book Ticker Oracle Trade Order
+                        Position Portfolio Notification. NOT running state -
+                        decode + drop. Caller owns aggregation.
 
   ws/managed.rs         Supervisor: one socket multiplexes every sub,
                         auto-reconnect + auth/sub replay. No gap detection;
@@ -106,8 +106,8 @@ full API reference; this file is the orientation, not the spec.
        │
        ▼
   Orders::place_limit
-       │  reject if order_type ≠ Limit          (no true MARKET on server)
-       │  reject if side ≠ Buy/Sell
+       │  reject if no signer, size/price ≤ 0, or side is Unspecified
+       │  (LIMIT only; no true MARKET on server - use IOC at top-of-book)
        ▼
   Client::resolve_market("BTC-PERP")
        │  MarketCache hit? return cached. miss? fetch /markets, swap Arc.
@@ -144,8 +144,8 @@ full API reference; this file is the orientation, not the spec.
   obsdn-rust-sdk/
   ├── Cargo.toml          standalone crate
   ├── examples/           place_order, cancel_order, ws_book,
-  │                       ws_private_orders, transfer, withdraw,
-  │                       book_with_resync
+  │                       ws_private_orders, market_maker, transfer,
+  │                       withdraw, book_with_resync
   ├── scripts/            codegen-rust (regenerates committed wire types)
   └── src/
       ├── lib.rs          re-exports Client, Env, LocalSigner

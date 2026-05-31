@@ -13,7 +13,7 @@ Runs the full offline suite, including:
 - **Golden EIP-712 tests** (`tests/eip712_golden.rs`) - Rust signing output matches the exchange's reference signer byte-for-byte across 10 template families (Order, Transfer, Withdraw, Register, DelegatedSigner, CreateVault, StakeVault, UnstakeVault, CreateSubaccount, RegisterChildAccountSigner).
 - **WS chaos tests** (`tests/ws_chaos.rs`) - reconnect, sub-replay, wildcard routing, sparse GSN.
 - **REST smoke** (`tests/rest_smoke.rs`, `tests/rest_phase3_smoke.rs`) - wiremock-based.
-- **View roundtrip** (`tests/ws_views_unit.rs`) - BookView, TickerView, OracleView, OrderView deserialization.
+- **View roundtrip** (`tests/ws_views_unit.rs`) - Book, Ticker, Oracle, Order, and Notification view deserialization (including wrong-channel rejection).
 - **Codegen** (`tests/codegen_smoke.rs`) - generated types compile and have expected fields.
 
 ### Production Smoke (unauthenticated)
@@ -38,7 +38,7 @@ Hits live staging public endpoints: markets, fee-tiers, client-info, portfolio (
 OBSDN_STAGING=1 cargo test --test e2e_staging -- --nocapture --test-threads=1
 ```
 
-Full end-to-end against the live staging matching engine **and** pulse WS. Gated by `OBSDN_STAGING=1`; self-skips when unset. Two tests:
+Full end-to-end against the live staging matching engine **and** pulse WS. Gated by `OBSDN_STAGING=1`; self-skips when unset. Eight tests, each setting up its own account state; the two canonical flows:
 
 **`e2e_combined_flow`** - one account lifecycle, with the WS as live observer of the REST mutations:
 
@@ -52,6 +52,15 @@ Full end-to-end against the live staging matching engine **and** pulse WS. Gated
 8. Cleanup - cancel all, WS shutdown
 
 **`e2e_ws_public_book`** - public book channel, no auth: asserts the first frame is a `Snapshot` with a populated book, then a follow-up `Update` arrives; validates live `as_book()` deserialization.
+
+The remaining six cover the rest of the authed surface, each self-contained:
+
+- **`e2e_order_ergonomics`** - `place_limit` (decimal-string price/size) read back by oid + client id, `list_open` membership, `cancel_by_client_id`, bulk `cancel_many`.
+- **`e2e_market_maker_flow`** - one authed WS fanned across book/ticker/order/portfolio, two resting post-only quotes observed over the wildcard order feed, then `cancel_all`.
+- **`e2e_collateral_movements`** - live USDC `transfer` (to a sibling subaccount) and `withdraw`, both signed with the main wallet key.
+- **`e2e_advanced_orders`** - a 2-order BRACKET (parent + take-profit child) and a TWAP scheduled out.
+- **`e2e_position_controls`** - flip margin mode, open a tiny IOC position, `transfer_margin`, then flatten.
+- **`e2e_subaccount_lifecycle`** - create a subaccount, register a child signer, delete.
 
 Per-channel GSN is logged, never asserted contiguous - pulse `gsn` is a global event watermark, sparse per subscription by design (observed deltas of tens-to-hundreds between consecutive frames on one channel).
 
