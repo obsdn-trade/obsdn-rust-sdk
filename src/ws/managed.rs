@@ -649,12 +649,13 @@ impl Supervisor {
         conn: &WsConnection,
         streams: &mut StreamMap<SubKey, Subscription>,
     ) {
-        let parked: Vec<(SubKey, Channel)> = self
-            .subs
-            .iter()
-            .filter(|(k, _)| k.0.is_private() && !streams.contains_key(*k))
-            .map(|(k, s)| (k.clone(), s.channel.clone()))
-            .collect();
+        // Private subs with no live stream were parked by a failed auth replay.
+        let mut parked: Vec<(SubKey, Channel)> = Vec::new();
+        for (key, slot) in &self.subs {
+            if key.0.is_private() && !streams.contains_key(key) {
+                parked.push((key.clone(), slot.channel.clone()));
+            }
+        }
         for (key, channel) in parked {
             match conn.subscribe(channel).await {
                 Ok(stream) => {
@@ -1065,8 +1066,18 @@ fn lagged_event(key: &SubKey) -> Event {
 }
 
 fn is_conn_gone(e: &Error) -> bool {
+    // Transport-died errors from the connection layer: the driver task is gone
+    // ("connection task is gone" / "connection task dropped <op> ack"), the
+    // socket closed ("connection closed"), or an outbound send failed
+    // ("ws send: ..."). These mean the connection died, not that the server
+    // rejected the request, so callers retry on reconnect instead of counting
+    // them as auth/subscription failures.
     match e {
-        Error::Ws(s) => s.contains("connection task is gone") || s.contains("connection closed"),
+        Error::Ws(s) => {
+            s.contains("connection task")
+                || s.contains("connection closed")
+                || s.contains("ws send")
+        }
         _ => false,
     }
 }
@@ -1182,6 +1193,10 @@ mod tests {
     fn is_conn_gone_matches_known_strings() {
         assert!(is_conn_gone(&Error::Ws("connection task is gone".into())));
         assert!(is_conn_gone(&Error::Ws("connection closed".into())));
+        assert!(is_conn_gone(&Error::Ws(
+            "connection task dropped auth ack".into()
+        )));
+        assert!(is_conn_gone(&Error::Ws("ws send: broken pipe".into())));
         assert!(!is_conn_gone(&Error::Ws(
             "server error: bad request".into()
         )));
