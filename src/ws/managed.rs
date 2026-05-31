@@ -46,8 +46,8 @@ use crate::env::Env;
 use crate::error::{Error, Result};
 
 use super::channel::{Channel, ChannelName};
-use super::connection::{Subscription, WsConnection};
-use super::event::{Event, Update};
+use super::connection::{RawSubItem, Subscription, WsConnection};
+use super::event::Event;
 
 /// Per-subscription user-facing buffer. Bounded so a stalled consumer can
 /// be detected and the sub dropped rather than backpressuring the
@@ -651,8 +651,8 @@ impl Supervisor {
                     tracing::info!("ws driver exited; reconnecting");
                     return DriveExit::ConnDropped;
                 }
-                Some((key, update)) = streams.next() => {
-                    if let Some(exit) = self.route_update(key, update, conn).await {
+                Some((key, item)) = streams.next() => {
+                    if let Some(exit) = self.route_update(key, item, conn).await {
                         return exit;
                     }
                 }
@@ -797,9 +797,29 @@ impl Supervisor {
     async fn route_update(
         &mut self,
         key: SubKey,
-        update: Update,
+        item: RawSubItem,
         conn: &WsConnection,
     ) -> Option<DriveExit> {
+        let update = match item {
+            RawSubItem::Update(u) => u,
+            RawSubItem::Lagged => {
+                // The raw socket->supervisor buffer overflowed (the supervisor
+                // was stalled, e.g. mid-reconnect or in a slow command), so
+                // updates were dropped. Surface Event::Lagged and drop the sub -
+                // the same terminal semantics as the user-side overflow below;
+                // the caller resubscribes to resync.
+                if let Some(slot) = self.subs.get(&key) {
+                    if let Err(e) = slot.user_tx.try_send(lagged_event(&key)) {
+                        tracing::warn!(
+                            ?key,
+                            ?e,
+                            "could not deliver raw-lag Lagged marker before drop"
+                        );
+                    }
+                }
+                return self.drop_sub(&key, conn).await;
+            }
+        };
         // try_send: blocking await here would back up the entire supervisor
         // (cmd loop, other subs, conn.closed() detection) on the slowest
         // consumer. A "drop-oldest" policy is not available in tokio mpsc, so

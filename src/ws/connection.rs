@@ -66,17 +66,60 @@ struct Inner {
     closed_rx: watch::Receiver<bool>,
 }
 
+/// Item carried on a raw subscription channel: a routed [`Update`], or a
+/// terminal [`RawSubItem::Lagged`] sentinel signalling that the socket ->
+/// supervisor buffer overflowed (the supervisor was stalled, e.g. mid-reconnect
+/// or in a slow command) and dropped updates. The supervisor converts the
+/// sentinel into a user-facing `Event::Lagged`.
+pub(crate) enum RawSubItem {
+    /// A routed snapshot/update frame.
+    Update(Update),
+    /// The raw buffer overflowed; updates after this point were dropped.
+    Lagged,
+}
+
 /// One snapshot/update stream for a subscribed channel. Drop to free the
 /// internal sender slot - note that this does NOT send `unsub` to the
 /// server. Call [`WsConnection::unsubscribe`] explicitly for clean
 /// shutdown of a single channel. Crate-internal - public callers receive
 /// [`super::event::Event`] via [`super::managed::SubscriptionStream`].
-pub(crate) type Subscription = ReceiverStream<Update>;
+pub(crate) type Subscription = ReceiverStream<RawSubItem>;
+
+/// Outcome of [`push_or_lag`].
+enum PushOutcome {
+    /// Update was queued; keep the subscription.
+    Delivered,
+    /// Buffer overflowed; a terminal `Lagged` sentinel was queued in the
+    /// reserved slot. Drop the subscription.
+    Lagged,
+    /// Receiver was dropped. Drop the subscription.
+    Closed,
+}
+
+/// Push `update` to a raw subscriber, reserving the last buffer slot for a
+/// terminal [`RawSubItem::Lagged`] sentinel. While more than the reserved slot
+/// is free the update is queued; once only the reserved slot remains the
+/// sentinel is queued instead, so a supervisor stall that overflows the buffer
+/// surfaces as `Event::Lagged` rather than silently dropping updates.
+fn push_or_lag(sender: &mpsc::Sender<RawSubItem>, update: Update) -> PushOutcome {
+    if sender.capacity() > 1 {
+        match sender.try_send(RawSubItem::Update(update)) {
+            Ok(()) => PushOutcome::Delivered,
+            // A single producer with capacity > 1 can't be Full here; a send
+            // error means the receiver was dropped.
+            Err(_) => PushOutcome::Closed,
+        }
+    } else {
+        // Only the reserved slot remains: spend it on the terminal marker.
+        let _ = sender.try_send(RawSubItem::Lagged);
+        PushOutcome::Lagged
+    }
+}
 
 enum Command {
     Subscribe {
         channel: Channel,
-        sender: mpsc::Sender<Update>,
+        sender: mpsc::Sender<RawSubItem>,
         ack: oneshot::Sender<Result<()>>,
     },
     Unsubscribe {
@@ -189,7 +232,7 @@ impl WsConnection {
     /// Subscribe to `channel`. Awaits the server `subscribed` ack and
     /// returns a stream of subsequent snapshot / update messages.
     pub(crate) async fn subscribe(&self, channel: Channel) -> Result<Subscription> {
-        let (sender, receiver) = mpsc::channel(SUB_BUFFER);
+        let (sender, receiver) = mpsc::channel::<RawSubItem>(SUB_BUFFER);
         let (ack_tx, ack_rx) = oneshot::channel();
         self.inner
             .cmd_tx
@@ -288,7 +331,7 @@ struct Driver<S> {
     /// `(channel, filter)` → fan-out sender. Filter for filter-less
     /// channels is `""` to match the server, which omits the filter
     /// field on `portfolio` / `notification` updates.
-    subscribers: HashMap<SubKey, mpsc::Sender<Update>>,
+    subscribers: HashMap<SubKey, mpsc::Sender<RawSubItem>>,
     /// Watch sender shared with [`Inner::closed_rx`]. Set to `true`
     /// exactly once on driver-task exit so any number of
     /// [`WsConnection::closed`] callers observe the death - even if they
@@ -571,14 +614,17 @@ where
             filter,
             data: frame.data.unwrap_or(serde_json::Value::Null),
         };
-        // try_send: if the consumer is slow, drop with a warn rather than
-        // backpressure into the socket.
-        match sender.try_send(update) {
-            Ok(()) => {}
-            Err(mpsc::error::TrySendError::Full(_)) => {
-                tracing::warn!(?key, "dropping ws update - subscriber buffer full");
+        // Reserve the last buffer slot for a terminal Lagged sentinel: if the
+        // supervisor stalls (mid-reconnect, slow command) and this buffer fills,
+        // signal lag rather than silently dropping updates. The supervisor turns
+        // the sentinel into a user-facing Event::Lagged.
+        match push_or_lag(sender, update) {
+            PushOutcome::Delivered => {}
+            PushOutcome::Lagged => {
+                tracing::warn!(?key, "ws raw buffer full; signalled lag and dropped sub");
+                self.subscribers.remove(&key);
             }
-            Err(mpsc::error::TrySendError::Closed(_)) => {
+            PushOutcome::Closed => {
                 self.subscribers.remove(&key);
             }
         }
@@ -605,5 +651,48 @@ mod tests {
         let ch = Channel::Portfolio;
         assert_eq!(ch.name(), ChannelName::Portfolio);
         assert_eq!(ch.filter(), "");
+    }
+
+    fn dummy_update() -> Update {
+        Update {
+            kind: UpdateKind::Update,
+            channel: ChannelName::Book,
+            gsn: 0,
+            ts: 0,
+            filter: String::new(),
+            data: serde_json::Value::Null,
+        }
+    }
+
+    /// The raw buffer reserves its last slot: when it fills, `push_or_lag`
+    /// queues a terminal `Lagged` sentinel (after the buffered updates) instead
+    /// of silently dropping, so the supervisor can surface `Event::Lagged`.
+    #[tokio::test]
+    async fn push_or_lag_reserves_slot_for_lagged_sentinel() {
+        // Capacity 2: one real update fits, then only the reserved slot remains.
+        let (tx, mut rx) = mpsc::channel::<RawSubItem>(2);
+        assert!(matches!(
+            push_or_lag(&tx, dummy_update()),
+            PushOutcome::Delivered
+        ));
+        // Only the reserved slot is left now, so the next push lags.
+        assert!(matches!(
+            push_or_lag(&tx, dummy_update()),
+            PushOutcome::Lagged
+        ));
+        // The consumer drains the buffered update first, then the sentinel.
+        assert!(matches!(rx.recv().await, Some(RawSubItem::Update(_))));
+        assert!(matches!(rx.recv().await, Some(RawSubItem::Lagged)));
+    }
+
+    /// A dropped receiver is reported as `Closed` so the caller drops the sub.
+    #[tokio::test]
+    async fn push_or_lag_reports_closed_receiver() {
+        let (tx, rx) = mpsc::channel::<RawSubItem>(8);
+        drop(rx);
+        assert!(matches!(
+            push_or_lag(&tx, dummy_update()),
+            PushOutcome::Closed
+        ));
     }
 }
