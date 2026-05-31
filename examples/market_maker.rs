@@ -20,7 +20,7 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use obsdn_sdk::rest::orders::LimitOrder;
 use obsdn_sdk::types::v1::{CancelAllOrdersRequest, OrderSide};
-use obsdn_sdk::ws::{Channel, Event, Session, Update};
+use obsdn_sdk::ws::{Channel, Event, Session, SubscriptionStream, Update};
 use obsdn_sdk::{Client, Env, LocalSigner};
 use tokio_stream::StreamMap;
 
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
         match tokio::time::timeout(remaining, streams.next()).await {
             Err(_) => break,   // time budget elapsed
             Ok(None) => break, // all streams ended
-            Ok(Some((key, evt))) => handle_event(&ws, &market, key, evt).await,
+            Ok(Some((key, evt))) => handle_event(&ws, &mut streams, &market, key, evt).await,
         }
     }
 
@@ -116,13 +116,20 @@ async fn place_quotes(client: &Client, market: &str, mark: f64) {
 /// Dispatch one `(channel, Event)`. On `Lagged` the subscription was dropped,
 /// so resubscribe it; on `Reconnected` re-seed from REST if you keep local
 /// state; on `Unauthorized` the private feed stopped.
-async fn handle_event(ws: &Session, market: &str, key: &'static str, evt: Event) {
+async fn handle_event(
+    ws: &Session,
+    streams: &mut StreamMap<&'static str, SubscriptionStream>,
+    market: &str,
+    key: &'static str,
+    evt: Event,
+) {
     match evt {
         Event::Update(u) => log_update(key, &u),
         Event::Lagged { channel, .. } => {
             tracing::warn!(%key, ?channel, "lagged; resubscribing to resync");
-            // The old registration is gone; resubscribe to get a fresh snapshot.
-            if let Err(e) = resubscribe(ws, key, market).await {
+            // The old registration is gone; resubscribe and re-insert the fresh
+            // stream so this channel keeps delivering after the lag.
+            if let Err(e) = resubscribe(ws, streams, key, market).await {
                 tracing::warn!(%key, error = %e, "resubscribe after lag failed");
             }
         }
@@ -138,7 +145,12 @@ async fn handle_event(ws: &Session, market: &str, key: &'static str, evt: Event)
     }
 }
 
-async fn resubscribe(ws: &Session, key: &'static str, market: &str) -> Result<()> {
+async fn resubscribe(
+    ws: &Session,
+    streams: &mut StreamMap<&'static str, SubscriptionStream>,
+    key: &'static str,
+    market: &str,
+) -> Result<()> {
     let channel = match key {
         "book" => Channel::book(market),
         "ticker" => Channel::ticker(market),
@@ -146,9 +158,10 @@ async fn resubscribe(ws: &Session, key: &'static str, market: &str) -> Result<()
         "position" => Channel::position(None),
         _ => return Ok(()),
     };
-    // In a full maker you would re-insert the returned stream into the
-    // StreamMap; here we just demonstrate the recovery call.
-    ws.subscribe(channel).await?;
+    // StreamMap already dropped the ended stream; re-insert the fresh one so
+    // the maker keeps receiving this channel after the lag.
+    let stream = ws.subscribe(channel).await?;
+    streams.insert(key, stream);
     Ok(())
 }
 
