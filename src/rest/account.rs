@@ -111,7 +111,9 @@ impl Account {
     ///
     /// `from` is the client's sender address (the main wallet in
     /// delegated-signing mode, otherwise the signer's own address). The nonce
-    /// is wall-clock nanoseconds.
+    /// is wall-clock nanoseconds, so this form is NOT safe to retry after a
+    /// timeout: a retry signs a fresh nonce and can move funds twice. Use
+    /// [`Self::transfer_with_nonce`] with a stable nonce for idempotent retry.
     ///
     /// Errors:
     /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is not a
@@ -121,6 +123,27 @@ impl Account {
         to: Address,
         token: Address,
         amount: f64,
+    ) -> Result<SendFundsResponse> {
+        self.transfer_with_nonce(to, token, amount, super::now_unix_nanos()?)
+            .await
+    }
+
+    /// Idempotent [`Self::transfer`]: the caller supplies the EIP-712 `nonce`.
+    ///
+    /// The nonce is the server's replay-protection key - a given
+    /// `(sender, nonce)` executes at most once. Reuse the same nonce to retry a
+    /// transfer safely after a network timeout: if the server already accepted
+    /// the first attempt, the retry is deduplicated instead of moving funds a
+    /// second time. Generate the nonce once (e.g. via `now_unix_nanos`) and
+    /// keep it across retries of the same logical transfer.
+    ///
+    /// Errors: same as [`Self::transfer`].
+    pub async fn transfer_with_nonce(
+        &self,
+        to: Address,
+        token: Address,
+        amount: f64,
+        nonce: u64,
     ) -> Result<SendFundsResponse> {
         let signer = self.client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
@@ -135,7 +158,6 @@ impl Account {
         // same decimal text, so the server scales an identical value.
         let amt = format!("{amount}");
         let amount_x18 = scale_decimal_str(&amt)?;
-        let nonce = super::now_unix_nanos()?;
         let payload = TransferPayload {
             from,
             to,
@@ -161,6 +183,10 @@ impl Account {
     /// submits the on-chain transaction; observe completion via the
     /// `notification` WS channel.
     ///
+    /// The nonce is wall-clock nanoseconds, so this form is NOT safe to retry
+    /// after a timeout: a retry signs a fresh nonce and can withdraw twice. Use
+    /// [`Self::withdraw_with_nonce`] with a stable nonce for idempotent retry.
+    ///
     /// Errors:
     /// - `Error::Sign` - no `eip712_signer` configured, or `amount` is not a
     ///   positive finite number.
@@ -168,6 +194,26 @@ impl Account {
         &self,
         token: Address,
         amount: f64,
+    ) -> Result<WithdrawCollateralResponse> {
+        self.withdraw_with_nonce(token, amount, super::now_unix_nanos()?)
+            .await
+    }
+
+    /// Idempotent [`Self::withdraw`]: the caller supplies the EIP-712 `nonce`.
+    ///
+    /// The nonce is the server's replay-protection key - a given
+    /// `(sender, nonce)` executes at most once. Reuse the same nonce to retry a
+    /// withdrawal safely after a network timeout: if the server already
+    /// accepted the first attempt, the retry is deduplicated instead of
+    /// withdrawing a second time. Generate the nonce once (e.g. via
+    /// `now_unix_nanos`) and keep it across retries of the same withdrawal.
+    ///
+    /// Errors: same as [`Self::withdraw`].
+    pub async fn withdraw_with_nonce(
+        &self,
+        token: Address,
+        amount: f64,
+        nonce: u64,
     ) -> Result<WithdrawCollateralResponse> {
         let signer = self.client.eip712_signer().cloned().ok_or_else(|| {
             Error::Sign("no eip712_signer configured; call ClientBuilder::eip712_signer".into())
@@ -180,7 +226,6 @@ impl Account {
         let sender = self.client.sender_address()?;
         let amt = format!("{amount}");
         let amount_x18 = scale_decimal_str(&amt)?;
-        let nonce = super::now_unix_nanos()?;
         let payload = WithdrawPayload {
             sender,
             token,
