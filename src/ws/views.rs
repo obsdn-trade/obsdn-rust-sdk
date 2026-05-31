@@ -408,9 +408,10 @@ pub struct Notification {
     /// Event kind, e.g. `"deposit.confirmed"`, `"withdrawal.failed"`,
     /// `"subaccount.created"`.
     pub notification_type: String,
-    /// Server timestamp (nanoseconds). `0` if absent.
+    /// Server timestamp (nanoseconds, as a JSON string, matching the other
+    /// timestamp fields like `mark_price_ts`). Empty if absent.
     #[serde(default)]
-    pub timestamp: i64,
+    pub timestamp: String,
     /// Type-specific payload (deposit/withdrawal/subaccount fields). Decode
     /// per `notification_type`. `Null` if absent.
     #[serde(default)]

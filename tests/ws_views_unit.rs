@@ -187,13 +187,13 @@ fn notification_view_decodes_type_and_payload() {
         ChannelName::Notification,
         json!({
             "notification_type": "deposit.confirmed",
-            "timestamp": 1700000000,
+            "timestamp": "1700000000",
             "payload": { "asset": "USDC", "amount": "1000", "tx_hash": "0xabc" }
         }),
     );
     let n = u.as_notification().expect("notification decode");
     assert_eq!(n.notification_type, "deposit.confirmed");
-    assert_eq!(n.timestamp, 1700000000);
+    assert_eq!(n.timestamp, "1700000000");
     assert_eq!(n.payload["asset"], "USDC");
     assert_eq!(n.payload["amount"], "1000");
 }
@@ -207,7 +207,7 @@ fn notification_view_tolerates_missing_optional_fields() {
     );
     let n = u.as_notification().expect("decode");
     assert_eq!(n.notification_type, "withdrawal.failed");
-    assert_eq!(n.timestamp, 0);
+    assert_eq!(n.timestamp, "");
     assert!(n.payload.is_null());
 }
 

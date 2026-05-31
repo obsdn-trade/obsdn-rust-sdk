@@ -271,17 +271,17 @@ fn decode_error(status: StatusCode, body: Bytes) -> Error {
         };
     }
     // Cap the surfaced body so a pathological error page (e.g. a multi-MB WAF
-    // HTML response) doesn't bloat the error string. The bytes were already
-    // buffered, so this only bounds the retained copy.
+    // HTML response) doesn't bloat the error string. Truncate the raw bytes
+    // before decoding so the full payload isn't decoded just to be capped;
+    // `from_utf8_lossy` repairs a byte-boundary split mid-character.
     const MAX_BODY: usize = 4096;
-    let text = String::from_utf8_lossy(&body);
-    let body = if text.len() > MAX_BODY {
+    let body = if body.len() > MAX_BODY {
         format!(
             "{}… (truncated)",
-            text.chars().take(MAX_BODY).collect::<String>()
+            String::from_utf8_lossy(&body[..MAX_BODY])
         )
     } else {
-        text.into_owned()
+        String::from_utf8_lossy(&body).into_owned()
     };
     Error::UnparsedBody {
         status: status.as_u16(),

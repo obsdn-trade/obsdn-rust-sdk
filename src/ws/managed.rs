@@ -590,7 +590,12 @@ impl Supervisor {
                 // succeeds. If the user shuts down or the supervisor exits
                 // first, `fail_all_pending` returns an err so the caller
                 // doesn't hang on the oneshot.
+                //
+                // Reset the retry budget: an explicit authenticate() grants a
+                // fresh bound, so a session that previously gave up retries the
+                // full MAX_AUTH_REPLAY_FAILURES again on the next reconnect.
                 self.auth_active = true;
+                self.auth_failures = 0;
                 self.pending_auth_acks.push(ack);
             }
             SupCommand::Shutdown { ack } => {
@@ -618,6 +623,42 @@ impl Supervisor {
         }
         for ack in self.pending_auth_acks.drain(..) {
             let _ = ack.send(Err(Error::Ws(format!("{err}"))));
+        }
+    }
+
+    /// Re-subscribe private channels that are registered but have no live
+    /// stream - parked by an earlier failed auth replay. Called after a manual
+    /// `authenticate()` succeeds on an active connection so the private feed
+    /// recovers without waiting for a reconnect. Already-streaming subs are
+    /// left untouched.
+    async fn replay_parked_private(
+        &mut self,
+        conn: &WsConnection,
+        streams: &mut StreamMap<SubKey, Subscription>,
+    ) {
+        let parked: Vec<(SubKey, Channel)> = self
+            .subs
+            .iter()
+            .filter(|(k, _)| k.0.is_private() && !streams.contains_key(*k))
+            .map(|(k, s)| (k.clone(), s.channel.clone()))
+            .collect();
+        for (key, channel) in parked {
+            match conn.subscribe(channel).await {
+                Ok(stream) => {
+                    streams.insert(key.clone(), stream);
+                    // Fire a first-time subscriber's parked ack, if any.
+                    if let Some(slot) = self.subs.get_mut(&key) {
+                        if let Some(p) = slot.pending.take() {
+                            let _ = p.ack.send(Ok(p.user_rx));
+                        }
+                    }
+                }
+                // Conn died mid-replay: the next reconnect re-attaches it.
+                Err(e) if is_conn_gone(&e) => return,
+                Err(e) => {
+                    tracing::warn!(?key, error = %e, "parked private resubscribe failed");
+                }
+            }
         }
     }
 
@@ -767,6 +808,14 @@ impl Supervisor {
                         self.auth_active = true;
                         self.auth_failures = 0;
                         self.auth_address = Some(addr.clone());
+                        // Re-establish any private subs parked by an earlier
+                        // failed auth replay BEFORE acking, so authenticate()
+                        // returns only once the private feed is actually
+                        // restored. Without this a manual authenticate() on a
+                        // still-healthy socket would auth the connection but
+                        // leave the private feed silent (the reconnect that
+                        // would replay it is not forced here).
+                        self.replay_parked_private(conn, streams).await;
                         let _ = ack.send(Ok(addr));
                     }
                     Err(e) if is_conn_gone(&e) => {

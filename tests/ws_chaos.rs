@@ -1545,6 +1545,68 @@ async fn bounded_auth_retry_recovers_private_feed() {
     ws.shutdown().await.expect("shutdown");
 }
 
+/// A transient auth failure parks the private sub but the connection stays
+/// healthy (public-only), so no reconnect is triggered. A manual
+/// `authenticate()` on that live connection must re-establish the parked sub
+/// without waiting for a reconnect.
+#[tokio::test]
+async fn manual_authenticate_replays_parked_private_without_reconnect() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth conn1");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // conn #2's auth replay fails once; the order sub is parked (not dropped)
+    // and the connection then stays healthy in public-only mode.
+    mock.send(MockCmd::RejectNextNAuth(1)).await;
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 2).await;
+    let mut saw_unauthorized = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !saw_unauthorized {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Unauthorized(_))) => saw_unauthorized = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("order stream ended; sub was dropped instead of parked"),
+            Err(_) => panic!("expected Unauthorized after failed auth replay"),
+        }
+    }
+
+    // No reconnect. A manual authenticate() on the still-healthy conn #2
+    // succeeds (the reject budget is exhausted) and must replay the parked sub.
+    ws.authenticate()
+        .await
+        .expect("manual re-auth on live conn");
+    mock.send(MockCmd::Push {
+        kind: "update",
+        channel: "order",
+        filter: None,
+        gsn: 300,
+        data: json!([]),
+    })
+    .await;
+    let mut recovered = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !recovered {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            Ok(Some(Event::Update(u))) if u.gsn == 300 => recovered = true,
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("order stream ended before recovery"),
+            Err(_) => panic!("parked private sub not replayed after manual auth"),
+        }
+    }
+    assert_eq!(
+        mock.conn_seq().await,
+        2,
+        "recovery must not require a reconnect"
+    );
+    ws.shutdown().await.expect("shutdown");
+}
+
 /// After more than MAX_AUTH_REPLAY_FAILURES consecutive failed auth replays the
 /// supervisor gives up: it stops attempting auth and downgrades to public-only.
 /// The next reconnect then replays the private sub unauthenticated, the server
