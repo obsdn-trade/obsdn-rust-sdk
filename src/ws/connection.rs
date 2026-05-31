@@ -106,9 +106,11 @@ fn push_or_lag(sender: &mpsc::Sender<RawSubItem>, update: Update) -> PushOutcome
     if sender.capacity() > 1 {
         match sender.try_send(RawSubItem::Update(update)) {
             Ok(()) => PushOutcome::Delivered,
-            // Capacity > 1 means this send can't be Full (we just checked); an
-            // error means the receiver was dropped.
-            Err(_) => PushOutcome::Closed,
+            // Capacity > 1 means this send can't be Full under the single
+            // producer; match both arms defensively anyway - a Full would be a
+            // lag, a Closed means the receiver was dropped.
+            Err(mpsc::error::TrySendError::Full(_)) => PushOutcome::Lagged,
+            Err(mpsc::error::TrySendError::Closed(_)) => PushOutcome::Closed,
         }
     } else {
         // Only the reserved slot remains: spend it on the terminal marker.
