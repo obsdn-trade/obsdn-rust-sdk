@@ -64,7 +64,7 @@ fn position_view_maps_every_wire_key() {
             "quote_bal": "100", "mark_px": "2010", "idx_px": "2005",
             "mrgn_mode": "MARGIN_MODE_CROSS", "lev": "5", "mrgn_bal": "400",
             "init_mrgn_req": "40", "maint_mrgn_req": "20", "liq_px": "2500",
-            "unrlzd_pnl": "-10", "tot_fund_paid": "0.5", "iso_usdc_bal": "0",
+            "unrlzd_pnl": "-10", "fund_fee": "0.5", "iso_usdc_bal": "0",
             "free_iso_usdc_bal": "0", "in_iso_liq": false, "mrgn_ratio": "0.05"
         }]),
     );
@@ -83,7 +83,7 @@ fn position_view_maps_every_wire_key() {
     assert_eq!(p.maintenance_margin_req, "20");
     assert_eq!(p.liquidation_price, "2500");
     assert_eq!(p.unrealized_pnl, "-10");
-    assert_eq!(p.total_funding_paid, "0.5");
+    assert_eq!(p.funding_fee, "0.5");
     assert!(!p.in_isolated_liquidation);
     assert_eq!(p.margin_ratio, "0.05");
 }

@@ -170,10 +170,10 @@ pub struct Position {
     #[serde(default)]
     #[serde(rename = "unrlzd_pnl")]
     pub unrealized_pnl: String,
-    /// Total cumulative funding payments. Decimal string.
+    /// Cumulative funding fee (positive = paid, negative = received). Decimal string.
     #[serde(default)]
-    #[serde(rename = "tot_fund_paid")]
-    pub total_funding_paid: String,
+    #[serde(rename = "fund_fee")]
+    pub funding_fee: String,
     /// Isolated USDC balance. Decimal string.
     #[serde(default)]
     #[serde(rename = "iso_usdc_bal")]
