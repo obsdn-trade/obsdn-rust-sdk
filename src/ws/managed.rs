@@ -476,7 +476,9 @@ impl Supervisor {
                             if let Some(p) = slot.pending {
                                 let _ = p.ack.send(Err(Error::Ws(detail)));
                             } else {
-                                let _ = slot.user_tx.send(Event::Unauthorized(detail)).await;
+                                // try_send: a full user buffer must not block the
+                                // supervisor's reconnect (the sub is dropped anyway).
+                                let _ = slot.user_tx.try_send(Event::Unauthorized(detail));
                             }
                         }
                     }
@@ -657,10 +659,26 @@ impl Supervisor {
             match conn.subscribe(channel).await {
                 Ok(stream) => {
                     streams.insert(key.clone(), stream);
-                    // Fire a first-time subscriber's parked ack, if any.
+                    // Fire a first-time subscriber's parked ack. If that caller
+                    // already dropped their `subscribe()` future, GC the slot
+                    // (remove + unsubscribe) instead of leaving an orphaned
+                    // server subscription that would reject a later subscribe to
+                    // the same channel as a duplicate. Mirrors the reconnect path.
+                    let mut needs_gc = false;
                     if let Some(slot) = self.subs.get_mut(&key) {
                         if let Some(p) = slot.pending.take() {
-                            let _ = p.ack.send(Ok(p.user_rx));
+                            if p.ack.is_closed() {
+                                needs_gc = true;
+                            } else {
+                                let _ = p.ack.send(Ok(p.user_rx));
+                            }
+                        }
+                    }
+                    if needs_gc {
+                        let ch = self.subs.remove(&key).map(|s| s.channel);
+                        streams.remove(&key);
+                        if let Some(c) = ch {
+                            let _ = conn.unsubscribe(c).await;
                         }
                     }
                 }
@@ -670,14 +688,16 @@ impl Supervisor {
                     // Terminal rejection (validation/permission): drop the sub
                     // so a pending caller isn't left hanging and an established
                     // stream isn't left silently registered. Mirrors the
-                    // reconnect resubscribe path.
+                    // reconnect resubscribe path. `try_send` so a full user
+                    // buffer can't block the supervisor (the sub is dropped
+                    // either way).
                     let detail = format!("resubscribe failed: {e}");
                     tracing::warn!(?key, error = %detail, "parked private resubscribe rejected; dropping sub");
                     if let Some(slot) = self.subs.remove(&key) {
                         if let Some(p) = slot.pending {
                             let _ = p.ack.send(Err(Error::Ws(detail)));
                         } else {
-                            let _ = slot.user_tx.send(Event::Unauthorized(detail)).await;
+                            let _ = slot.user_tx.try_send(Event::Unauthorized(detail));
                         }
                     }
                 }
