@@ -27,10 +27,10 @@
 //!   must resync via REST.
 //! - Auth replay failures emit [`super::event::Event::Unauthorized`] on every
 //!   sub but are retried on subsequent reconnects (a transient failure, e.g. a
-//!   server restart, recovers the private feed automatically). Only after
-//!   [`MAX_AUTH_REPLAY_FAILURES`] consecutive failures does the supervisor give
-//!   up and downgrade to public-only until the caller invokes `authenticate()`
-//!   again. Public subs keep working throughout.
+//!   server restart, recovers the private feed automatically). Only after more
+//!   than [`MAX_AUTH_REPLAY_FAILURES`] consecutive failures does the supervisor
+//!   give up and downgrade to public-only until the caller invokes
+//!   `authenticate()` again. Public subs keep working throughout.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1035,10 +1035,9 @@ impl Backoff {
     }
 }
 
-/// Per-instance seed mixing wall-clock nanos with a stack address.
-/// Two `Backoff::new()` calls in the same process get different seeds
-/// (different stack frames); two processes started simultaneously
-/// diverge via ASLR. Avoids pulling the `rand` crate.
+/// Per-call backoff seed from OS entropy, so two clients reconnecting on the
+/// same host at the same instant get independent jitter. Avoids the `rand`
+/// crate.
 fn seed_for_backoff() -> u64 {
     use std::hash::BuildHasher;
     // `RandomState` seeds from OS entropy on construction, so each call yields

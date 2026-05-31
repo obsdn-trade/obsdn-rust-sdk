@@ -215,4 +215,5 @@ fn notification_view_tolerates_missing_optional_fields() {
 fn wrong_channel_is_rejected() {
     let u = upd(ChannelName::Book, json!({"bids": [], "asks": []}));
     assert!(u.as_ticker().is_err());
+    assert!(u.as_notification().is_err());
 }

@@ -67,10 +67,10 @@ struct Inner {
 }
 
 /// Item carried on a raw subscription channel: a routed [`Update`], or a
-/// terminal [`RawSubItem::Lagged`] sentinel signalling that the socket ->
-/// supervisor buffer overflowed (the supervisor was stalled, e.g. mid-reconnect
-/// or in a slow command) and dropped updates. The supervisor converts the
-/// sentinel into a user-facing `Event::Lagged`.
+/// terminal [`RawSubItem::Lagged`] sentinel signalling that the driver ->
+/// supervisor per-subscription buffer overflowed (the supervisor was stalled,
+/// e.g. mid-reconnect or in a slow command) and dropped updates. The supervisor
+/// converts the sentinel into a user-facing `Event::Lagged`.
 pub(crate) enum RawSubItem {
     /// A routed snapshot/update frame.
     Update(Update),
@@ -97,22 +97,28 @@ enum PushOutcome {
 }
 
 /// Push `update` to a raw subscriber, reserving the last buffer slot for a
-/// terminal [`RawSubItem::Lagged`] sentinel. While more than the reserved slot
-/// is free the update is queued; once only the reserved slot remains the
-/// sentinel is queued instead, so a supervisor stall that overflows the buffer
-/// surfaces as `Event::Lagged` rather than silently dropping updates.
+/// terminal [`RawSubItem::Lagged`] sentinel. While capacity is above the
+/// reserved slot (`capacity() > 1`) the update is queued; once only the
+/// reserved slot remains the sentinel is queued instead, so a supervisor stall
+/// that overflows the buffer surfaces as `Event::Lagged` rather than silently
+/// dropping updates.
 fn push_or_lag(sender: &mpsc::Sender<RawSubItem>, update: Update) -> PushOutcome {
     if sender.capacity() > 1 {
         match sender.try_send(RawSubItem::Update(update)) {
             Ok(()) => PushOutcome::Delivered,
-            // A single producer with capacity > 1 can't be Full here; a send
+            // Capacity > 1 means this send can't be Full (we just checked); an
             // error means the receiver was dropped.
             Err(_) => PushOutcome::Closed,
         }
     } else {
-        // Only the reserved slot remains: spend it on the terminal marker.
-        let _ = sender.try_send(RawSubItem::Lagged);
-        PushOutcome::Lagged
+        // Only the reserved slot remains: spend it on the terminal marker. If
+        // the receiver was dropped meanwhile the sentinel is moot, so report
+        // Closed - the sub is dropped either way and the caller's log stays
+        // accurate about whether lag was actually signalled.
+        match sender.try_send(RawSubItem::Lagged) {
+            Ok(()) => PushOutcome::Lagged,
+            Err(_) => PushOutcome::Closed,
+        }
     }
 }
 

@@ -1545,6 +1545,49 @@ async fn bounded_auth_retry_recovers_private_feed() {
     ws.shutdown().await.expect("shutdown");
 }
 
+/// After more than MAX_AUTH_REPLAY_FAILURES consecutive failed auth replays the
+/// supervisor gives up: it stops attempting auth and downgrades to public-only.
+/// The next reconnect then replays the private sub unauthenticated, the server
+/// rejects it, and the sub is dropped - the order stream ends. This is the
+/// give-up path, distinct from the transient case where the sub stays parked
+/// and recovers (see `bounded_auth_retry_recovers_private_feed`).
+#[tokio::test]
+async fn auth_retry_gives_up_after_budget_and_drops_private_feed() {
+    let mock = MockPulse::start().await;
+    mock.enforce_private_auth().await;
+    let client = build_authed_client(mock.url());
+    let ws = client.ws();
+    ws.authenticate().await.expect("auth conn1");
+    let mut order = ws.subscribe(Channel::order(None)).await.expect("sub order");
+
+    // Reject every auth replay. The give-up check is `> MAX_AUTH_REPLAY_FAILURES`
+    // (5), so the 6th consecutive failed replay (conn #7) downgrades the session
+    // to public-only.
+    mock.send(MockCmd::RejectNextNAuth(6)).await;
+    for next_conn in 2..=7 {
+        mock.send(MockCmd::KillConn).await;
+        await_conn_seq(&mock, next_conn).await;
+    }
+
+    // One more reconnect: having given up, the supervisor no longer attempts
+    // auth, replays the private sub unauthenticated, the server rejects it, and
+    // it is dropped. The order stream drains its markers and then ends.
+    mock.send(MockCmd::KillConn).await;
+    await_conn_seq(&mock, 8).await;
+    let mut ended = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !ended {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match timeout(remaining, order.next()).await {
+            // Drain buffered Unauthorized / Reconnected markers from the cycles.
+            Ok(Some(_)) => {}
+            Ok(None) => ended = true,
+            Err(_) => panic!("private feed should drop after give-up; stream still open"),
+        }
+    }
+    ws.shutdown().await.expect("shutdown");
+}
+
 /// A full order JSON with the given status/filled-size/done-reason. Other
 /// fields are fixed; only the fill-tracking fields vary.
 fn order_json(status: &str, filled_sz: &str, done_rsn: &str) -> Value {

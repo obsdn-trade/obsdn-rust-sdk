@@ -163,3 +163,28 @@ async fn transfer_without_signer_errors() {
         .expect_err("must require a signer");
     assert!(matches!(err, Error::Sign(_)), "got {err:?}");
 }
+
+#[tokio::test]
+async fn with_nonce_helpers_require_signer() {
+    let client = Client::builder()
+        .env(Env::Staging)
+        .api_key("KEY", "SECRET")
+        .build()
+        .unwrap();
+    let to: Address = address!("0000000000000000000000000000000000000001");
+    let token: Address = address!("0000000000000000000000000000000000000002");
+    // The idempotent variants move funds too, so they must enforce the same
+    // signer requirement as the auto-nonce forms.
+    let err = client
+        .account()
+        .transfer_with_nonce(to, token, 1.0, 42)
+        .await
+        .expect_err("transfer_with_nonce must require a signer");
+    assert!(matches!(err, Error::Sign(_)), "got {err:?}");
+    let err = client
+        .account()
+        .withdraw_with_nonce(token, 1.0, 42)
+        .await
+        .expect_err("withdraw_with_nonce must require a signer");
+    assert!(matches!(err, Error::Sign(_)), "got {err:?}");
+}

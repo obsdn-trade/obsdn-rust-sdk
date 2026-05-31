@@ -80,13 +80,20 @@ async fn main() -> Result<()> {
         }
     }
 
-    // --- Always flatten quotes on the way out.
-    let _ = client
+    // --- Always flatten quotes on the way out. Check the result: a maker that
+    // logs "cancelled" on a failed cancel_all could leave resting quotes that
+    // fill unattended.
+    match client
         .orders()
         .cancel_all(CancelAllOrdersRequest::default())
-        .await;
+        .await
+    {
+        Ok(_) => tracing::info!("market maker stopped; orders cancelled"),
+        Err(e) => {
+            tracing::warn!(error = %e, "market maker stopping; cancel_all failed, orders may still be open")
+        }
+    }
     ws.shutdown().await.ok();
-    tracing::info!("market maker stopped; orders cancelled");
     Ok(())
 }
 
@@ -115,8 +122,9 @@ async fn handle_event(ws: &Session, market: &str, key: &'static str, evt: Event)
         Event::Lagged { channel, .. } => {
             tracing::warn!(%key, ?channel, "lagged; resubscribing to resync");
             // The old registration is gone; resubscribe to get a fresh snapshot.
-            // (Errors here just mean the session is shutting down.)
-            let _ = resubscribe(ws, key, market).await;
+            if let Err(e) = resubscribe(ws, key, market).await {
+                tracing::warn!(%key, error = %e, "resubscribe after lag failed");
+            }
         }
         Event::Reconnected => {
             // The socket reconnected and the server will re-send a snapshot.
