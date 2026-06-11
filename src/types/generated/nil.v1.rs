@@ -4080,6 +4080,9 @@ pub struct ApiKey {
     /// When true, this API key is restricted to read-only operations.
     #[prost(bool, tag = "8")]
     pub is_ro: bool,
+    /// Exact client IPs allowed to use this key. Empty means any IP is allowed.
+    #[prost(string, repeated, tag = "9")]
+    pub ip_whitelist: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RegisterSignerRequest {
@@ -4123,6 +4126,10 @@ pub struct CreateApiKeyRequest {
     /// When true, restricts the API key to read-only operations.
     #[prost(bool, tag = "2")]
     pub is_ro: bool,
+    /// Exact client IPs allowed to use this key (max 10, IPv4 only). Empty means
+    /// any IP is allowed.
+    #[prost(string, repeated, tag = "3")]
+    pub ip_whitelist: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateApiKeyResponse {

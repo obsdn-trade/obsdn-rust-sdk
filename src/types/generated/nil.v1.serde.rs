@@ -30,6 +30,9 @@ impl serde::Serialize for ApiKey {
         if self.is_ro {
             len += 1;
         }
+        if !self.ip_whitelist.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("nil.v1.APIKey", len)?;
         if !self.api_key.is_empty() {
             struct_ser.serialize_field("apiKey", &self.api_key)?;
@@ -59,6 +62,9 @@ impl serde::Serialize for ApiKey {
         if self.is_ro {
             struct_ser.serialize_field("isRo", &self.is_ro)?;
         }
+        if !self.ip_whitelist.is_empty() {
+            struct_ser.serialize_field("ipWhitelist", &self.ip_whitelist)?;
+        }
         struct_ser.end()
     }
 }
@@ -82,6 +88,8 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
             "expTs",
             "is_ro",
             "isRo",
+            "ip_whitelist",
+            "ipWhitelist",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -94,6 +102,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
             CrtTs,
             ExpTs,
             IsRo,
+            IpWhitelist,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -123,6 +132,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                             "crtTs" | "crt_ts" => Ok(GeneratedField::CrtTs),
                             "expTs" | "exp_ts" => Ok(GeneratedField::ExpTs),
                             "isRo" | "is_ro" => Ok(GeneratedField::IsRo),
+                            "ipWhitelist" | "ip_whitelist" => Ok(GeneratedField::IpWhitelist),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -150,6 +160,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                 let mut crt_ts__ = None;
                 let mut exp_ts__ = None;
                 let mut is_ro__ = None;
+                let mut ip_whitelist__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::ApiKey => {
@@ -186,7 +197,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                             if crt_ts__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("crtTs"));
                             }
-                            crt_ts__ = 
+                            crt_ts__ =
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -194,7 +205,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                             if exp_ts__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("expTs"));
                             }
-                            exp_ts__ = 
+                            exp_ts__ =
                                 Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -203,6 +214,12 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                                 return Err(serde::de::Error::duplicate_field("isRo"));
                             }
                             is_ro__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::IpWhitelist => {
+                            if ip_whitelist__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ipWhitelist"));
+                            }
+                            ip_whitelist__ = Some(map_.next_value()?);
                         }
                     }
                 }
@@ -215,6 +232,7 @@ impl<'de> serde::Deserialize<'de> for ApiKey {
                     crt_ts: crt_ts__.unwrap_or_default(),
                     exp_ts: exp_ts__.unwrap_or_default(),
                     is_ro: is_ro__.unwrap_or_default(),
+                    ip_whitelist: ip_whitelist__.unwrap_or_default(),
                 })
             }
         }
@@ -2519,12 +2537,18 @@ impl serde::Serialize for CreateApiKeyRequest {
         if self.is_ro {
             len += 1;
         }
+        if !self.ip_whitelist.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("nil.v1.CreateAPIKeyRequest", len)?;
         if !self.nm.is_empty() {
             struct_ser.serialize_field("nm", &self.nm)?;
         }
         if self.is_ro {
             struct_ser.serialize_field("isRo", &self.is_ro)?;
+        }
+        if !self.ip_whitelist.is_empty() {
+            struct_ser.serialize_field("ipWhitelist", &self.ip_whitelist)?;
         }
         struct_ser.end()
     }
@@ -2539,12 +2563,15 @@ impl<'de> serde::Deserialize<'de> for CreateApiKeyRequest {
             "nm",
             "is_ro",
             "isRo",
+            "ip_whitelist",
+            "ipWhitelist",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Nm,
             IsRo,
+            IpWhitelist,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2568,6 +2595,7 @@ impl<'de> serde::Deserialize<'de> for CreateApiKeyRequest {
                         match value {
                             "nm" => Ok(GeneratedField::Nm),
                             "isRo" | "is_ro" => Ok(GeneratedField::IsRo),
+                            "ipWhitelist" | "ip_whitelist" => Ok(GeneratedField::IpWhitelist),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2589,6 +2617,7 @@ impl<'de> serde::Deserialize<'de> for CreateApiKeyRequest {
             {
                 let mut nm__ = None;
                 let mut is_ro__ = None;
+                let mut ip_whitelist__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Nm => {
@@ -2603,11 +2632,18 @@ impl<'de> serde::Deserialize<'de> for CreateApiKeyRequest {
                             }
                             is_ro__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::IpWhitelist => {
+                            if ip_whitelist__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("ipWhitelist"));
+                            }
+                            ip_whitelist__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CreateApiKeyRequest {
                     nm: nm__.unwrap_or_default(),
                     is_ro: is_ro__.unwrap_or_default(),
+                    ip_whitelist: ip_whitelist__.unwrap_or_default(),
                 })
             }
         }
