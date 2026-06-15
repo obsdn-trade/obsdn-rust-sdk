@@ -271,6 +271,29 @@ pub struct GetClientInfoResponse {
     /// Whether this wallet has redeemed an access code (production gate).
     #[prost(bool, tag = "7")]
     pub has_access: bool,
+    /// Whether this wallet has accepted the current terms of service.
+    #[prost(bool, tag = "8")]
+    pub term_accepted: bool,
+    /// The terms content the user must sign to accept (plain text for personal_sign).
+    #[prost(string, tag = "9")]
+    pub term_content: ::prost::alloc::string::String,
+    /// Server timestamp in nanoseconds.
+    #[prost(string, tag = "10")]
+    pub server_ts: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetServerTimeRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetServerTimeResponse {
+    /// Unix timestamp in nanoseconds.
+    #[prost(string, tag = "1")]
+    pub ns: ::prost::alloc::string::String,
+    /// Unix timestamp in milliseconds.
+    #[prost(string, tag = "2")]
+    pub ms: ::prost::alloc::string::String,
+    /// Unix timestamp in seconds.
+    #[prost(string, tag = "3")]
+    pub s: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetErrorCodesRequest {
@@ -319,6 +342,21 @@ pub struct ErrorCodeMeta {
     /// Corresponding HTTP status code.
     #[prost(int32, tag = "10")]
     pub http_st: i32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AcceptTermRequest {
+    /// The full terms content that was signed (must match server-side text).
+    #[prost(string, tag = "1")]
+    pub content: ::prost::alloc::string::String,
+    /// personal_sign signature over the content, signed by the user's wallet.
+    #[prost(string, tag = "2")]
+    pub sig: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct AcceptTermResponse {
+    /// Timestamp (unix nanos) when the acceptance was recorded.
+    #[prost(uint64, tag = "1")]
+    pub accepted_ts: u64,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetFeeTiersRequest {}
@@ -443,6 +481,9 @@ pub struct Order {
     /// Client-provided identifier for the order.
     #[prost(string, tag = "29")]
     pub cl_oid: ::prost::alloc::string::String,
+    /// Parent order ID for child orders (e.g., bracket TP/SL legs).
+    #[prost(string, tag = "36")]
+    pub par_oid: ::prost::alloc::string::String,
     /// If true, order has been requested for cancellation.
     #[prost(bool, tag = "30")]
     pub cancel_req: bool,
@@ -623,9 +664,9 @@ pub struct Position {
     /// Unrealized PnL.
     #[prost(string, tag = "14")]
     pub unrlzd_pnl: ::prost::alloc::string::String,
-    /// Total cumulative funding payments. Positive values indicate payments made; negative values indicate payments received.
+    /// Cumulative funding fee for this position. Positive = paid, negative = received.
     #[prost(string, tag = "15")]
-    pub tot_fund_paid: ::prost::alloc::string::String,
+    pub fund_fee: ::prost::alloc::string::String,
     /// Isolated USDC balance (for isolated positions).
     #[prost(string, tag = "16")]
     pub iso_usdc_bal: ::prost::alloc::string::String,
@@ -1155,10 +1196,10 @@ pub struct PlaceOrderRequest {
     /// Order type (LIMIT, MARKET, STOP, TWAP).
     #[prost(enumeration = "OrderType", tag = "3")]
     pub ot: i32,
-    /// Order quantity in base asset units (decimal string).
+    /// Order quantity in base asset units.
     #[prost(string, tag = "4")]
     pub sz: ::prost::alloc::string::String,
-    /// Limit price in quote asset units (decimal string).
+    /// Limit price in quote asset units.
     #[prost(string, tag = "5")]
     pub px: ::prost::alloc::string::String,
     /// Time-in-force policy. Defaults to GTC.
@@ -1185,7 +1226,7 @@ pub struct PlaceOrderRequest {
     /// Type of stop order (stop_loss or take_profit). For STOP orders.
     #[prost(enumeration = "StopType", tag = "13")]
     pub stop_t: i32,
-    /// Price at which the stop order triggers (decimal string). For STOP orders.
+    /// Price at which the stop order triggers. For STOP orders.
     #[prost(string, tag = "14")]
     pub stop_px: ::prost::alloc::string::String,
     /// Price source for stop evaluation. For STOP orders.
@@ -1264,10 +1305,10 @@ pub mod place_twap_orders_request {
     /// SubOrder represents an individual TWAP sub-order.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct SubOrder {
-        /// Limit price in quote asset units (decimal string).
+        /// Limit price in quote asset units.
         #[prost(string, tag = "1")]
         pub px: ::prost::alloc::string::String,
-        /// Order quantity in base asset units (decimal string).
+        /// Order quantity in base asset units.
         #[prost(string, tag = "2")]
         pub sz: ::prost::alloc::string::String,
         /// Unique nonce as a Unix nanosecond timestamp. Must be within ±5 minutes of server time.
@@ -1463,10 +1504,9 @@ pub struct ListOrderHistoryRequest {
     /// Filter results by order status.
     #[prost(enumeration = "OrderStatus", repeated, tag = "5")]
     pub statuses: ::prost::alloc::vec::Vec<i32>,
-    /// Sort the results using the given field. Supported values :`created_at`
-    /// (sort by created_at asc), `-created_at` (sort by created_at desc),
-    /// `updated_at` (sort by updated_at asc), `-updated_at` (sort by updated_at
-    /// desc).
+    /// Sort the results using the given field. Accepts API field names or DB
+    /// column names: `crt_ts` / `created_at` (asc), `-crt_ts` / `-created_at`
+    /// (desc), `upd_ts` / `updated_at` (asc), `-upd_ts` / `-updated_at` (desc).
     #[prost(string, tag = "6")]
     pub sorted_by: ::prost::alloc::string::String,
     /// Filter by cl_oids.
@@ -1734,9 +1774,8 @@ pub struct GetPositionHistoryRequest {
     /// Maximum results to return (default: 100, max: 1000).
     #[prost(int32, tag = "4")]
     pub lmt: i32,
-    /// Sort by field. Prefix with "-" for descending.
-    /// Valid values: "created_at", "-created_at", "updated_at", "-updated_at".
-    /// Default: unsorted.
+    /// Sort by field. Prefix with "-" for descending. Accepts API field names or
+    /// DB column names: crt_ts/created_at, upd_ts/updated_at. Default: unsorted.
     #[prost(string, tag = "5")]
     pub sorted_by: ::prost::alloc::string::String,
 }
@@ -1885,9 +1924,6 @@ pub struct TradingCalendarDay {
     /// Activity level for heatmap (0=none, 1=low, 2=medium, 3=high, 4=very high).
     #[prost(int32, tag = "5")]
     pub activity_level: i32,
-    /// Whether this day's data is synthetically generated (pre-reset dates). Currently always false (synthetic data is disabled).
-    #[prost(bool, tag = "6")]
-    pub is_synthetic: bool,
     /// Daily PnL in USD (account_value_end - account_value_start - net_deposits).
     #[prost(string, tag = "7")]
     pub pnl_usd: ::prost::alloc::string::String,
@@ -1945,6 +1981,18 @@ pub struct PulseCard {
     pub viewer_state: ::core::option::Option<PulseViewerState>,
     #[prost(string, tag = "18")]
     pub status: ::prost::alloc::string::String,
+    #[prost(map = "string, string", tag = "19")]
+    pub title_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(map = "string, string", tag = "20")]
+    pub body_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(int64, tag = "21")]
+    pub scheduled_at_ts: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PulsePostedBy {
@@ -1976,6 +2024,11 @@ pub struct PulseTopic {
     pub tone: ::prost::alloc::string::String,
     #[prost(int32, tag = "4")]
     pub count: i32,
+    #[prost(map = "string, string", tag = "5")]
+    pub label_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct PulseViewerState {
@@ -1994,6 +2047,11 @@ pub struct PulseTrendingItem {
     pub topic_label: ::prost::alloc::string::String,
     #[prost(int32, tag = "4")]
     pub delta_pct: i32,
+    #[prost(map = "string, string", tag = "5")]
+    pub topic_label_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct PulsePagination {
@@ -2039,6 +2097,11 @@ pub struct PulseTopicCount {
     pub label: ::prost::alloc::string::String,
     #[prost(int32, tag = "3")]
     pub count: i32,
+    #[prost(map = "string, string", tag = "4")]
+    pub label_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PulseFeedCounts {
@@ -2091,6 +2154,8 @@ pub struct ListPulseFeedRequest {
     pub per_page: u32,
     #[prost(uint32, tag = "9")]
     pub window_h: u32,
+    #[prost(string, tag = "10")]
+    pub locale: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListPulseFeedResponse {
@@ -2106,17 +2171,21 @@ pub struct ListPulseFeedResponse {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPulseCardRequest {
     #[prost(string, tag = "1")]
-    pub slug: ::prost::alloc::string::String,
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub locale: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPulseCardResponse {
     #[prost(message, optional, tag = "1")]
     pub card: ::core::option::Option<PulseCard>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPulseTrendingRequest {
     #[prost(uint32, tag = "1")]
     pub window_h: u32,
+    #[prost(string, tag = "2")]
+    pub locale: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPulseTrendingResponse {
@@ -2127,10 +2196,12 @@ pub struct GetPulseTrendingResponse {
     #[prost(int64, tag = "3")]
     pub computed_at_ts: i64,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListPulseTopicsRequest {
     #[prost(uint32, tag = "1")]
     pub window_h: u32,
+    #[prost(string, tag = "2")]
+    pub locale: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListPulseTopicsResponse {
@@ -2163,10 +2234,16 @@ pub struct TogglePulseWatchResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreatePulseCardRequest {
-    #[prost(string, tag = "1")]
-    pub title: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub body: ::prost::alloc::string::String,
+    #[prost(map = "string, string", tag = "1")]
+    pub title_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(map = "string, string", tag = "2")]
+    pub body_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     #[prost(string, tag = "3")]
     pub slug: ::prost::alloc::string::String,
     #[prost(enumeration = "PulseCardType", tag = "4")]
@@ -2185,6 +2262,8 @@ pub struct CreatePulseCardRequest {
     pub linked_assets: ::prost::alloc::vec::Vec<PulseCardAssetInput>,
     #[prost(string, repeated, tag = "11")]
     pub topic_slugs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(int64, tag = "12")]
+    pub scheduled_at_ts: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreatePulseCardResponse {
@@ -2195,10 +2274,16 @@ pub struct CreatePulseCardResponse {
 pub struct UpdatePulseCardRequest {
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub title: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub body: ::prost::alloc::string::String,
+    #[prost(map = "string, string", tag = "2")]
+    pub title_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(map = "string, string", tag = "3")]
+    pub body_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     #[prost(string, tag = "4")]
     pub slug: ::prost::alloc::string::String,
     #[prost(enumeration = "PulseCardType", tag = "5")]
@@ -2217,6 +2302,8 @@ pub struct UpdatePulseCardRequest {
     pub linked_assets: ::prost::alloc::vec::Vec<PulseCardAssetInput>,
     #[prost(string, repeated, tag = "12")]
     pub topic_slugs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(int64, tag = "13")]
+    pub scheduled_at_ts: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdatePulseCardResponse {
@@ -2268,8 +2355,11 @@ pub struct GetAdminPulseCardResponse {
 pub struct CreatePulseTopicRequest {
     #[prost(string, tag = "1")]
     pub slug: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub label: ::prost::alloc::string::String,
+    #[prost(map = "string, string", tag = "2")]
+    pub label_i18n: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     #[prost(string, tag = "3")]
     pub tone: ::prost::alloc::string::String,
 }
@@ -2508,9 +2598,12 @@ pub struct Market {
     /// Most recent trade price.
     #[prost(string, tag = "19")]
     pub last_px: ::prost::alloc::string::String,
-    /// Total open interest.
+    /// Total open interest in USD notional (oi_sz * mark_px).
     #[prost(string, tag = "20")]
     pub oi: ::prost::alloc::string::String,
+    /// Total open interest in base currency / shares.
+    #[prost(string, tag = "36")]
+    pub oi_sz: ::prost::alloc::string::String,
     /// Funding interval in nanoseconds. Always 3600000000000 ns (1 hour);
     /// identical across all markets.
     #[prost(string, tag = "21")]
@@ -2528,9 +2621,18 @@ pub struct Market {
     /// Index price.
     #[prost(string, tag = "25")]
     pub idx_px: ::prost::alloc::string::String,
-    /// Open interest cap (0 = no cap).
+    /// Open interest cap in USD notional (0 = no cap).
     #[prost(string, tag = "26")]
     pub oi_cap: ::prost::alloc::string::String,
+    /// Position size cap per address in USD notional (0 = no cap).
+    #[prost(string, tag = "33")]
+    pub pos_cap: ::prost::alloc::string::String,
+    /// Open interest cap in base currency / shares (0 = no cap).
+    #[prost(string, tag = "34")]
+    pub oi_cap_sz: ::prost::alloc::string::String,
+    /// Position size cap per address in base currency / shares (0 = no cap).
+    #[prost(string, tag = "35")]
+    pub pos_cap_sz: ::prost::alloc::string::String,
     /// Tags for UI grouping/filtering. Values: "crypto", "equities".
     #[prost(string, repeated, tag = "27")]
     #[doc(hidden)]
@@ -2538,11 +2640,24 @@ pub struct Market {
     /// URL for the market icon (e.g., "<https://assets.obsdn.trade/images/icons/btc.png">).
     #[prost(string, tag = "28")]
     pub icon_url: ::prost::alloc::string::String,
-    /// Market trading mode: "trading", "post_only", "wind_down", "halted", "delisting", "delisted".
+    /// Market trading mode: "trading", "post_only", "wind_down", "halted",
+    /// "off_hours", "delisting", "delisted".
     /// Frontend integrations MUST use `mode`; `enabled` and `post_only` cannot
-    /// distinguish `wind_down`/`halted`/`delisting`/`delisted`.
+    /// distinguish `wind_down`/`halted`/`off_hours`/`delisting`/`delisted`.
+    /// Markets with a non-24/7 `schedule` are set to "off_hours" outside trading
+    /// hours and restored automatically when the schedule reopens.
     #[prost(string, tag = "29")]
     pub mode: ::prost::alloc::string::String,
+    /// Trading schedule in "Timezone;WeeklySchedule;Holidays" format.
+    /// Example: "UTC;O,O,O,O,O,O,O;" (24/7) or "Asia/Tokyo;0900-1800,...;0101/C,..." (Japan).
+    #[prost(string, tag = "30")]
+    pub schedule: ::prost::alloc::string::String,
+    /// Maker fee rate (e.g. "0.0002" = 2 bps).
+    #[prost(string, tag = "31")]
+    pub mkr_fee_rt: ::prost::alloc::string::String,
+    /// Taker fee rate (e.g. "0.0005" = 5 bps).
+    #[prost(string, tag = "32")]
+    pub tkr_fee_rt: ::prost::alloc::string::String,
 }
 /// GetOrderBookRequest is the request for GetOrderBook.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3128,110 +3243,9 @@ pub struct GetPendingTransfersRequest {}
 /// GetPendingTransfersResponse is the response for GetPendingTransfers.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetPendingTransfersResponse {
-    /// List of pending transfer items.
+    /// List of pending transfer items (same shape as TransferItem with pnd=true).
     #[prost(message, repeated, tag = "1")]
-    pub items: ::prost::alloc::vec::Vec<PendingTransfer>,
-    /// Last block that has been confirmed/processed by the system.
-    #[prost(uint64, tag = "2")]
-    pub last_conf_blk: u64,
-    /// Current block number on the blockchain.
-    #[prost(uint64, tag = "3")]
-    pub cur_blk: u64,
-    /// Number of block confirmations required before a transfer is considered confirmed.
-    #[prost(uint64, tag = "4")]
-    pub req_confs: u64,
-}
-/// PendingTransfer represents a pending (unconfirmed) transfer event from the blockchain.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PendingTransfer {
-    /// Transaction hash on the blockchain.
-    #[prost(string, tag = "1")]
-    pub tx_hash: ::prost::alloc::string::String,
-    /// Log index within the transaction.
-    #[prost(uint32, tag = "2")]
-    pub log_idx: u32,
-    /// Block number where the event was emitted.
-    #[prost(uint64, tag = "3")]
-    pub blk_num: u64,
-    /// Unix timestamp of the block.
-    #[prost(uint64, tag = "4")]
-    pub blk_time: u64,
-    /// Type of transfer (deposit, stake_vault, unstake_vault).
-    #[prost(enumeration = "TransferItemType", tag = "5")]
-    pub t: i32,
-    /// Number of confirmations received so far.
-    #[prost(uint64, tag = "6")]
-    pub confs: u64,
-    /// Type-specific data.
-    #[prost(oneof = "pending_transfer::Data", tags = "10, 11, 12")]
-    pub data: ::core::option::Option<pending_transfer::Data>,
-}
-/// Nested message and enum types in `PendingTransfer`.
-pub mod pending_transfer {
-    /// Type-specific data.
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Data {
-        #[prost(message, tag = "10")]
-        Dep(super::PendingDeposit),
-        #[prost(message, tag = "11")]
-        StkVlt(super::PendingStakeVault),
-        #[prost(message, tag = "12")]
-        UnstkVlt(super::PendingUnstakeVault),
-    }
-}
-/// PendingDeposit represents pending deposit event data.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PendingDeposit {
-    /// Account address that received the deposit.
-    #[prost(string, tag = "1")]
-    pub acct: ::prost::alloc::string::String,
-    /// Token contract address of the deposited asset.
-    #[prost(string, tag = "2")]
-    pub tkn: ::prost::alloc::string::String,
-    /// Deposit amount in decimal format.
-    #[prost(string, tag = "3")]
-    pub amt: ::prost::alloc::string::String,
-}
-/// PendingStakeVault represents pending vault stake event data.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PendingStakeVault {
-    /// Vault address receiving the stake.
-    #[prost(string, tag = "1")]
-    pub vlt: ::prost::alloc::string::String,
-    /// Staker's wallet address.
-    #[prost(string, tag = "2")]
-    pub stkr: ::prost::alloc::string::String,
-    /// Token contract address of the staked asset.
-    #[prost(string, tag = "3")]
-    pub tkn: ::prost::alloc::string::String,
-    /// Staked amount in decimal format.
-    #[prost(string, tag = "4")]
-    pub amt: ::prost::alloc::string::String,
-    /// Number of vault shares received.
-    #[prost(string, tag = "5")]
-    pub shrs: ::prost::alloc::string::String,
-}
-/// PendingUnstakeVault represents pending vault unstake event data.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct PendingUnstakeVault {
-    /// Vault address from which funds are unstaked.
-    #[prost(string, tag = "1")]
-    pub vlt: ::prost::alloc::string::String,
-    /// Staker's wallet address.
-    #[prost(string, tag = "2")]
-    pub stkr: ::prost::alloc::string::String,
-    /// Token contract address of the unstaked asset.
-    #[prost(string, tag = "3")]
-    pub tkn: ::prost::alloc::string::String,
-    /// Unstaked amount in decimal format.
-    #[prost(string, tag = "4")]
-    pub amt: ::prost::alloc::string::String,
-    /// Number of vault shares burned.
-    #[prost(string, tag = "5")]
-    pub shrs: ::prost::alloc::string::String,
-    /// Fee amount charged for early unstaking.
-    #[prost(string, tag = "6")]
-    pub fee: ::prost::alloc::string::String,
+    pub items: ::prost::alloc::vec::Vec<TransferItem>,
 }
 /// GetWithdrawalRequestsRequest is the request for GetWithdrawalRequests.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3427,6 +3441,8 @@ pub enum TransferItemType {
     VaultProfitShare = 7,
     SendFundsOut = 8,
     SendFundsIn = 9,
+    /// Transfer between two subaccounts, visible from the main account.
+    SendFunds = 10,
 }
 impl TransferItemType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -3445,6 +3461,7 @@ impl TransferItemType {
             Self::VaultProfitShare => "TRANSFER_ITEM_TYPE_VAULT_PROFIT_SHARE",
             Self::SendFundsOut => "TRANSFER_ITEM_TYPE_SEND_FUNDS_OUT",
             Self::SendFundsIn => "TRANSFER_ITEM_TYPE_SEND_FUNDS_IN",
+            Self::SendFunds => "TRANSFER_ITEM_TYPE_SEND_FUNDS",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -3460,6 +3477,7 @@ impl TransferItemType {
             "TRANSFER_ITEM_TYPE_VAULT_PROFIT_SHARE" => Some(Self::VaultProfitShare),
             "TRANSFER_ITEM_TYPE_SEND_FUNDS_OUT" => Some(Self::SendFundsOut),
             "TRANSFER_ITEM_TYPE_SEND_FUNDS_IN" => Some(Self::SendFundsIn),
+            "TRANSFER_ITEM_TYPE_SEND_FUNDS" => Some(Self::SendFunds),
             _ => None,
         }
     }
@@ -3591,6 +3609,106 @@ pub struct GetSubaccountPortfolioHistoryResponse {
     #[prost(message, repeated, tag = "1")]
     pub data: ::prost::alloc::vec::Vec<PortfolioSnapshot>,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetOlpInfoRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetOlpInfoResponse {
+    #[prost(string, tag = "1")]
+    pub addr: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub asset: ::core::option::Option<OlpAsset>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OlpAsset {
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub icon: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub addr: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetOlpStatsRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetOlpStatsResponse {
+    #[prost(string, tag = "1")]
+    pub tvl_usdc: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub apy: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub supply: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetOlpPositionRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetOlpPositionResponse {
+    #[prost(string, tag = "1")]
+    pub current_shares: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub value_usdc: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub total_deposited: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub total_withdrawn: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetOlpTransfersRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetOlpTransfersResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub transfers: ::prost::alloc::vec::Vec<OlpTransfer>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OlpTransfer {
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(string, tag = "2")]
+    pub r#type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub amount_usdc: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub share_delta: ::prost::alloc::string::String,
+    #[prost(string, tag = "5")]
+    pub share_price: ::prost::alloc::string::String,
+    #[prost(string, tag = "6")]
+    pub status: ::prost::alloc::string::String,
+    #[prost(string, tag = "7")]
+    pub tx_hash: ::prost::alloc::string::String,
+    #[prost(string, tag = "8")]
+    pub created_at: ::prost::alloc::string::String,
+    #[prost(uint64, tag = "9")]
+    pub resolved_at: u64,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct GetOlpValuationsRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetOlpValuationsResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub valuations: ::prost::alloc::vec::Vec<OlpValuation>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct OlpValuation {
+    #[prost(string, tag = "1")]
+    pub nav_usdc: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub total_shares: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub share_price: ::prost::alloc::string::String,
+    #[prost(string, tag = "4")]
+    pub timestamp: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RequestOlpWithdrawRequest {
+    #[prost(string, tag = "1")]
+    pub share_amount: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RequestOlpWithdrawResponse {
+    #[prost(int64, tag = "1")]
+    pub transfer_id: i64,
+    #[prost(string, tag = "2")]
+    pub status: ::prost::alloc::string::String,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetVaultPortfolioRequest {
     /// Vault address.
@@ -3704,7 +3822,8 @@ pub struct GetVaultOrderHistoryRequest {
     /// Filter by order statuses.
     #[prost(enumeration = "OrderStatus", repeated, tag = "6")]
     pub statuses: ::prost::alloc::vec::Vec<i32>,
-    /// Sort order (created_at, -created_at, updated_at, -updated_at).
+    /// Sort order. Accepts API field names or DB column names:
+    /// crt_ts/created_at, upd_ts/updated_at. Prefix with "-" for descending.
     #[prost(string, tag = "7")]
     pub sorted_by: ::prost::alloc::string::String,
     /// Filter by client order IDs.
@@ -4005,7 +4124,7 @@ pub struct GetVaultPositionHistoryRequest {
     /// Maximum results (default: 100, max: 1000).
     #[prost(int64, tag = "5")]
     pub lmt: i64,
-    /// Sort order (updated_at, -updated_at).
+    /// Sort order. Accepts upd_ts/updated_at. Prefix with "-" for descending.
     #[prost(string, tag = "6")]
     pub sorted_by: ::prost::alloc::string::String,
 }
@@ -4127,7 +4246,7 @@ pub struct CreateApiKeyRequest {
     #[prost(bool, tag = "2")]
     pub is_ro: bool,
     /// Exact client IPs allowed to use this key (max 10, IPv4 only). Empty means
-    /// any IP is allowed.
+    /// any IP is allowed. Use GET /client to see the exact IP the server observes.
     #[prost(string, repeated, tag = "3")]
     pub ip_whitelist: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
