@@ -37,6 +37,9 @@ ignore = [
     # of the alloy-sol-macro proc-macros (compile-time only, not shipped).
     # Revisit when the alloy macro stack drops it.
     "RUSTSEC-2024-0436",
+    # proc-macro-error2 is unmaintained (compile-time only). Transitive of
+    # alloy-sol-macro via alloy. No safe upgrade available upstream.
+    "RUSTSEC-2026-0173",
 ]
 
 [bans]
