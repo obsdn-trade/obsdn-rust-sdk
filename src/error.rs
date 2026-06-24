@@ -2,8 +2,9 @@
 //!
 //! `Error` is the top-level result type. `Api` wraps the JSON envelope the
 //! grpc-gateway emits on non-2xx:
-//! `{"error":{"code":"...","message":"..."},"request_id":"..."}` - `code`
-//! is the gRPC status string (e.g., `"InvalidArgument"`, `"Unauthenticated"`).
+//! `{"error":{"code":"...","message":"...","ref":"..."},"request_id":"..."}` -
+//! `code` is the gRPC status string (e.g., `"InvalidArgument"`), `ref` is the
+//! structured error code (e.g., `"E0101_InvalidArgument"`).
 
 use thiserror::Error;
 
@@ -22,7 +23,7 @@ pub enum Error {
     Transport(#[from] reqwest::Error),
 
     /// Server returned non-2xx with a parsed error envelope.
-    #[error("api error {status} {code}: {message}")]
+    #[error("api error {status} {code}: {message}{}", ref_code.as_deref().map(|r| format!(" [ref: {r}]")).unwrap_or_default())]
     Api {
         /// HTTP status code.
         status: u16,
@@ -30,6 +31,8 @@ pub enum Error {
         code: String,
         /// Human-readable message from the server.
         message: String,
+        /// Structured error ref code (e.g., `"E0101_InvalidArgument"`), if any.
+        ref_code: Option<String>,
         /// Server-assigned request id (echoed via `X-Request-Id`), if any.
         request_id: Option<String>,
     },
@@ -81,4 +84,6 @@ pub(crate) struct WireError {
 pub(crate) struct WireErrorDetail {
     pub code: String,
     pub message: String,
+    #[serde(default, rename = "ref")]
+    pub ref_code: Option<String>,
 }

@@ -267,6 +267,7 @@ fn decode_error(status: StatusCode, body: Bytes) -> Error {
             status: status.as_u16(),
             code: parsed.error.code,
             message: parsed.error.message,
+            ref_code: parsed.error.ref_code,
             request_id: parsed.request_id,
         };
     }

@@ -161,6 +161,7 @@ async fn server_error_envelope_decodes_to_api_error() {
         "error": {
             "code": "InvalidArgument",
             "message": "market not found",
+            "ref": "E0101_InvalidArgument",
         },
         "request_id": "req-bad",
     });
@@ -181,12 +182,50 @@ async fn server_error_envelope_decodes_to_api_error() {
             status,
             code,
             message,
+            ref_code,
             request_id,
         } => {
             assert_eq!(status, 400);
             assert_eq!(code, "InvalidArgument");
             assert_eq!(message, "market not found");
+            assert_eq!(ref_code.as_deref(), Some("E0101_InvalidArgument"));
             assert_eq!(request_id.as_deref(), Some("req-bad"));
+        }
+        other => panic!("expected Error::Api, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn error_without_ref_field_decodes_ref_code_as_none() {
+    let server = MockServer::start().await;
+
+    let body = serde_json::json!({
+        "error": {
+            "code": "NotFound",
+            "message": "order not found",
+        },
+        "request_id": "req-old",
+    });
+    Mock::given(method("GET"))
+        .and(path("/markets"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(&body))
+        .mount(&server)
+        .await;
+
+    let client = build_client(&server);
+    let err = client
+        .markets()
+        .list()
+        .await
+        .expect_err("must surface server error");
+    match err {
+        Error::Api {
+            ref_code,
+            request_id,
+            ..
+        } => {
+            assert_eq!(ref_code, None);
+            assert_eq!(request_id.as_deref(), Some("req-old"));
         }
         other => panic!("expected Error::Api, got {other:?}"),
     }
