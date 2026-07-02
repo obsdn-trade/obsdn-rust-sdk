@@ -104,14 +104,15 @@ async fn staging_ws_wildcard_trade_routes() {
         .expect("subscribe all-markets trade");
     match first_data(&mut s, 20).await {
         Some(u) => {
-            let t = u.as_trade().expect("trade decodes");
+            let trades = u.as_trades().expect("trades decode");
             assert!(
                 !u.filter.is_empty(),
                 "trade frame must carry a concrete market filter"
             );
+            assert!(!trades.is_empty(), "trade array must not be empty");
             eprintln!(
                 "OK: wildcard trade routed live: {} px={}",
-                u.filter, t.price
+                u.filter, trades[0].price
             );
         }
         None => eprintln!("NOTE: no trade activity in 20s window; wildcard routing not exercised"),

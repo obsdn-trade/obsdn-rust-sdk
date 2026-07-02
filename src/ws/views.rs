@@ -86,10 +86,10 @@ pub struct Oracle {
     pub index_price_ts: String,
 }
 
-/// Public trade execution (`trade` channel - update only, no snapshot).
+/// Public trade execution (`trade` channel).
 ///
-/// Note: trade timestamp is at the frame level - use `Update.ts`, not a
-/// field in this struct.
+/// Both snapshot and update payloads are JSON arrays of trades.
+/// Per-trade timestamp in `ts` field; envelope timestamp in `Update.ts`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Trade {
     /// Unique trade id.
@@ -106,6 +106,9 @@ pub struct Trade {
     /// Trade size in quote asset as decimal string.
     #[serde(rename = "quote_sz")]
     pub quote_size: String,
+    /// Trade timestamp in nanoseconds.
+    #[serde(default)]
+    pub ts: Option<String>,
 }
 
 /// User position frame (`position` channel).
@@ -435,8 +438,8 @@ impl Update {
         parse_view(self, ChannelName::Oracle)
     }
 
-    /// Decode `data` as a [`Trade`].
-    pub fn as_trade(&self) -> Result<Trade> {
+    /// Decode `data` as a list of [`Trade`].
+    pub fn as_trades(&self) -> Result<Vec<Trade>> {
         parse_view(self, ChannelName::Trade)
     }
 

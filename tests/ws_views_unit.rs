@@ -168,17 +168,26 @@ fn book_ticker_oracle_trade_decode() {
     assert_eq!(o.mark_price_ts, "1");
     assert_eq!(o.index_price_ts, "2");
 
-    let tr = upd(
+    let trades = upd(
         ChannelName::Trade,
-        json!({"id": "t1", "mkr_sd": "ORDER_SIDE_BUY", "px": "100", "sz": "0.5", "quote_sz": "50"}),
+        json!([
+            {"id": "t1", "mkr_sd": "ORDER_SIDE_BUY", "px": "100", "sz": "0.5", "quote_sz": "50", "ts": "123"},
+            {"id": "t2", "mkr_sd": "ORDER_SIDE_SELL", "px": "99", "sz": "1", "quote_sz": "99"}
+        ]),
     )
-    .as_trade()
-    .expect("trade");
-    assert_eq!(tr.id, "t1");
-    assert_eq!(tr.maker_side, "ORDER_SIDE_BUY");
-    assert_eq!(tr.price, "100");
-    assert_eq!(tr.size, "0.5");
-    assert_eq!(tr.quote_size, "50");
+    .as_trades()
+    .expect("trades");
+    assert_eq!(trades.len(), 2);
+    assert_eq!(trades[0].id, "t1");
+    assert_eq!(trades[0].maker_side, "ORDER_SIDE_BUY");
+    assert_eq!(trades[0].price, "100");
+    assert_eq!(trades[0].size, "0.5");
+    assert_eq!(trades[0].quote_size, "50");
+    assert_eq!(trades[0].ts, Some("123".into()));
+    assert_eq!(trades[1].ts, None);
+
+    let empty = upd(ChannelName::Trade, json!([])).as_trades().expect("empty trades");
+    assert!(empty.is_empty());
 }
 
 #[test]
